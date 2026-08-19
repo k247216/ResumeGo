@@ -6,6 +6,7 @@ export default defineConfig(({ mode }) => {
   const apiTarget = env.VITE_API_TARGET || 'http://localhost:12345'
 
   return {
+    base: './',
     plugins: [vue()],
     server: {
       port: 5173,

@@ -1,0 +1,30 @@
+server:
+  address: 127.0.0.1
+  port: ${SERVER_PORT:12345}
+
+spring:
+  datasource:
+    url: jdbc:h2:file:${RESUMEGO_DB_PATH:./data/resumego};MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration-h2
+    baseline-on-migrate: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+logging:
+  level:
+    com.resumego: info
+
+resumego:
+  security:
+    workspace-token: ${LOCAL_WORKSPACE_TOKEN:resumego-local-workspace}
+    internal-token: ${RESUMEGO_INTERNAL_TOKEN:}

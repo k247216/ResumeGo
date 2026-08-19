@@ -6,9 +6,7 @@ ResumeGo 面向正在准备实习、校招或初级岗位的求职者。它围�
 
 ## 当前状态
 
-项目正在从 Web 原型重置为可长期维护的个人桌面产品。现有 Vue 与 Spring Boot 功能作为能力草本保留，但产品结构、交互、数据可信度和桌面运行方式将逐步重做。
-
-当前代码仍是 Web 架构，尚不能作为无需配置的桌面应用交付。真实状态和主要问题见 [当前基线](docs/baseline.md)。
+项目正在从 Web 原型重置为可长期维护的个人桌面产品。当前已经具备 Electron 最小桌面链路：应用可启动内置 Java 运行时与 H2 文件工作区，并在设置页安全配置常见模型服务。安装签名、图标、Windows 实机验证和正式发布流程仍未完成。
 
 ## 产品原则
 
@@ -23,9 +21,9 @@ ResumeGo 面向正在准备实习、校招或初级岗位的求职者。它围�
 
 - 前端：Vue 3、TypeScript、Vite、Element Plus
 - 后端：Java 21、Spring Boot、MyBatis-Plus、Flyway
-- 当前数据库：MySQL
-- 目标桌面容器：Electron
-- 目标本地存储：H2 文件数据库
+- 服务端兼容数据库：MySQL
+- 桌面容器：Electron
+- 桌面本地存储：H2 文件数据库
 
 桌面化采用渐进式迁移：优先复用现有 Vue 和 Spring Boot 能力，再逐步处理本地存储、进程管理、系统集成、安装包和更新。
 
@@ -57,3 +55,13 @@ mvn test
 ```
 
 本仓库仍处于产品重置阶段。公开发布前需要完成桌面打包、隐私检查、数据迁移和安装包验证。
+
+桌面开发启动与当前平台未签名开发包：
+
+```bash
+cd frontend
+npm run desktop:start
+npm run desktop:pack
+```
+
+`desktop:pack` 会构建当前操作系统对应的精简 Java 运行时。macOS 与 Windows 包需分别在对应系统构建；详细说明见 [桌面开发与打包](docs/operations/desktop-development.md)。

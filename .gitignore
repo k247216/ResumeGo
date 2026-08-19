@@ -11,6 +11,8 @@
 node_modules/
 dist/
 coverage/
+electron-dist/
+runtime/
 
 # Backend
 target/
@@ -18,4 +20,5 @@ target/
 
 # Local generated artifacts
 outputs/
+/output/
 .superpowers/

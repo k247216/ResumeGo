@@ -1,67 +1,50 @@
 package com.resumego.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.DisplayName;
+import com.resumego.ai.runtime.AiRuntimeRegistry;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * AiClientSelector 单元测试。
- */
 class AiClientSelectorTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("无 API Key 时返回 MockAiClient")
-    void shouldReturnMockClientWhenNoApiKey() {
-        AiConfig config = new AiConfig();
-        config.setEndpoint("https://api.example.com");
-        config.setModel("test-model");
-        config.setApiKey(""); // 无 API Key
+    void returnsNotConfiguredInsteadOfDisguisedMockOutput() {
+        AiConfig config = config("");
+        AiRuntimeRegistry registry = new AiRuntimeRegistry(objectMapper);
+        AiClientSelector selector = new AiClientSelector(config, objectMapper, registry);
 
-        AiClientSelector selector = new AiClientSelector(config, objectMapper);
+        AiResult result = selector.invoke(request());
 
-        assertThat(selector.getClient()).isInstanceOf(MockAiClient.class);
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorCategory()).isEqualTo(AiErrorCategory.NOT_CONFIGURED);
+        assertThat(selector.getClient()).isSameAs(selector);
     }
 
     @Test
-    @DisplayName("有 API Key 时返回 QwenMaxProvider")
-    void shouldReturnQwenMaxProviderWhenApiKeyPresent() {
-        AiConfig config = new AiConfig();
-        config.setEndpoint("https://api.example.com");
-        config.setModel("test-model");
-        config.setApiKey("sk-real-api-key");
+    void loadsLegacyEnvironmentConfigurationIntoRuntimeRegistry() {
+        AiConfig config = config("sk-legacy");
+        AiRuntimeRegistry registry = new AiRuntimeRegistry(objectMapper);
 
-        AiClientSelector selector = new AiClientSelector(config, objectMapper);
+        new AiClientSelector(config, objectMapper, registry);
 
-        assertThat(selector.getClient()).isInstanceOf(QwenMaxProvider.class);
+        assertThat(registry.activeRuntime()).isNotNull();
+        assertThat(registry.activeRuntime().protocolType()).isEqualTo("openai-compatible");
+        assertThat(registry.activeRuntime().model()).isEqualTo("test-model");
     }
 
-    @Test
-    @DisplayName("空白字符串 API Key 应视为无 Key")
-    void shouldTreatBlankApiKeyAsMissing() {
+    private AiConfig config(String apiKey) {
         AiConfig config = new AiConfig();
-        config.setEndpoint("https://api.example.com");
+        config.setEndpoint("https://api.example.com/v1");
         config.setModel("test-model");
-        config.setApiKey("   ");
-
-        AiClientSelector selector = new AiClientSelector(config, objectMapper);
-
-        assertThat(selector.getClient()).isInstanceOf(MockAiClient.class);
+        config.setApiKey(apiKey);
+        return config;
     }
 
-    @Test
-    @DisplayName("getClient 多次调用返回同一实例")
-    void shouldReturnSameInstanceOnMultipleCalls() {
-        AiConfig config = new AiConfig();
-        config.setEndpoint("https://api.example.com");
-        config.setModel("test-model");
-        config.setApiKey("");
-
-        AiClientSelector selector = new AiClientSelector(config, objectMapper);
-
-        assertThat(selector.getClient()).isSameAs(selector.getClient());
+    private AiRequest request() {
+        return AiRequest.builder().requestId("request-1").featureType("test")
+                .systemPrompt("system").userMessage("user").build();
     }
 }

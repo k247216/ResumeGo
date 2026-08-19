@@ -7,57 +7,15 @@
 
     <!-- ========== 面试大厅（未选中活跃会话时显示） ========== -->
     <template v-if="!activeSessionId">
-      <section class="interview-lobby-hero">
-        <div class="lobby-hero-copy">
-          <p class="section-kicker">{{ fromTarget ? 'Target Practice' : 'Interview Practice' }}</p>
-          <h1>{{ fromTarget ? '用当前目标验证这版简历' : '把这版简历放进一次完整多轮面试里验证' }}</h1>
-          <p>
-            {{ fromTarget
-              ? '岗位和简历版本已经由求职目标锁定。你只需选择本轮面试官与考察重点，面试记录会留在这组真实材料下。'
-              : '绑定简历版本与目标岗位，选择多位面试官依次追问；过程、评分与复盘都会沉淀为下一版简历的优化依据。' }}
-          </p>
-          <div class="lobby-hero-actions">
-            <button class="interview-start-button" type="button" @click="focusCreatePanel">
-              新建模拟面试
-              <el-icon><ArrowRight /></el-icon>
-            </button>
-            <button
-              class="lobby-ghost-button"
-              type="button"
-              :disabled="growthLoading"
-              @click="loadGrowthData"
-            >
-              <el-icon v-if="growthLoading" class="is-loading"><Loading /></el-icon>
-              <el-icon v-else><Trophy /></el-icon>
-              查看成长趋势
-            </button>
-          </div>
-        </div>
-        <div class="lobby-hero-panel">
-          <div class="lobby-orbit">
-            <span>简历</span>
-            <span>岗位</span>
-            <span>面试</span>
-            <div class="zhida-brand-mark" aria-label="职达">
-              <img :src="zhidaInterviewBrand" alt="职达 AI 简历求职助手" />
-            </div>
-          </div>
-          <div class="lobby-stat-grid">
-            <div>
-              <span>面试档案</span>
-              <strong>{{ visibleInterviewRecords.length }}</strong>
-            </div>
-            <div>
-              <span>完成复盘</span>
-              <strong>{{ completedSessionCount }}</strong>
-            </div>
-            <div>
-              <span>待继续</span>
-              <strong>{{ inProgressSessionCount }}</strong>
-            </div>
-          </div>
-        </div>
-      </section>
+      <InterviewLobbyHero
+        :from-target="fromTarget"
+        :record-count="visibleInterviewRecords.length"
+        :completed-count="completedSessionCount"
+        :in-progress-count="inProgressSessionCount"
+        :growth-loading="growthLoading"
+        @create="focusCreatePanel"
+        @view-growth="loadGrowthData"
+      />
 
       <el-alert
         v-if="errorMessage"
@@ -285,108 +243,15 @@
           </div>
         </section>
 
-        <aside class="lobby-side">
-          <section class="recent-interview-card">
-            <div class="recent-card-head">
-              <span>Quick Access</span>
-              <strong>最近面试</strong>
-            </div>
-            <div v-if="recentInterviewRecords.length" class="recent-record-list">
-              <article
-                v-for="record in recentInterviewRecords"
-                :key="record.id"
-                class="recent-record"
-                @click="openInterviewRecord(record)"
-              >
-                <div>
-                  <strong>{{ record.title }}</strong>
-                  <span>{{ record.completedCount }}/{{ record.totalCount }} 轮 · {{ record.resumeLabel }}</span>
-                </div>
-                <button type="button">{{ record.isCompleted ? '查看' : '继续' }}</button>
-              </article>
-            </div>
-            <p v-else class="recent-empty">创建一次面试后，这里会出现快捷入口。</p>
-          </section>
-
-          <!-- 历史会话列表 -->
-          <section class="history-sessions-section side-history-section">
-            <div class="history-head">
-              <div>
-                <p class="section-kicker">History</p>
-                <h2>面试记录</h2>
-                <p>以一次面试计划为单位管理历史。</p>
-              </div>
-            </div>
-
-            <div v-if="visibleInterviewRecords.length > 0" class="history-filter-tabs">
-              <button
-                v-for="tab in historyFilterTabs"
-                :key="tab.key"
-                class="filter-tab"
-                :class="{ active: historyFilter === tab.key }"
-                @click="historyFilter = tab.key"
-              >
-                {{ tab.label }} ({{ tab.count }})
-              </button>
-            </div>
-
-            <div v-if="visibleInterviewRecords.length === 0" class="history-empty-card">
-              <el-icon><VideoPlay /></el-icon>
-              <strong>还没有面试记录</strong>
-              <span>先从左侧创建一次面试。</span>
-            </div>
-
-            <div v-else class="history-record-grid">
-              <div
-                v-for="record in filteredInterviewRecords"
-                :key="record.id"
-                class="history-record-card"
-              >
-                <div class="history-card-top">
-                  <span class="hsc-status" :class="recordStatusClass(record)">
-                    {{ recordStatusText(record) }}
-                  </span>
-                </div>
-                <div class="hsc-main" @click="openInterviewRecord(record)">
-                  <CompanyAvatar v-if="record.job" class="hsc-company-avatar" :job="record.job" size="md" />
-                  <div v-else class="hsc-avatar">{{ record.latestSession.personaName?.charAt(0) || '面' }}</div>
-                  <div class="hsc-info">
-                    <span class="hsc-name">{{ record.title }}</span>
-                    <span class="hsc-title">{{ record.resumeLabel }} · {{ record.subtitle }}</span>
-                  </div>
-                </div>
-                <div class="hsc-progress-line">
-                  <span>轮次进度</span>
-                  <strong>{{ record.completedCount }}/{{ record.totalCount }} 轮</strong>
-                </div>
-                <div class="record-round-list">
-                  <span
-                    v-for="(session, index) in record.sessions"
-                    :key="session.sessionId"
-                    :class="roundStatusClass(session)"
-                  >
-                    {{ index + 1 }}. {{ session.personaName || '面试官' }}
-                  </span>
-                </div>
-                <el-progress
-                  :percentage="recordProgress(record)"
-                  :show-text="false"
-                  :stroke-width="6"
-                  :color="record.isCompleted ? '#10b981' : '#101a33'"
-                />
-                <div class="record-actions">
-                  <button class="hsc-open-button" type="button" @click="openInterviewRecord(record)">
-                    {{ record.isCompleted ? '查看复盘' : '继续面试' }}
-                    <el-icon><ArrowRight /></el-icon>
-                  </button>
-                  <button class="hsc-delete-button" type="button" @click.stop="deleteInterviewRecord(record)">
-                    <el-icon><Delete /></el-icon>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-        </aside>
+        <InterviewHistoryPanel
+          v-model:active-filter="historyFilter"
+          :records="visibleInterviewRecords"
+          :filtered-records="filteredInterviewRecords"
+          :recent-records="recentInterviewRecords"
+          :filter-tabs="historyFilterTabs"
+          @open="openInterviewRecord"
+          @delete="deleteInterviewRecord"
+        />
       </div>
     </template>
 
@@ -564,157 +429,26 @@
       </template>
     </el-dialog>
 
-    <!-- ========== 单次多轮面试复盘弹窗 ========== -->
-    <el-dialog
+    <InterviewPlanReviewDialog
       v-model="showPlanReviewDialog"
-      title="整次面试复盘"
-      width="780px"
-      class="plan-review-dialog"
-      :close-on-click-modal="false"
-    >
-      <div v-if="activePlanReviewSummary" class="plan-review-dialog-content">
-        <div class="plan-review-dialog-hero">
-          <div>
-            <span class="chat-plan-kicker">Interview Review</span>
-            <h3>{{ activePlanReviewSummary.plan.jobLabel }}</h3>
-            <p>{{ activePlanReviewSummary.plan.resumeLabel }} · {{ activePlanReviewSummary.completedRounds }}/{{ activePlanReviewSummary.totalRounds }} 轮已完成</p>
-          </div>
-          <div v-if="activePlanReviewSummary.overall" class="plan-review-dialog-score">
-            <strong>{{ activePlanReviewSummary.overall.displayAverage }}</strong>
-            <span>/10</span>
-          </div>
-        </div>
-
-        <div v-if="activePlanReviewSummary.overall" class="plan-review-dialog-metrics">
-          <div
-            v-for="dim in activePlanReviewSummary.overall.dimensions"
-            :key="dim.key"
-            class="plan-review-dialog-metric"
-          >
-            <span>{{ dim.label }}</span>
-            <strong>{{ dim.value.toFixed(1) }}</strong>
-            <div><i :style="{ width: `${dim.value * 10}%`, background: dim.color }"></i></div>
-          </div>
-        </div>
-
-        <div class="round-review-grid dialog-round-review-grid">
-          <article
-            v-for="round in activePlanReviewSummary.rounds"
-            :key="round.sessionId"
-            class="round-review-card"
-            :class="{ completed: round.completed }"
-          >
-            <span>第 {{ round.order }} 轮</span>
-            <strong>{{ round.personaName }}</strong>
-            <small>{{ round.personaTitle }}</small>
-            <div v-if="round.summary" class="round-review-score">
-              <b>{{ round.summary.displayAverage }}</b>
-              <em>/10</em>
-              <p>薄弱点：{{ round.summary.weakest.label }}</p>
-            </div>
-            <p v-else class="round-review-pending">{{ round.completed ? '评分加载中' : '待完成' }}</p>
-          </article>
-        </div>
-
-        <div v-if="activePlanReviewSummary.cachedSummary" class="plan-review-ai-summary">
-          <h4>整次总结</h4>
-          <p>{{ activePlanReviewSummary.cachedSummary.overallSummary }}</p>
-          <div class="plan-review-list" v-if="activePlanReviewSummary.cachedSummary.crossStrengths.length">
-            <span>稳定优势</span>
-            <ul>
-              <li v-for="item in activePlanReviewSummary.cachedSummary.crossStrengths" :key="item">{{ item }}</li>
-            </ul>
-          </div>
-          <div class="plan-review-list" v-if="activePlanReviewSummary.cachedSummary.crossWeaknesses.length">
-            <span>共性薄弱点</span>
-            <ul>
-              <li v-for="item in activePlanReviewSummary.cachedSummary.crossWeaknesses" :key="item">{{ item }}</li>
-            </ul>
-          </div>
-          <div class="plan-review-list" v-if="activePlanReviewSummary.cachedSummary.suggestions.length">
-            <span>训练方向</span>
-            <ul>
-              <li v-for="item in activePlanReviewSummary.cachedSummary.suggestions" :key="item">{{ item }}</li>
-            </ul>
-          </div>
-        </div>
-        <div v-else class="plan-review-empty-summary">
-          <el-icon><Trophy /></el-icon>
-          <strong>整次总结正在准备中</strong>
-          <span>完成全部面试官后，可以生成跨轮次复盘。</span>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showPlanReviewDialog = false">关闭</el-button>
-      </template>
-    </el-dialog>
+      :summary="activePlanReviewSummary"
+    />
 
     <!-- ========== 聊天界面（有活跃会话时显示） ========== -->
     <section v-if="activeSession" class="interview-chat-layout">
-      <!-- 窄侧边栏 -->
-      <aside class="chat-sidebar">
-        <button
-          class="sidebar-back-btn"
-          type="button"
-          @click="backToPersona"
-          title="返回面试大厅"
-        >
-          <el-icon><ArrowLeft /></el-icon>
-        </button>
-
-        <div class="sidebar-persona-card">
-          <div class="sidebar-persona-avatar" :class="'avatar-' + (activeSessionPersona?.avatar || 'general')">
-            {{ activeSession?.personaName?.charAt(0) || '面' }}
-          </div>
-          <span>当前面试官</span>
-          <strong>{{ activeSession?.personaName || '面试官' }}</strong>
-          <small>{{ activeSession?.personaTitle || '模拟面试官' }}</small>
-          <p>{{ activePersonaStyle }}</p>
-        </div>
-
-        <!-- 活跃会话的题目进度 -->
-        <div class="sidebar-question-card">
-          <span>{{ activeSession.completed ? '本轮已完成' : '当前题目' }}</span>
-          <strong>{{ activeSession.completed ? '完成' : `第 ${activeSession.currentQuestionIndex} 题` }}</strong>
-          <small>{{ activeSession.currentQuestionIndex }} / {{ activeSession.totalQuestions }}</small>
-        </div>
-        <div class="sidebar-dots">
-          <span
-            v-for="step in (activeSession?.totalQuestions || 3)"
-            :key="step"
-            class="sidebar-dot"
-            :class="{
-              active: !activeSession.completed && step === activeSession.currentQuestionIndex && activeState.viewingHistoryIndex === null,
-              completed: isQuestionStepCompleted(step),
-              viewing: step === activeState.viewingHistoryIndex
-            }"
-            :title="isQuestionStepCompleted(step) ? '第' + step + '题已完成' : ''"
-          >
-            {{ step }}
-          </span>
-        </div>
-        <div v-if="activeInterviewPlan && activePlanSessions.length > 1" class="sidebar-round-card">
-          <span>{{ activeReviewMode ? '复盘轮次' : '本次轮次' }}</span>
-          <button
-            v-for="(session, index) in activePlanSessions"
-            :key="session.sessionId"
-            type="button"
-            class="round-switch-button"
-            :class="{
-              active: session.sessionId === activeSessionId,
-              completed: sessionCompleted(session),
-              failed: sessionFailed(session),
-              cancelled: sessionCancelled(session),
-            }"
-            :disabled="actionLoading"
-            @click="switchToSession(session.sessionId)"
-          >
-            <i>{{ index + 1 }}</i>
-            <strong>{{ session.personaName || '面试官' }}</strong>
-            <small>{{ roundStatusText(session) }}</small>
-          </button>
-        </div>
-      </aside>
+      <InterviewRoomSidebar
+        :active-session="activeSession"
+        :active-persona="activeSessionPersona"
+        :active-persona-style="activePersonaStyle"
+        :plan-sessions="activePlanSessions"
+        :active-session-id="activeSession.sessionId"
+        :completed-question-steps="completedQuestionSteps"
+        :viewing-history-index="activeState.viewingHistoryIndex"
+        :review-mode="activeReviewMode"
+        :action-loading="actionLoading"
+        @back="backToPersona"
+        @switch-session="switchToSession"
+      />
 
       <!-- 聊天框 -->
       <div class="chat-main">
@@ -1029,23 +763,23 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft,
   ArrowRight,
   CircleCheck,
   Close,
-  Delete,
   Loading,
   Microphone,
   Plus,
   RefreshRight,
   Trophy,
-  VideoPlay,
   Warning,
 } from '@element-plus/icons-vue'
 import { listJobDescriptions, resolveCompanyProfile } from '../api/job'
-import zhidaInterviewBrand from '../assets/zhida-interview-brand.png'
 import CompanyAvatar from '../components/CompanyAvatar.vue'
 import CompanyProfileSignal from '../components/CompanyProfileSignal.vue'
+import InterviewHistoryPanel from '../components/interview/InterviewHistoryPanel.vue'
+import InterviewLobbyHero from '../components/interview/InterviewLobbyHero.vue'
+import InterviewPlanReviewDialog from '../components/interview/InterviewPlanReviewDialog.vue'
+import InterviewRoomSidebar from '../components/interview/InterviewRoomSidebar.vue'
 import {
   createInterviewPlan,
   deleteInterviewPlan,
@@ -1072,9 +806,6 @@ import type {
   InterviewerPersona,
   InterviewStatusResponse,
   MultiSessionSummaryResponse,
-  PerQuestionScore,
-  ScoreDetail,
-  SessionHistoryItem,
 } from '../types/interview'
 import type { Resume, ResumeVersion } from '../types/resume'
 import {
@@ -1085,6 +816,20 @@ import {
 } from '../utils/workspaceContext'
 import { buildResumeEditorLocation } from '../utils/editorRoute'
 import { filterTargetInterviewRecords } from '../utils/interviewContext'
+import {
+  buildInterviewRecords,
+  interviewRoundStatus,
+  type InterviewPlanContext,
+  type InterviewRecord,
+} from '../utils/interviewRecords'
+import {
+  questionEvaluationAverage,
+  questionEvaluationCopy,
+  summarizeQuestionScores,
+  trainingHintForDimension,
+  type ScoreSummary,
+} from '../utils/interviewReview'
+import { useInterviewSessions } from '../composables/useInterviewSessions'
 
 interface ChatMessage {
   role: 'interviewer' | 'user' | 'sending' | 'evaluation' | 'summary'
@@ -1093,65 +838,13 @@ interface ChatMessage {
   evaluation?: EvaluationSummary | null
 }
 
-interface SessionState {
-  history: SessionHistoryItem[]
-  answerDraft: string
-  pendingAnswer: string
-  retryable: boolean
-  lastSubmitAnswer: string
-  perQuestionScores: PerQuestionScore[]
-  viewingHistoryIndex: number | null
-}
-
-interface LocalInterviewPlan {
-  planId: string
-  sessionId: number
-  resumeVersionId: number
-  resumeLabel: string
-  jobDescriptionId: number
-  jobLabel: string
-  personaIds: number[]
-  personaNames: string[]
-  currentPersonaIndex: number
+interface LocalInterviewPlan extends InterviewPlanContext {
   questionCount: number
   focusTags: string[]
   supplement: string
   summary: MultiSessionSummaryResponse | null
   summaryGeneratedAt?: string | null
   createdAt: string
-}
-
-interface InterviewRecord {
-  id: string
-  title: string
-  subtitle: string
-  sessions: InterviewStatusResponse[]
-  latestSession: InterviewStatusResponse
-  job: JobDescription | null
-  resumeLabel: string
-  completedCount: number
-  totalCount: number
-  isCompleted: boolean
-  isInProgress: boolean
-  jobDescriptionId: number | null
-  resumeVersionId: number | null
-}
-
-type ScoreDimensionKey = keyof GrowthDimensions
-
-interface ScoreDimensionSummary {
-  key: ScoreDimensionKey
-  label: string
-  value: number
-  color: string
-}
-
-interface ScoreSummary {
-  average: number
-  displayAverage: string
-  dimensions: ScoreDimensionSummary[]
-  strongest: ScoreDimensionSummary
-  weakest: ScoreDimensionSummary
 }
 
 interface RoundReviewSummary {
@@ -1162,18 +855,6 @@ interface RoundReviewSummary {
   completed: boolean
   questionCount: number
   summary: ScoreSummary | null
-}
-
-function createSessionState(): SessionState {
-  return {
-    history: [],
-    answerDraft: '',
-    pendingAnswer: '',
-    retryable: false,
-    lastSubmitAnswer: '',
-    perQuestionScores: [],
-    viewingHistoryIndex: null,
-  }
 }
 
 const route = useRoute()
@@ -1252,9 +933,17 @@ const filteredInterviewRecords = computed(() => {
 })
 
 // 多会话状态
-const sessions = ref<InterviewStatusResponse[]>([])
-const activeSessionId = ref<number | null>(null)
-const sessionStates = ref<Record<number, SessionState>>({})
+const {
+  sessions,
+  activeSessionId,
+  sessionStates,
+  activeSession,
+  activeState,
+  getOrCreateSessionState,
+  updateSession: updateSessionInList,
+  upsertSession,
+  removeSessionState,
+} = useInterviewSessions()
 const localInterviewPlans = ref<Record<number, LocalInterviewPlan>>({})
 const persistedInterviewPlans = ref<InterviewPlanResponse[]>([])
 
@@ -1271,67 +960,16 @@ let recognitionSessionId: number | null = null
 
 // ── 计算属性 ──
 
-const activeSession = computed(() =>
-  sessions.value.find((s) => s.sessionId === activeSessionId.value) ?? null,
-)
-
 const visibleSessions = computed(() =>
   sessions.value.filter((session) => !deletedSessionIds.value.has(session.sessionId)),
 )
 
-const interviewRecords = computed<InterviewRecord[]>(() => {
-  const grouped = new Map<string, InterviewStatusResponse[]>()
-
-  for (const session of visibleSessions.value) {
-    const plan = localInterviewPlans.value[session.sessionId]
-    if (plan?.planId) {
-      // 有 planId 的会话：按 planId 分组（一次计划包含多位面试官 → 一条档案）
-      const existing = grouped.get(plan.planId) ?? []
-      grouped.set(plan.planId, [...existing, session])
-    } else {
-      // 无 planId 的旧会话：各自作为独立档案（一条会话 → 一条档案）
-      grouped.set('legacy_' + session.sessionId, [session])
-    }
-  }
-
-  return [...grouped.entries()]
-    .map(([id, groupSessions]) => {
-      const sortedSessions = [...groupSessions].sort(comparePlanSessionOrder)
-      const latestSession = sortedSessions[sortedSessions.length - 1] ?? sortedSessions[0]
-      const plan = sortedSessions
-        .map((session) => localInterviewPlans.value[session.sessionId])
-        .find(Boolean)
-      const completedSessionIds = sortedSessions
-        .filter((session) => sessionCompleted(session))
-        .map((session) => session.sessionId)
-      const completedCount = completedSessionIds.length
-      const totalCount = Math.max(plan?.personaIds.length ?? sortedSessions.length, sortedSessions.length)
-      const title = plan?.jobLabel ?? '本次多轮面试'
-      const job = plan?.jobDescriptionId
-        ? jobs.value.find((item) => item.id === plan.jobDescriptionId) ?? null
-        : null
-      const resumeLabel = plan?.resumeLabel ?? '未知简历版本'
-      const personaSummary = plan?.personaNames.join(' / ')
-        ?? sortedSessions.map((session) => session.personaName || '面试官').join(' / ')
-
-      return {
-        id,
-        title,
-        subtitle: personaSummary,
-        sessions: sortedSessions,
-        latestSession,
-        job,
-        resumeLabel,
-        completedCount,
-        totalCount,
-        isCompleted: totalCount > 0 && completedCount >= totalCount,
-        isInProgress: completedCount < totalCount || sortedSessions.some((session) => !sessionCompleted(session)),
-        jobDescriptionId: plan?.jobDescriptionId ?? null,
-        resumeVersionId: plan?.resumeVersionId ?? null,
-      }
-    })
-    .sort((a, b) => b.latestSession.sessionId - a.latestSession.sessionId)
-})
+const interviewRecords = computed<InterviewRecord[]>(() => buildInterviewRecords({
+  sessions: visibleSessions.value,
+  plansBySessionId: localInterviewPlans.value,
+  jobs: jobs.value,
+  deletedSessionIds: deletedSessionIds.value,
+}))
 
 const visibleInterviewRecords = computed(() => fromTarget.value
   ? filterTargetInterviewRecords(interviewRecords.value, selectedJobId.value, selectedVersionId.value)
@@ -1383,10 +1021,10 @@ const canReturnToWorkspace = computed(() => {
   if (!activeInterviewPlan.value) return sessionCompleted(activeSession.value)
   return activePlanFinished.value
 })
-const activeState = computed<SessionState>(() => {
-  if (!activeSessionId.value) return createSessionState()
-  return sessionStates.value[activeSessionId.value] ?? createSessionState()
-})
+const completedQuestionSteps = computed(() => Array.from(
+  { length: activeSession.value?.totalQuestions ?? 0 },
+  (_, index) => index + 1,
+).filter(isQuestionStepCompleted))
 
 const activeSessionPersona = computed(() => {
   if (!activeSession.value?.personaName) return null
@@ -1562,105 +1200,8 @@ function scoresForSession(sessionId: number) {
   return sessions.value.find((session) => session.sessionId === sessionId)?.perQuestionScores ?? []
 }
 
-function summarizeQuestionScores(scores: PerQuestionScore[]): ScoreSummary | null {
-  if (!scores.length) return null
-  const totals = scores.reduce(
-    (acc, item) => {
-      acc.clarity += Number(item.clarity || 0)
-      acc.relevance += Number(item.relevance || 0)
-      acc.depth += Number(item.depth || 0)
-      acc.accuracy += Number(item.accuracy || 0)
-      return acc
-    },
-    { clarity: 0, relevance: 0, depth: 0, accuracy: 0 },
-  )
-  const dimensions = dimNames.map((item) => {
-    const key = item.key as ScoreDimensionKey
-    return {
-      key,
-      label: item.label,
-      value: roundToOneDecimal(totals[key] / scores.length),
-      color: item.color,
-    }
-  })
-  const sorted = [...dimensions].sort((a, b) => a.value - b.value)
-  const average = roundToOneDecimal(dimensions.reduce((sum, item) => sum + item.value, 0) / dimensions.length)
-  return {
-    average,
-    displayAverage: average.toFixed(1),
-    dimensions,
-    strongest: sorted[sorted.length - 1],
-    weakest: sorted[0],
-  }
-}
-
-function roundToOneDecimal(value: number) {
-  return Math.round(value * 10) / 10
-}
-
-function questionEvaluationAverage(score: ScoreDetail) {
-  return roundToOneDecimal((score.clarity + score.relevance + score.depth + score.accuracy) / 4).toFixed(1)
-}
-
-function questionEvaluationCopy(score: ScoreDetail) {
-  const dimensions = dimNames.map((item) => {
-    const key = item.key as ScoreDimensionKey
-    return { label: item.label, value: score[key] }
-  })
-  const weakest = [...dimensions].sort((a, b) => a.value - b.value)[0]
-  return `当前最需要加强：${weakest.label}`
-}
-
-function trainingHintForDimension(key: ScoreDimensionKey) {
-  const hints: Record<ScoreDimensionKey, string> = {
-    clarity: '建议练习“背景—动作—结果”三段式表达，把回答控制在 60-90 秒内。',
-    relevance: '建议先复述岗位关键词，再把项目经历对齐到岗位要求，避免泛泛介绍。',
-    depth: '建议补充技术取舍、故障定位、边界条件和复盘，减少只讲功能实现。',
-    accuracy: '建议核实技术名词、指标和个人职责，避免模糊或夸大的表述。',
-  }
-  return hints[key]
-}
-
 function sessionCompleted(s: InterviewStatusResponse) {
-  return s.completed === true && s.status === 'COMPLETED'
-}
-
-function sessionFailed(s: InterviewStatusResponse) {
-  return s.status === 'FAILED'
-}
-
-function sessionCancelled(s: InterviewStatusResponse) {
-  return s.status === 'CANCELLED'
-}
-
-function roundStatusText(s: InterviewStatusResponse) {
-  if (sessionCompleted(s)) return '已完成'
-  if (sessionFailed(s)) return '异常中断'
-  if (sessionCancelled(s)) return '已取消'
-  return '进行中'
-}
-
-function roundStatusClass(s: InterviewStatusResponse) {
-  return {
-    completed: sessionCompleted(s),
-    failed: sessionFailed(s),
-    cancelled: sessionCancelled(s),
-  }
-}
-
-function recordStatusText(record: InterviewRecord) {
-  if (record.isCompleted) return '已完成'
-  if (record.sessions.some(sessionFailed)) return '异常中断'
-  if (record.sessions.some(sessionCancelled)) return '已取消'
-  return '进行中'
-}
-
-function recordStatusClass(record: InterviewRecord) {
-  return {
-    completed: record.isCompleted,
-    failed: record.sessions.some(sessionFailed),
-    cancelled: !record.sessions.some(sessionFailed) && record.sessions.some(sessionCancelled),
-  }
+  return interviewRoundStatus(s) === 'completed'
 }
 
 function comparePlanSessionOrder(a: InterviewStatusResponse, b: InterviewStatusResponse) {
@@ -1674,11 +1215,6 @@ function isQuestionStepCompleted(step: number) {
   if (!activeSession.value) return false
   if (activeSession.value.completed && step <= activeSession.value.totalQuestions) return true
   return activeState.value.history.some((h) => h.questionIndex === step)
-}
-
-function recordProgress(record: InterviewRecord) {
-  if (record.totalCount <= 0) return 0
-  return Math.min(100, Math.max(0, Math.round((record.completedCount / record.totalCount) * 100)))
 }
 
 async function openInterviewRecord(record: InterviewRecord) {
@@ -1744,7 +1280,7 @@ async function deleteInterviewRecord(record: InterviewRecord) {
   deleteIds.forEach((sessionId) => {
     nextDeleted.add(sessionId)
     delete localInterviewPlans.value[sessionId]
-    delete sessionStates.value[sessionId]
+    removeSessionState(sessionId)
   })
   deletedSessionIds.value = nextDeleted
   persistDeletedSessionIds()
@@ -1819,29 +1355,6 @@ function movePersonaInPlan(personaId: number, direction: -1 | 1) {
   next.splice(nextIndex, 0, item)
   selectedPersonaIds.value = next
   syncPrimaryPersona()
-}
-
-function getOrCreateSessionState(sessionId: number): SessionState {
-  if (!sessionStates.value[sessionId]) {
-    sessionStates.value[sessionId] = createSessionState()
-  }
-  return sessionStates.value[sessionId]
-}
-
-function updateSessionInList(sessionId: number, partial: Partial<InterviewStatusResponse>) {
-  const idx = sessions.value.findIndex((s) => s.sessionId === sessionId)
-  if (idx >= 0) {
-    sessions.value[idx] = { ...sessions.value[idx], ...partial }
-  }
-}
-
-function upsertSession(session: InterviewStatusResponse) {
-  const idx = sessions.value.findIndex((s) => s.sessionId === session.sessionId)
-  if (idx >= 0) {
-    sessions.value[idx] = { ...sessions.value[idx], ...session }
-  } else {
-    sessions.value = [session, ...sessions.value]
-  }
 }
 
 function buildStatusFromPlanRound(round: InterviewPlanRound): InterviewStatusResponse {

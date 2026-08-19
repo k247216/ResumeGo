@@ -1,13 +1,22 @@
 {
-  "name": "frontend",
+  "name": "resumego",
   "private": true,
   "version": "0.0.0",
+  "description": "本地优先的简历优化与面试准备工作台",
+  "author": "ResumeGo contributors",
   "type": "module",
+  "main": "electron-dist/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run --environment happy-dom"
+    "test": "vitest run --environment happy-dom",
+    "build:backend": "cd ../backend && mvn -DskipTests package",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:runtime": "node scripts/build-runtime.mjs",
+    "desktop:prepare": "npm run build:backend && npm run build && npm run build:electron",
+    "desktop:start": "npm run desktop:prepare && electron .",
+    "desktop:pack": "npm run desktop:prepare && npm run build:runtime && electron-builder --dir"
   },
   "dependencies": {
     "axios": "^1.18.1",
@@ -23,10 +32,44 @@
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.11",
     "@vue/tsconfig": "^0.9.1",
+    "electron": "^37.10.3",
+    "electron-builder": "^26.15.3",
     "happy-dom": "^20.11.2",
     "typescript": "~6.0.2",
     "vite": "^8.1.1",
     "vitest": "^4.1.11",
     "vue-tsc": "^3.3.5"
+  },
+  "build": {
+    "appId": "com.resumego.desktop",
+    "productName": "ResumeGo",
+    "asar": true,
+    "directories": {
+      "output": "../output/desktop"
+    },
+    "files": [
+      "electron-dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "frontend"
+      },
+      {
+        "from": "../backend/target/resume-go-0.0.1-SNAPSHOT.jar",
+        "to": "backend/resume-go.jar"
+      },
+      {
+        "from": "runtime",
+        "to": "runtime"
+      }
+    ],
+    "mac": {
+      "target": "dir"
+    },
+    "win": {
+      "target": "portable"
+    }
   }
 }

@@ -324,3 +324,16 @@ Mark RG-003 complete when first-run, target creation, and async failure tests ex
 git add docs/roadmap.md docs/superpowers/plans/2026-08-19-workbench-shell-phase-a.md
 git commit -m "docs(roadmap): close workbench phase a"
 ```
+
+### Completion note: target-scoped interview decomposition
+
+RG-004 后续收束已于 2026-08-19 完成：
+
+- 面试记录分组、状态与进度计算迁移到 `frontend/src/utils/interviewRecords.ts`；
+- 面试评分与训练提示迁移到 `frontend/src/utils/interviewReview.ts`；
+- 多会话编辑状态迁移到 `frontend/src/composables/useInterviewSessions.ts`；
+- 大厅头部、历史面板、进行中侧栏和整次复盘弹窗迁移到 `frontend/src/components/interview/`；
+- 前端完整回归为 28 个测试文件、71 条测试通过；
+- 后端完整回归为 421 条测试通过、1 条跳过。
+
+视觉细化与进一步拆分不阻塞 RG-005，后续只在实际维护需求出现时继续，避免为了文件行数进行无目标重构。

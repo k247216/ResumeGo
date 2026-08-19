@@ -5,6 +5,24 @@ package com.resumego.ai;
  */
 public enum AiErrorCategory {
 
+    /** 用户尚未配置可用模型 */
+    NOT_CONFIGURED,
+
+    /** API Key 无效 */
+    AUTHENTICATION,
+
+    /** API Key 有效但无权访问当前资源 */
+    PERMISSION,
+
+    /** 请求频率或额度受限 */
+    RATE_LIMIT,
+
+    /** 网络连接失败 */
+    NETWORK,
+
+    /** Provider 响应缺少预期结构 */
+    INVALID_RESPONSE,
+
     /** 请求超时 */
     TIMEOUT,
 

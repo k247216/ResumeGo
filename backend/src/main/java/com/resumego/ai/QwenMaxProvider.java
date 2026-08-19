@@ -10,7 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.Map;
 
@@ -26,14 +25,21 @@ public class QwenMaxProvider implements AiClient {
     private final RestClient restClient;
 
     public QwenMaxProvider(AiConfig aiConfig, ObjectMapper objectMapper) {
+        this(aiConfig, objectMapper, createRestClient(aiConfig));
+    }
+
+    QwenMaxProvider(AiConfig aiConfig, ObjectMapper objectMapper, RestClient restClient) {
         this.aiConfig = aiConfig;
         this.objectMapper = objectMapper;
+        this.restClient = restClient;
+    }
 
+    private static RestClient createRestClient(AiConfig aiConfig) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(10));
         factory.setReadTimeout(Duration.ofSeconds(60));
 
-        this.restClient = RestClient.builder()
+        return RestClient.builder()
                 .baseUrl(aiConfig.getEndpoint())
                 .defaultHeader("Authorization", "Bearer " + aiConfig.getApiKey())
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
@@ -59,7 +65,7 @@ public class QwenMaxProvider implements AiClient {
                     .body(body)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        throw new RuntimeException("Provider error: " + res.getStatusCode());
+                        throw new ProviderHttpException(res.getStatusCode().value());
                     })
                     .body(String.class);
 
@@ -69,17 +75,16 @@ public class QwenMaxProvider implements AiClient {
             Integer inputTokens = extractPromptTokens(responseBody);
             Integer outputTokens = extractCompletionTokens(responseBody);
 
-            log.info("千问 Max 调用完成: requestId={}, model={}, latencyMs={}",
+            log.info("OpenAI 兼容模型调用完成: requestId={}, model={}, latencyMs={}",
                     request.requestId(), aiConfig.getModel(), latencyMs);
 
             return AiResult.success(request.requestId(), content, inputTokens, outputTokens, latencyMs);
 
         } catch (Exception e) {
-            long latencyMs = System.currentTimeMillis() - start;
-            AiErrorCategory category = categorizeError(e);
-            log.error("千问 Max 调用失败: requestId={}, category={}, message={}",
-                    request.requestId(), category, e.getMessage());
-            return AiResult.failure(request.requestId(), category, e.getMessage(), latencyMs);
+            AiResult failure = ProviderSupport.failure(request.requestId(), e, start);
+            log.warn("OpenAI 兼容模型调用失败: requestId={}, category={}",
+                    request.requestId(), failure.errorCategory());
+            return failure;
         }
     }
 
@@ -100,9 +105,9 @@ public class QwenMaxProvider implements AiClient {
                 }
             }
         } catch (JsonProcessingException e) {
-            log.warn("解析 AI 响应 content 失败，返回原始响应体", e);
+            throw new IllegalStateException("Provider 返回格式无效", e);
         }
-        return responseBody;
+        throw new IllegalStateException("Provider 返回格式无效");
     }
 
     /**
@@ -143,14 +148,4 @@ public class QwenMaxProvider implements AiClient {
         return null;
     }
 
-    /**
-     * 将异常归类为 timeout / provider_error / unknown。
-     */
-    private AiErrorCategory categorizeError(Exception e) {
-        if (e instanceof SocketTimeoutException
-                || (e.getCause() instanceof SocketTimeoutException)) {
-            return AiErrorCategory.TIMEOUT;
-        }
-        return AiErrorCategory.PROVIDER_ERROR;
-    }
 }

@@ -1,5 +1,6 @@
 package com.resumego.ai;
 
+import com.resumego.ai.runtime.AiRuntimeRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,11 +18,11 @@ public class AiInvocationService {
     private static final Logger log = LoggerFactory.getLogger(AiInvocationService.class);
 
     private final AiInvocationMapper aiInvocationMapper;
-    private final AiConfig aiConfig;
+    private final AiRuntimeRegistry runtimeRegistry;
 
-    public AiInvocationService(AiInvocationMapper aiInvocationMapper, AiConfig aiConfig) {
+    public AiInvocationService(AiInvocationMapper aiInvocationMapper, AiRuntimeRegistry runtimeRegistry) {
         this.aiInvocationMapper = aiInvocationMapper;
-        this.aiConfig = aiConfig;
+        this.runtimeRegistry = runtimeRegistry;
     }
 
     /**
@@ -36,9 +37,7 @@ public class AiInvocationService {
         entity.setRequestId(request.requestId());
         entity.setUserId(request.userId());
         entity.setFeatureType(request.featureType());
-        entity.setProvider(aiConfig.getModel() != null && aiConfig.isApiKeyConfigured()
-                ? "qwen" : "mock");
-        entity.setModelName(aiConfig.isApiKeyConfigured() ? aiConfig.getModel() : "mock");
+        applyRuntimeMetadata(entity);
         entity.setPromptVersion(request.promptVersion());
         entity.setStatus(result.success() ? "success" : "failed");
         entity.setLatencyMs(result.latencyMs() > Integer.MAX_VALUE
@@ -69,8 +68,7 @@ public class AiInvocationService {
         entity.setRequestId(request.requestId());
         entity.setUserId(request.userId());
         entity.setFeatureType(request.featureType());
-        entity.setProvider(aiConfig.isApiKeyConfigured() ? "qwen" : "mock");
-        entity.setModelName(aiConfig.isApiKeyConfigured() ? aiConfig.getModel() : "mock");
+        applyRuntimeMetadata(entity);
         entity.setPromptVersion(request.promptVersion());
         entity.setStatus(result.success() ? "success" : "failed");
         entity.setLatencyMs(result.latencyMs() > Integer.MAX_VALUE
@@ -101,5 +99,11 @@ public class AiInvocationService {
             return null;
         }
         return text.length() <= maxLength ? text : text.substring(0, maxLength);
+    }
+
+    private void applyRuntimeMetadata(AiInvocation entity) {
+        AiRuntimeRegistry.ActiveRuntime runtime = runtimeRegistry.activeRuntime();
+        entity.setProvider(runtime == null ? "not_configured" : runtime.protocolType());
+        entity.setModelName(runtime == null ? "none" : runtime.model());
     }
 }
