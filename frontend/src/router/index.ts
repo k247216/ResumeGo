@@ -27,7 +27,7 @@ const router = createRouter({
     {
       path: '/evidences',
       name: 'evidences',
-      component: () => import('../views/EvidenceView.vue'),
+      component: () => import('../views/evidence/EvidenceLibraryView.vue'),
     },
     {
       path: '/interview',
