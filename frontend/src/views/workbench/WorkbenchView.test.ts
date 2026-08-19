@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getResumeVersion: vi.fn(),
   createJob: vi.fn(),
   getJob: vi.fn(),
+  routerPush: vi.fn(),
+  routeQuery: {} as Record<string, string>,
 }))
 
 const targetStore = reactive({
@@ -25,6 +27,10 @@ const targetStore = reactive({
 vi.mock('../../api/resume', () => ({ listResumes: mocks.listResumes, getResumeVersion: mocks.getResumeVersion }))
 vi.mock('../../api/job', () => ({ createJobDescription: mocks.createJob, getJobDescription: mocks.getJob }))
 vi.mock('../../stores/targets', () => ({ useTargetsStore: () => targetStore }))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: mocks.routeQuery }),
+  useRouter: () => ({ push: mocks.routerPush }),
+}))
 
 describe('WorkbenchView', () => {
   beforeEach(() => {
@@ -33,6 +39,7 @@ describe('WorkbenchView', () => {
     targetStore.loading = false
     targetStore.errorMessage = ''
     vi.clearAllMocks()
+    mocks.routeQuery = {}
     targetStore.load.mockResolvedValue(undefined)
     mocks.listResumes.mockResolvedValue({ success: true, data: [] })
     targetStore.updateLinks.mockResolvedValue(undefined)
@@ -87,6 +94,23 @@ describe('WorkbenchView', () => {
     const wrapper = mount(WorkbenchView, { global: { stubs: ['RouterLink'] } })
     await flushPromises()
     expect(wrapper.get('[data-test="target-dashboard"]').text()).toContain('2 条已引用')
+  })
+
+  it('opens interview preparation with the active target context', async () => {
+    const target = { id: 3, name: '完整目标', status: 'active', jobDescriptionId: 6, resumeVersionId: 21 }
+    targetStore.targets = [target]
+    targetStore.activeTarget = target
+    mocks.getJob.mockResolvedValue({ success: true, data: { id: 6, jobTitle: '后端实习', rawText: '岗位描述内容足够长并用于组件测试。', parseStatus: 'pending', createdAt: '', updatedAt: '' } })
+    mocks.getResumeVersion.mockResolvedValue({ success: true, data: { id: 21, resumeId: 8, versionNo: 4, createdByType: 'user', createdAt: '', content: { projects: [] } } })
+    const wrapper = mount(WorkbenchView, { global: { stubs: ['RouterLink'] } })
+    await flushPromises()
+
+    await wrapper.get('[data-test="prepare-interview"]').trigger('click')
+
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      name: 'interview',
+      query: { from: 'target', targetId: '3', versionId: '21', jobId: '6' },
+    })
   })
 
   it('keeps target context and form content visible when saving a job fails', async () => {

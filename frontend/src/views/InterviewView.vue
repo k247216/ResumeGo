@@ -1,7 +1,7 @@
 <template>
   <div class="interview-page">
-    <div v-if="fromEditor" class="workspace-return-bar">
-      <button type="button" :disabled="!canReturnToWorkspace" @click="returnToEditor">← 返回当前简历工作台</button>
+    <div v-if="fromWorkspace" class="workspace-return-bar">
+      <button type="button" :disabled="!canReturnToWorkspace" @click="returnToEditor">← {{ workspaceReturnLabel }}</button>
       <span>{{ canReturnToWorkspace ? '模拟面试将作为当前简历的改进输入' : '请先完成本次多轮面试，再回到简历工作台' }}</span>
     </div>
 
@@ -1059,7 +1059,7 @@ import {
   submitInterviewAnswer,
   getInterviewGrowthReport,
 } from '../api/interview'
-import { getResumeVersions, listResumes } from '../api/resume'
+import { getResumeVersion, getResumeVersions, listResumes } from '../api/resume'
 import type { CompanyProfile, JobDescription } from '../types/job'
 import type {
   EvaluationSummary,
@@ -1081,6 +1081,7 @@ import {
   markReturnToEditor,
   setWorkspaceSelectedJobId,
 } from '../utils/workspaceContext'
+import { buildResumeEditorLocation } from '../utils/editorRoute'
 
 interface ChatMessage {
   role: 'interviewer' | 'user' | 'sending' | 'evaluation' | 'summary'
@@ -1173,6 +1174,10 @@ function createSessionState(): SessionState {
 const route = useRoute()
 const router = useRouter()
 const fromEditor = computed(() => route.query.from === 'editor')
+const fromTarget = computed(() => route.query.from === 'target')
+const fromWorkspace = computed(() => fromEditor.value || fromTarget.value)
+const targetId = computed(() => positiveQueryId(route.query.targetId))
+const workspaceReturnLabel = computed(() => fromTarget.value ? '返回求职目标工作台' : '返回当前简历工作台')
 const loadingOptions = ref(false)
 const actionLoading = ref(false)
 const activeReviewMode = ref(false)
@@ -1418,7 +1423,7 @@ const companyProfileTags = computed(() => [
   ...(selectedCompanyProfile.value?.interviewFocus ?? []),
 ].filter(Boolean))
 const hasCompanyProfile = computed(() => Boolean(selectedCompanyProfile.value?.companyName && companyProfileTags.value.length))
-const workspaceContextLocked = computed(() => fromEditor.value && Boolean(selectedVersionId.value && selectedJobId.value))
+const workspaceContextLocked = computed(() => fromWorkspace.value && Boolean(selectedVersionId.value && selectedJobId.value))
 const completedSessionCount = computed(() => interviewRecords.value.filter((r) => r.isCompleted).length)
 const inProgressSessionCount = computed(() => interviewRecords.value.filter((r) => !r.isCompleted).length)
 const startInterviewButtonLabel = computed(() => {
@@ -2015,7 +2020,11 @@ async function loadOptions() {
       const storedJobId = getWorkspaceSelectedJobId()
       const storedResumeId = getWorkspaceSelectedResumeId()
 
-      const targetResumeId = storedResumeId ?? resumes.value[0].id
+      let targetResumeId = storedResumeId ?? resumes.value[0].id
+      if (fromTarget.value && queryVersionId > 0) {
+        const targetVersionRes = await getResumeVersion(queryVersionId)
+        targetResumeId = targetVersionRes.data.resumeId
+      }
       const versionRes = await getResumeVersions(targetResumeId)
       versions.value = versionRes.data
       selectedVersionId.value = versions.value.find((item) => item.id === queryVersionId)?.id
@@ -2452,20 +2461,16 @@ function goToOptimization() {
     ElMessage.info('请先完成本次多轮面试，再回到简历优化。')
     return
   }
-  if (fromEditor.value) {
+  if (fromWorkspace.value) {
     returnToEditor()
     return
   }
   if (selectedVersionId.value && selectedJobId.value) {
     setWorkspaceSelectedJobId(selectedJobId.value)
-    router.push({
-      name: 'resume-assessment',
-      params: { versionId: selectedVersionId.value },
-      query: { jobId: selectedJobId.value },
-    })
+    router.push(buildResumeEditorLocation({ versionId: selectedVersionId.value }))
     return
   }
-  router.push({ name: 'home' })
+  router.push({ name: 'workbench' })
 }
 
 function returnToEditor() {
@@ -2473,11 +2478,21 @@ function returnToEditor() {
     ElMessage.info('请先完成本次多轮面试，再回到简历工作台。')
     return
   }
+  if (fromTarget.value) {
+    router.push({ name: 'workbench', query: targetId.value ? { targetId: String(targetId.value) } : {} })
+    return
+  }
   markReturnToEditor()
-  router.push({ name: 'home', query: { editor: '1' } })
+  router.push(buildResumeEditorLocation({ versionId: selectedVersionId.value }))
 }
 
 // ── 工具函数 ──
+
+function positiveQueryId(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  const id = Number(raw)
+  return Number.isSafeInteger(id) && id > 0 ? id : null
+}
 
 function parseTextList(value: unknown, fallback: string[]) {
   if (Array.isArray(value)) return value.map(String).filter(Boolean)

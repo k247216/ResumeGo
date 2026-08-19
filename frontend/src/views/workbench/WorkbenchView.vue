@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { createJobDescription, getJobDescription } from '../../api/job'
 import { getResumeVersion, listResumes } from '../../api/resume'
 import TargetCreateDialog from '../../components/targets/TargetCreateDialog.vue'
@@ -64,9 +64,11 @@ import type { CreateJobProjectRequest } from '../../types/project'
 import type { CreateJobDescriptionRequest, JobDescription } from '../../types/job'
 import type { Resume, ResumeVersion } from '../../types/resume'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
+import { buildTargetInterviewLocation } from '../../utils/interviewRoute'
 import { resolveWorkspaceLaunchState } from '../../utils/workspaceLaunchState'
 
 const targetsStore = useTargetsStore()
+const route = useRoute()
 const router = useRouter()
 const resumes = ref<Resume[]>([])
 const loading = ref(true)
@@ -95,6 +97,8 @@ async function loadWorkspace() {
   try {
     const [, resumeResponse] = await Promise.all([targetsStore.load(), listResumes()])
     resumes.value = resumeResponse.data
+    const requestedTargetId = Number(Array.isArray(route.query.targetId) ? route.query.targetId[0] : route.query.targetId)
+    if (Number.isSafeInteger(requestedTargetId) && requestedTargetId > 0) targetsStore.select(requestedTargetId)
     if (targetsStore.errorMessage) localError.value = targetsStore.errorMessage
     await loadActiveMaterials()
   } catch (error) {
@@ -155,7 +159,18 @@ function handleTargetAction(action: TargetDashboardAction) {
   targetMaterialError.value = ''
   if (action === 'add-job') { jobDialogOpen.value = true; return }
   if (action === 'select-resume') { resumeDialogOpen.value = true; return }
+  if (action === 'open-interview') { openTargetInterview(); return }
   openTargetEditor()
+}
+
+function openTargetInterview() {
+  const target = targetsStore.activeTarget
+  if (!target?.jobDescriptionId || !target.resumeVersionId) return
+  void router.push(buildTargetInterviewLocation({
+    targetId: target.id,
+    versionId: target.resumeVersionId,
+    jobId: target.jobDescriptionId,
+  }))
 }
 
 function openTargetEditor() {
@@ -193,6 +208,7 @@ async function selectTargetResume(versionId: number) {
   targetMaterialError.value = ''
   try {
     await targetsStore.updateLinks(target.id, { jobDescriptionId: target.jobDescriptionId, resumeVersionId: versionId })
+    await loadActiveMaterials()
     resumeDialogOpen.value = false
   } catch (error) {
     targetMaterialError.value = error instanceof Error ? error.message : '关联当前简历失败'
