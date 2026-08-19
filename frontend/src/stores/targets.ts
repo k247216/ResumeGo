@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { createProject, listProjects } from '../api/project'
-import type { CreateJobProjectRequest, JobProject } from '../types/project'
+import { createProject, listProjects, updateProjectLinks } from '../api/project'
+import type { CreateJobProjectRequest, JobProject, UpdateJobProjectLinksRequest } from '../types/project'
 
 const activeTargetStorageKey = 'resumego:activeTargetId'
 
@@ -57,6 +57,18 @@ export const useTargetsStore = defineStore('targets', () => {
     }
   }
 
+  async function updateLinks(id: number, payload: UpdateJobProjectLinksRequest) {
+    errorMessage.value = ''
+    try {
+      const response = await updateProjectLinks(id, payload)
+      targets.value = targets.value.map((target) => target.id === id ? response.data : target)
+      return response.data
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '更新求职目标材料失败'
+      throw error
+    }
+  }
+
   function setActiveTargetId(id: number | null) {
     activeTargetId.value = id
     if (id === null) {
@@ -76,6 +88,7 @@ export const useTargetsStore = defineStore('targets', () => {
     retry,
     select,
     create,
+    updateLinks,
   }
 })
 

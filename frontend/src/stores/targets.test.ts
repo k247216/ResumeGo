@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { createProject, listProjects } from '../api/project'
+import { createProject, listProjects, updateProjectLinks } from '../api/project'
 import type { JobProject } from '../types/project'
 import { useTargetsStore } from './targets'
 
 vi.mock('../api/project', () => ({
   listProjects: vi.fn(),
   createProject: vi.fn(),
+  updateProjectLinks: vi.fn(),
 }))
 
 const project = (id: number, status: JobProject['status'] = 'active'): JobProject => ({
@@ -66,5 +67,19 @@ describe('useTargetsStore', () => {
 
     expect(store.targets).toHaveLength(1)
     expect(store.errorMessage).toBe('本地服务暂时不可用')
+  })
+
+  it('updates target material links without reloading the target list', async () => {
+    const existing = project(5)
+    const updated = { ...existing, jobDescriptionId: 12, resumeVersionId: 18 }
+    vi.mocked(listProjects).mockResolvedValue({ success: true, data: [existing] })
+    vi.mocked(updateProjectLinks).mockResolvedValue({ success: true, data: updated })
+    const store = useTargetsStore()
+    await store.load()
+
+    await store.updateLinks(5, { jobDescriptionId: 12, resumeVersionId: 18 })
+
+    expect(store.activeTarget).toEqual(updated)
+    expect(updateProjectLinks).toHaveBeenCalledWith(5, { jobDescriptionId: 12, resumeVersionId: 18 })
   })
 })

@@ -5,6 +5,8 @@ import WorkbenchView from './WorkbenchView.vue'
 
 const mocks = vi.hoisted(() => ({
   listResumes: vi.fn(),
+  createJob: vi.fn(),
+  getJob: vi.fn(),
 }))
 
 const targetStore = reactive({
@@ -16,9 +18,11 @@ const targetStore = reactive({
   retry: vi.fn(),
   select: vi.fn(),
   create: vi.fn(),
+  updateLinks: vi.fn(),
 })
 
 vi.mock('../../api/resume', () => ({ listResumes: mocks.listResumes }))
+vi.mock('../../api/job', () => ({ createJobDescription: mocks.createJob, getJobDescription: mocks.getJob }))
 vi.mock('../../stores/targets', () => ({ useTargetsStore: () => targetStore }))
 
 describe('WorkbenchView', () => {
@@ -30,6 +34,7 @@ describe('WorkbenchView', () => {
     vi.clearAllMocks()
     targetStore.load.mockResolvedValue(undefined)
     mocks.listResumes.mockResolvedValue({ success: true, data: [] })
+    targetStore.updateLinks.mockResolvedValue(undefined)
   })
 
   it('shows first-run guidance when no local materials or targets exist', async () => {
@@ -56,7 +61,38 @@ describe('WorkbenchView', () => {
     await flushPromises()
     const dashboard = wrapper.get('[data-test="target-dashboard"]')
     expect(dashboard.text()).toContain('腾讯 · Java 后端实习')
-    expect(dashboard.text()).toContain('添加目标岗位')
+    expect(dashboard.text()).toContain('录入目标岗位')
+    await dashboard.get('[data-test="target-next-action"]').trigger('click')
+    expect(wrapper.get('[data-test="job-title"]')).toBeTruthy()
+  })
+
+  it('opens resume selection after target job information exists', async () => {
+    const target = { id: 3, name: '目标', status: 'active', jobDescriptionId: 6, resumeVersionId: null }
+    targetStore.targets = [target]
+    targetStore.activeTarget = target
+    mocks.getJob.mockResolvedValue({ success: true, data: { id: 6, jobTitle: '后端实习', rawText: '岗位描述内容足够长并用于组件测试。', parseStatus: 'pending', createdAt: '', updatedAt: '' } })
+    const wrapper = mount(WorkbenchView, { global: { stubs: ['RouterLink'] } })
+    await flushPromises()
+    await wrapper.get('[data-test="target-next-action"]').trigger('click')
+    expect(wrapper.text()).toContain('选择这个目标采用的简历版本')
+  })
+
+  it('keeps target context and form content visible when saving a job fails', async () => {
+    const target = { id: 3, name: '稳定保留的目标', status: 'active', jobDescriptionId: null, resumeVersionId: null }
+    targetStore.targets = [target]
+    targetStore.activeTarget = target
+    mocks.createJob.mockRejectedValue(new Error('岗位保存失败'))
+    const wrapper = mount(WorkbenchView, { global: { stubs: ['RouterLink'] } })
+    await flushPromises()
+    await wrapper.get('[data-test="target-next-action"]').trigger('click')
+    await wrapper.get('[data-test="job-title"]').setValue('后端实习')
+    await wrapper.get('[data-test="job-raw-text"]').setValue('这是一段长度超过二十个字符且需要在失败后保留的岗位描述内容。')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="target-dashboard"]').text()).toContain('稳定保留的目标')
+    expect(wrapper.text()).toContain('岗位保存失败')
+    expect((wrapper.get('[data-test="job-raw-text"]').element as HTMLTextAreaElement).value).toContain('失败后保留')
   })
 
   it('shows a retryable error instead of pretending the workspace is empty', async () => {
