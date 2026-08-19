@@ -5,7 +5,6 @@ import WorkbenchView from './WorkbenchView.vue'
 
 const mocks = vi.hoisted(() => ({
   listResumes: vi.fn(),
-  listJobs: vi.fn(),
 }))
 
 const targetStore = reactive({
@@ -20,7 +19,6 @@ const targetStore = reactive({
 })
 
 vi.mock('../../api/resume', () => ({ listResumes: mocks.listResumes }))
-vi.mock('../../api/job', () => ({ listJobDescriptions: mocks.listJobs }))
 vi.mock('../../stores/targets', () => ({ useTargetsStore: () => targetStore }))
 
 describe('WorkbenchView', () => {
@@ -32,7 +30,6 @@ describe('WorkbenchView', () => {
     vi.clearAllMocks()
     targetStore.load.mockResolvedValue(undefined)
     mocks.listResumes.mockResolvedValue({ success: true, data: [] })
-    mocks.listJobs.mockResolvedValue({ success: true, data: [] })
   })
 
   it('shows first-run guidance when no local materials or targets exist', async () => {

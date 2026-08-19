@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the feature-menu homepage with a desktop-style workbench that supports first-run, local-library, and active-target states, while keeping the existing resume editor available through an explicit route.
+**Goal:** Replace the feature-menu homepage with a desktop-style workbench that supports first-run, local-library, and active-target states, plus a focused resume editor that excludes retired product features.
 
-**Architecture:** A small Pinia target store owns target loading, selection, creation, and errors. A stable `DesktopShell` renders navigation and local-storage status around route views. `WorkbenchView` composes state-specific components and existing typed APIs; the legacy `HomeView` remains intact as the editor implementation and moves behind `/editor` until a later focused extraction.
+**Architecture:** A small Pinia target store owns target loading, selection, creation, and errors. A stable `DesktopShell` renders navigation and local-storage status around route views. `WorkbenchView` composes state-specific components and existing typed APIs. A new `ResumeEditorView` incrementally migrates only core editing capabilities from the legacy `HomeView`; the old mixed page remains as unreachable source until replacement is verified.
 
 **Tech Stack:** Vue 3.5, TypeScript 6, Vue Router 4, Pinia 3, Element Plus, Vitest 4, Vue Test Utils, Spring Boot APIs already implemented by RG-002.
 
@@ -16,7 +16,9 @@
 - Stage A does not implement Markdown persistence, H2, Electron, AI extraction, or visual-system redesign.
 - AI must not create facts, choose target state, or accept resume changes.
 - Loading failures render a retry state and never masquerade as an empty workspace.
-- Existing resume editing, versioning, assessment, and interview behavior must remain reachable.
+- Existing resume editing, versioning, templates, layout, preview, and export remain in scope.
+- Job library, job exploration, job recommendations, resume total score, assessment, and matching have no product routes or controls.
+- Existing scoring and matching source stays in the repository but is frozen and must not be called by the new workbench.
 - The current `main` branch remains buildable and tested after every task.
 
 ---
@@ -150,7 +152,7 @@ Expected: FAIL because `DesktopShell.vue` does not exist.
 <DesktopShell v-else><router-view /></DesktopShell>
 ```
 
-Map `/` to the new workbench, `/targets` to the target list, `/settings` to a local-mode settings summary, and `/editor` to the existing `HomeView.vue` with `meta: { immersive: true }`. The settings summary displays local storage and model-configuration status without adding Electron-only controls. Keep existing assessment, job-detail, and interview routes reachable during migration.
+Map `/` to the new workbench, `/targets` to the target list, `/settings` to a local-mode settings summary, and `/editor` to the new `ResumeEditorView.vue` with `meta: { immersive: true }`. The settings summary displays local storage and model-configuration status without adding Electron-only controls. Remove product routes for job library, job creation, job detail, assessment, score, recommendations, and matching; retain their source files for possible future reconsideration.
 
 - [ ] **Step 4: Verify GREEN and build**
 
@@ -182,11 +184,11 @@ git commit -m "feat(workbench): add desktop application shell"
 - Modify: `frontend/src/router/index.ts`
 
 **Interfaces:**
-- Consumes: target store, `listResumes()`, `listJobDescriptions()`, `resolveWorkspaceLaunchState()`.
+- Consumes: target store, `listResumes()`, `resolveWorkspaceLaunchState()`.
 - Produces: first-run actions `创建空白简历` and `添加目标岗位`; Markdown import remains absent until Phase B rather than presenting a dead control.
 - Produces: library state with resume cards and `针对岗位开始优化`.
 - Produces: target state with current target, linked job, linked resume version, deterministic next action, and `打开当前简历`.
-- Produces: target creation payload `{ name, jobDescriptionId, resumeVersionId }`, using only jobs and current resume versions already loaded for the local user.
+- Produces: target creation payload `{ name, resumeVersionId }`; target-specific job content is entered inside the target context rather than selected from a public job library.
 
 - [ ] **Step 1: Write failing workbench state tests**
 
@@ -204,7 +206,7 @@ Use one test per state; do not connect to Spring Boot.
 
 - [ ] **Step 2: Write failing target dialog tests**
 
-Assert blank names cannot submit; optional job and resume selections produce exactly one `create` event with numeric IDs; API failure text remains visible and the form contents are preserved.
+Assert blank names cannot submit; an optional resume selection produces exactly one `create` event with a numeric version ID; API failure text remains visible and the form contents are preserved.
 
 - [ ] **Step 3: Verify RED**
 
@@ -214,7 +216,7 @@ Expected: FAIL because the workbench components do not exist.
 
 - [ ] **Step 4: Implement the state components and orchestration**
 
-Load targets, resumes, and jobs in one orchestrator. Derive state only after all three settle. Keep each state component presentational; all retry and navigation events return to `WorkbenchView`.
+Load targets and resumes in one orchestrator. Derive state only after both settle. Keep each state component presentational; all retry and navigation events return to `WorkbenchView`.
 
 The target dashboard chooses its next action deterministically:
 
@@ -237,22 +239,26 @@ git add frontend/src/views/workbench frontend/src/views/targets frontend/src/com
 git commit -m "feat(workbench): add target-centered launch experience"
 ```
 
-### Task 5: Explicit editor route and context return
+### Task 5: Focused editor route and context return
 
 **Files:**
-- Modify: `frontend/src/views/HomeView.vue`
+- Create: `frontend/src/views/resumes/ResumeEditorView.vue`
+- Create: `frontend/src/views/resumes/ResumeEditorView.test.ts`
+- Create: `frontend/src/composables/useResumeEditor.ts`
+- Create: `frontend/src/composables/useResumeEditor.test.ts`
 - Modify: `frontend/src/views/workbench/WorkbenchView.vue`
+- Modify: `frontend/src/router/index.ts`
 - Create: `frontend/src/utils/editorRoute.ts`
 - Create: `frontend/src/utils/editorRoute.test.ts`
 
 **Interfaces:**
 - Produces: `buildResumeEditorLocation({ resumeId?, versionId?, targetId?, mode? })` returning route name `resume-editor` and validated positive query values; `mode` only accepts `blank`.
-- Consumes: `/editor?editor=1&resumeId=<id>&versionId=<id>&targetId=<id>`.
+- Consumes: `/editor?resumeId=<id>&versionId=<id>&targetId=<id>`.
 - Editor back action returns to `{ name: 'workbench', query: { targetId } }` after the existing unsaved-change guard succeeds.
 
 - [ ] **Step 1: Write failing route helper tests**
 
-Assert positive IDs are serialized, null or non-positive IDs are omitted, `mode: 'blank'` is serialized, unsupported modes are omitted, and `editor=1` is always present.
+Assert positive IDs are serialized, null or non-positive IDs are omitted, `mode: 'blank'` is serialized, and unsupported modes are omitted.
 
 - [ ] **Step 2: Verify RED**
 
@@ -262,13 +268,15 @@ Expected: FAIL because `editorRoute.ts` does not exist.
 
 - [ ] **Step 3: Implement route helper and replace workbench editor links**
 
-Use the helper for first-run blank creation, library resume cards, and the target dashboard current-resume action. Preserve existing `HomeView` loading and editor components.
+Use the helper for first-run blank creation, library resume cards, and the target dashboard current-resume action. `ResumeEditorView` may reuse focused editor components, but must not import or render `HomeView`.
 
-When `mode=blank`, `HomeView` must enter blank resume mode after API loading without requiring a target job. Saving continues to use the existing nullable `targetJobDescriptionId` contract.
+Migrate content editing, version save/history, undo/redo, template and layout controls, real-time preview, and PDF export behind a small editor composable. Do not migrate job library, exploration, recommendations, total score, assessment, matching, AI suggestions, or interview controls into this view.
+
+When `mode=blank`, `ResumeEditorView` enters blank resume mode without requiring a target job. Saving continues to use the existing nullable `targetJobDescriptionId` contract.
 
 - [ ] **Step 4: Update editor exit behavior**
 
-After the existing dirty-state guard, call `router.push({ name: 'workbench', query: targetId ? { targetId } : {} })` instead of returning to the legacy launch page. Do not change save/version logic.
+After the dirty-state guard, call `router.push({ name: 'workbench', query: targetId ? { targetId } : {} })`. Remove legacy product routes from the router while retaining their implementation files as unreachable source.
 
 - [ ] **Step 5: Verify targeted and full frontend checks**
 
@@ -279,8 +287,8 @@ Expected: all frontend tests pass and the production bundle builds.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add frontend/src/views/HomeView.vue frontend/src/views/workbench/WorkbenchView.vue frontend/src/utils/editorRoute.ts frontend/src/utils/editorRoute.test.ts
-git commit -m "refactor(editor): move editor behind explicit route"
+git add frontend/src/views/resumes frontend/src/composables/useResumeEditor.ts frontend/src/composables/useResumeEditor.test.ts frontend/src/views/workbench/WorkbenchView.vue frontend/src/router/index.ts frontend/src/utils/editorRoute.ts frontend/src/utils/editorRoute.test.ts
+git commit -m "refactor(editor): add focused resume workspace"
 ```
 
 ### Task 6: Phase A regression and roadmap closure
@@ -291,7 +299,7 @@ git commit -m "refactor(editor): move editor behind explicit route"
 
 **Interfaces:**
 - Records: RG-003 test infrastructure complete for launch, target creation, and async failure.
-- Records: RG-004 workbench shell and routing complete; deeper `HomeView` and `InterviewView` extraction remains a later refactor.
+- Records: RG-004 workbench shell and focused editor routing complete; legacy mixed-page source remains frozen and unreachable pending safe deletion.
 
 - [ ] **Step 1: Verify all acceptance paths**
 
