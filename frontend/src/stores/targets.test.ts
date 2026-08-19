@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { archiveProject, createProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
+import { archiveProject, createProject, deleteProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
 import type { JobProject } from '../types/project'
 import { useTargetsStore } from './targets'
 
@@ -11,6 +11,7 @@ vi.mock('../api/project', () => ({
   renameProject: vi.fn(),
   archiveProject: vi.fn(),
   restoreProject: vi.fn(),
+  deleteProject: vi.fn(),
 }))
 
 const project = (id: number, status: JobProject['status'] = 'active'): JobProject => ({
@@ -102,5 +103,17 @@ describe('useTargetsStore', () => {
     expect(store.targets.find((target) => target.id === 1)?.status).toBe('archived')
     await store.restore(1)
     expect(store.targets.find((target) => target.id === 1)?.status).toBe('active')
+  })
+
+  it('removes only the deleted target from local state and selects a fallback', async () => {
+    vi.mocked(listProjects).mockResolvedValue({ success: true, data: [project(1), project(2)] })
+    vi.mocked(deleteProject).mockResolvedValue({ success: true, data: null })
+    const store = useTargetsStore()
+    await store.load()
+
+    await store.remove(1)
+
+    expect(store.targets.map((target) => target.id)).toEqual([2])
+    expect(store.activeTarget?.id).toBe(2)
   })
 })

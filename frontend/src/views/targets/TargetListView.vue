@@ -18,10 +18,12 @@
           <button :data-test="`rename-target-${target.id}`" type="button" @click="beginRename(target.id, target.name)">重命名</button>
           <button v-if="target.status === 'active'" :data-test="`archive-target-${target.id}`" type="button" :disabled="busyId === target.id" @click="archiveTarget(target.id)">归档</button>
           <button v-else :data-test="`restore-target-${target.id}`" type="button" :disabled="busyId === target.id" @click="restoreTarget(target.id)">恢复</button>
+          <button class="danger" type="button" @click="openDelete(target)">删除</button>
         </div>
       </article>
     </div>
     <div v-else-if="!store.loading" class="empty">还没有求职目标。可从工作台创建第一个目标。</div>
+    <TargetDeleteDialog :open="Boolean(deleteTarget)" :target="deleteTarget" :submitting="deleting" :error-message="deleteError" @close="closeDelete" @confirm="confirmDelete" />
   </section>
 </template>
 
@@ -29,6 +31,8 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTargetsStore } from '../../stores/targets'
+import TargetDeleteDialog from '../../components/targets/TargetDeleteDialog.vue'
+import type { JobProject } from '../../types/project'
 
 const store = useTargetsStore()
 const router = useRouter()
@@ -36,6 +40,9 @@ const editingId = ref<number | null>(null)
 const editingName = ref('')
 const busyId = ref<number | null>(null)
 const operationError = ref('')
+const deleteTarget = ref<JobProject | null>(null)
+const deleting = ref(false)
+const deleteError = ref('')
 onMounted(() => { if (!store.targets.length) void store.load() })
 
 function selectTarget(id: number) { store.select(id); void router.push({ name: 'workbench' }) }
@@ -56,8 +63,17 @@ async function runTargetAction(id: number, action: () => Promise<unknown>, fallb
   try { await action() } catch (error) { operationError.value = error instanceof Error ? error.message : fallback }
   finally { busyId.value = null }
 }
+function openDelete(target: JobProject) { deleteTarget.value = target; deleteError.value = '' }
+function closeDelete() { if (!deleting.value) deleteTarget.value = null }
+async function confirmDelete() {
+  if (!deleteTarget.value) return
+  deleting.value = true; deleteError.value = ''
+  try { await store.remove(deleteTarget.value.id); deleteTarget.value = null }
+  catch (error) { deleteError.value = error instanceof Error ? error.message : '删除求职目标失败' }
+  finally { deleting.value = false }
+}
 </script>
 
 <style scoped>
-.target-list{padding:42px}.target-list header{display:flex;align-items:center;justify-content:space-between}.target-list p{color:#168866;font-weight:700}.target-list h1{margin:6px 0 24px}.target-list a{color:#168866}.targets{display:grid;gap:10px}.targets article{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #dfe5e9;border-radius:12px;background:#fff;padding:17px}.targets article.active{border-color:#5bb697}.target-copy{display:grid;gap:6px;min-width:220px}.target-copy input{border:1px solid #b9c9ce;border-radius:8px;padding:8px 10px}.targets small{color:#78858f}.target-actions,.inline-actions{display:flex;flex-wrap:wrap;gap:7px}.targets button,.error button{border:1px solid #d6dfe4;border-radius:8px;background:#fff;padding:8px 11px}.targets button:disabled{opacity:.55}.empty{border:1px dashed #ccd7dd;border-radius:12px;padding:28px;color:#74828c}.error{border:1px solid #efc7c2;border-radius:9px;background:#fff2f0!important;color:#b53c32!important;padding:9px 12px}
+.target-list{padding:42px}.target-list header{display:flex;align-items:center;justify-content:space-between}.target-list p{color:#168866;font-weight:700}.target-list h1{margin:6px 0 24px}.target-list a{color:#168866}.targets{display:grid;gap:10px}.targets article{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #dfe5e9;border-radius:12px;background:#fff;padding:17px}.targets article.active{border-color:#5bb697}.target-copy{display:grid;gap:6px;min-width:220px}.target-copy input{border:1px solid #b9c9ce;border-radius:8px;padding:8px 10px}.targets small{color:#78858f}.target-actions,.inline-actions{display:flex;flex-wrap:wrap;gap:7px}.targets button,.error button{border:1px solid #d6dfe4;border-radius:8px;background:#fff;padding:8px 11px}.targets button.danger{color:#a33d35}.targets button:disabled{opacity:.55}.empty{border:1px dashed #ccd7dd;border-radius:12px;padding:28px;color:#74828c}.error{border:1px solid #efc7c2;border-radius:9px;background:#fff2f0!important;color:#b53c32!important;padding:9px 12px}
 </style>

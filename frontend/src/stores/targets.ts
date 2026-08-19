@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { archiveProject, createProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
+import { archiveProject, createProject, deleteProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
 import type { CreateJobProjectRequest, JobProject, UpdateJobProjectLinksRequest } from '../types/project'
 
 const activeTargetStorageKey = 'resumego:activeTargetId'
@@ -84,6 +84,18 @@ export const useTargetsStore = defineStore('targets', () => {
     return mutateTarget(id, () => restoreProject(id), '恢复求职目标失败')
   }
 
+  async function remove(id: number) {
+    errorMessage.value = ''
+    try {
+      await deleteProject(id)
+      targets.value = targets.value.filter((target) => target.id !== id)
+      chooseValidTarget()
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '删除求职目标失败'
+      throw error
+    }
+  }
+
   async function mutateTarget(id: number, request: () => Promise<{ data: JobProject }>, fallback: string) {
     errorMessage.value = ''
     try {
@@ -119,6 +131,7 @@ export const useTargetsStore = defineStore('targets', () => {
     rename,
     archive,
     restore,
+    remove,
   }
 })
 
