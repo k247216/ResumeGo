@@ -42,6 +42,7 @@
     :error-message="targetMaterialError"
     @close="closeMaterialDialogs"
     @select="selectTargetResume"
+    @create-resume="createResumeForTarget"
   />
 </template>
 
@@ -184,6 +185,12 @@ async function selectTargetResume(versionId: number) {
   } catch (error) {
     targetMaterialError.value = error instanceof Error ? error.message : '关联当前简历失败'
   } finally { updatingTargetMaterials.value = false }
+}
+
+function createResumeForTarget() {
+  const targetId = targetsStore.activeTarget?.id
+  resumeDialogOpen.value = false
+  void router.push(buildResumeEditorLocation({ mode: 'blank', targetId }))
 }
 
 onMounted(loadWorkspace)

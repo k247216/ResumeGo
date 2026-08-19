@@ -23,7 +23,10 @@
       <strong>无法打开简历</strong><span>{{ editor.errorMessage.value }}</span>
     </div>
     <template v-else>
-      <p v-if="editor.errorMessage.value" class="inline-error">{{ editor.errorMessage.value }}</p>
+      <div v-if="editor.errorMessage.value || targetLinkError" class="inline-error">
+        <span>{{ targetLinkError || editor.errorMessage.value }}</span>
+        <button v-if="targetLinkError" type="button" @click="retryTargetLink">重新关联</button>
+      </div>
       <div class="editor-grid" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
         <EditorSidebar
           :sections="editor.sections.value"
@@ -85,6 +88,7 @@ import EditorSidebar from '../../components/editor/EditorSidebar.vue'
 import { useResumeEditor } from '../../composables/useResumeEditor'
 import { defaultResumeTemplateKey, resumeTemplateOptions } from '../../constants/resumeTemplates'
 import { exportResumeElementToPdf } from '../../utils/exportResumePdf'
+import { linkResumeVersionToTarget } from '../../utils/targetMaterials'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,6 +97,7 @@ const selectedSectionId = ref('personal-info')
 const selectedTemplate = ref(localStorage.getItem('resumego:selectedResumeTemplate') || defaultResumeTemplateKey)
 const sidebarCollapsed = ref(false)
 const exporting = ref(false)
+const targetLinkError = ref('')
 
 onMounted(() => {
   void editor.load({
@@ -129,8 +134,23 @@ function removeModule(sectionId: string) {
 }
 
 async function save() {
-  try { await editor.save() } catch { /* error is rendered by the composable */ }
+  const wasBlank = editor.blank.value
+  try {
+    await editor.save()
+    if (wasBlank) await linkSavedResumeToTarget()
+  } catch { /* error is rendered by the composable */ }
 }
+
+async function linkSavedResumeToTarget() {
+  const targetId = positiveQueryId(route.query.targetId)
+  const versionId = editor.selectedVersionId.value
+  if (!targetId || !versionId) return
+  targetLinkError.value = ''
+  try { await linkResumeVersionToTarget(targetId, versionId) }
+  catch (error) { targetLinkError.value = `简历已保存，但关联求职目标失败：${error instanceof Error ? error.message : '请重试'}` }
+}
+
+function retryTargetLink() { void linkSavedResumeToTarget() }
 
 async function exportPdf() {
   exporting.value = true
@@ -149,5 +169,5 @@ async function exportPdf() {
 </script>
 
 <style scoped>
-.focused-editor{--editor-subbar-height:58px;height:100vh;overflow:hidden;background:#eef2f4;color:#1c2a32}.topbar{box-sizing:border-box;height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #dfe5e8;background:#fff;padding:9px 16px}.topbar__identity,.topbar__actions{display:flex;align-items:center;gap:9px}.topbar__identity>span{width:1px;height:28px;background:#dfe5e8}.topbar__identity div{display:grid}.topbar small{color:#7b8992}.topbar button,.topbar select{border:1px solid #d5dfe3;border-radius:8px;background:#fff;padding:7px 10px}.topbar button:disabled{color:#aab4ba}.topbar label{display:flex;align-items:center;gap:6px;color:#66757e;font-size:13px}.editor-grid{height:calc(100vh - 64px);display:grid;grid-template-columns:220px minmax(420px,.9fr) minmax(420px,1.1fr);min-width:1060px}.editor-grid.sidebar-collapsed{grid-template-columns:58px minmax(420px,.9fr) minmax(420px,1.1fr)}.editor-state{height:calc(100vh - 64px);display:grid;place-content:center;gap:8px;color:#6c7982}.editor-state.error{color:#a23d35}.inline-error{position:fixed;z-index:8;top:72px;left:50%;transform:translateX(-50%);margin:0;border:1px solid #efc7c2;border-radius:8px;background:#fff2f0;color:#a23d35;padding:8px 12px}
+.focused-editor{--editor-subbar-height:58px;height:100vh;overflow:hidden;background:#eef2f4;color:#1c2a32}.topbar{box-sizing:border-box;height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #dfe5e8;background:#fff;padding:9px 16px}.topbar__identity,.topbar__actions{display:flex;align-items:center;gap:9px}.topbar__identity>span{width:1px;height:28px;background:#dfe5e8}.topbar__identity div{display:grid}.topbar small{color:#7b8992}.topbar button,.topbar select{border:1px solid #d5dfe3;border-radius:8px;background:#fff;padding:7px 10px}.topbar button:disabled{color:#aab4ba}.topbar label{display:flex;align-items:center;gap:6px;color:#66757e;font-size:13px}.editor-grid{height:calc(100vh - 64px);display:grid;grid-template-columns:220px minmax(420px,.9fr) minmax(420px,1.1fr);min-width:1060px}.editor-grid.sidebar-collapsed{grid-template-columns:58px minmax(420px,.9fr) minmax(420px,1.1fr)}.editor-state{height:calc(100vh - 64px);display:grid;place-content:center;gap:8px;color:#6c7982}.editor-state.error{color:#a23d35}.inline-error{position:fixed;z-index:8;top:72px;left:50%;display:flex;align-items:center;gap:10px;transform:translateX(-50%);margin:0;border:1px solid #efc7c2;border-radius:8px;background:#fff2f0;color:#a23d35;padding:8px 12px}.inline-error button{border:0;border-radius:7px;background:#a23d35;color:#fff;padding:6px 9px}
 </style>

@@ -17,4 +17,10 @@ describe('TargetResumeDialog', () => {
     expect(wrapper.text()).toContain('先创建一份本地简历')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
+
+  it('offers blank resume creation without leaving the target flow', async () => {
+    const wrapper = mount(TargetResumeDialog, { props: { open: true, resumes: [] } })
+    await wrapper.get('[data-test="create-blank-resume"]').trigger('click')
+    expect(wrapper.emitted('create-resume')).toHaveLength(1)
+  })
 })
