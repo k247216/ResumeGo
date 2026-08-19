@@ -5,8 +5,24 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
+      name: 'workbench',
       component: () => import('../views/HomeView.vue'),
+    },
+    {
+      path: '/home',
+      name: 'home',
+      redirect: { name: 'workbench' },
+    },
+    {
+      path: '/targets',
+      name: 'targets',
+      component: () => import('../views/HomeView.vue'),
+    },
+    {
+      path: '/editor',
+      name: 'resume-editor',
+      component: () => import('../views/HomeView.vue'),
+      meta: { immersive: true },
     },
     {
       path: '/evidences',
@@ -17,6 +33,11 @@ const router = createRouter({
       path: '/interview',
       name: 'interview',
       component: () => import('../views/InterviewView.vue'),
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/settings/SettingsView.vue'),
     },
     {
       path: '/resumes',
