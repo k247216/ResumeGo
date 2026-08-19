@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { createProject, listProjects, updateProjectLinks } from '../api/project'
+import { archiveProject, createProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
 import type { JobProject } from '../types/project'
 import { useTargetsStore } from './targets'
 
@@ -8,6 +8,9 @@ vi.mock('../api/project', () => ({
   listProjects: vi.fn(),
   createProject: vi.fn(),
   updateProjectLinks: vi.fn(),
+  renameProject: vi.fn(),
+  archiveProject: vi.fn(),
+  restoreProject: vi.fn(),
 }))
 
 const project = (id: number, status: JobProject['status'] = 'active'): JobProject => ({
@@ -81,5 +84,23 @@ describe('useTargetsStore', () => {
 
     expect(store.activeTarget).toEqual(updated)
     expect(updateProjectLinks).toHaveBeenCalledWith(5, { jobDescriptionId: 12, resumeVersionId: 18 })
+  })
+
+  it('renames, archives, and restores targets in place', async () => {
+    const first = project(1)
+    const second = project(2)
+    vi.mocked(listProjects).mockResolvedValue({ success: true, data: [first, second] })
+    vi.mocked(renameProject).mockResolvedValue({ success: true, data: { ...first, name: '新的目标名称' } })
+    vi.mocked(archiveProject).mockResolvedValue({ success: true, data: { ...first, name: '新的目标名称', status: 'archived', archivedAt: '2026-08-19' } })
+    vi.mocked(restoreProject).mockResolvedValue({ success: true, data: { ...first, name: '新的目标名称' } })
+    const store = useTargetsStore()
+    await store.load()
+
+    await store.rename(1, '新的目标名称')
+    await store.archive(1)
+    expect(store.activeTarget?.id).toBe(2)
+    expect(store.targets.find((target) => target.id === 1)?.status).toBe('archived')
+    await store.restore(1)
+    expect(store.targets.find((target) => target.id === 1)?.status).toBe('active')
   })
 })

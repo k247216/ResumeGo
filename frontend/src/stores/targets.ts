@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { createProject, listProjects, updateProjectLinks } from '../api/project'
+import { archiveProject, createProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
 import type { CreateJobProjectRequest, JobProject, UpdateJobProjectLinksRequest } from '../types/project'
 
 const activeTargetStorageKey = 'resumego:activeTargetId'
@@ -16,8 +16,9 @@ export const useTargetsStore = defineStore('targets', () => {
   ))
 
   function chooseValidTarget() {
-    if (targets.value.some((target) => target.id === activeTargetId.value)) return
-    const fallback = targets.value.find((target) => target.status === 'active') ?? targets.value[0] ?? null
+    const selected = targets.value.find((target) => target.id === activeTargetId.value)
+    if (selected?.status === 'active') return
+    const fallback = targets.value.find((target) => target.status === 'active') ?? selected ?? targets.value[0] ?? null
     setActiveTargetId(fallback?.id ?? null)
   }
 
@@ -69,6 +70,32 @@ export const useTargetsStore = defineStore('targets', () => {
     }
   }
 
+  async function rename(id: number, name: string) {
+    return mutateTarget(id, () => renameProject(id, name), '重命名求职目标失败')
+  }
+
+  async function archive(id: number) {
+    const target = await mutateTarget(id, () => archiveProject(id), '归档求职目标失败')
+    chooseValidTarget()
+    return target
+  }
+
+  async function restore(id: number) {
+    return mutateTarget(id, () => restoreProject(id), '恢复求职目标失败')
+  }
+
+  async function mutateTarget(id: number, request: () => Promise<{ data: JobProject }>, fallback: string) {
+    errorMessage.value = ''
+    try {
+      const response = await request()
+      targets.value = targets.value.map((target) => target.id === id ? response.data : target)
+      return response.data
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : fallback
+      throw error
+    }
+  }
+
   function setActiveTargetId(id: number | null) {
     activeTargetId.value = id
     if (id === null) {
@@ -89,6 +116,9 @@ export const useTargetsStore = defineStore('targets', () => {
     select,
     create,
     updateLinks,
+    rename,
+    archive,
+    restore,
   }
 })
 
