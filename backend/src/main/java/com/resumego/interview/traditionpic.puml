@@ -1,0 +1,50 @@
+@startuml Interview State Machine Flow
+
+skinparam state {
+  nodesep 1.2
+  ranksep 1.8
+  BackgroundColor white
+}
+skinparam arrow {
+  color #333
+  thickness 1.1
+}
+
+' ========== S2 状态定义 ==========
+[*] --> READY : 初始化会话
+state READY : 初始空闲态
+state ASKING : 提问状态
+state WAITING_ANSWER : 等待答题状态
+state EVALUATING : 评估答案状态
+state SUMMARIZING : 生成总结
+state COMPLETED : 正常完整结束
+state CANCELLED : 用户主动取消
+state FAILED : 系统异常终止
+
+' 1. READY
+READY --> ASKING : START
+READY --> CANCELLED : CANCEL
+READY --> FAILED : FAIL
+
+' 2. ASKING
+ASKING --> WAITING_ANSWER : QUESTION_READY
+ASKING --> CANCELLED : CANCEL
+ASKING --> FAILED : FAIL
+
+' 3. WAITING_ANSWER
+WAITING_ANSWER --> EVALUATING : ANSWER_SUBMITTED
+WAITING_ANSWER --> CANCELLED : CANCEL
+WAITING_ANSWER --> FAILED : FAIL
+
+' 4. EVALUATING
+EVALUATING --> ASKING : GO_NEXT（非最后一题）
+EVALUATING --> SUMMARIZING : GO_SUMMARIZE（最后一题）
+EVALUATING --> CANCELLED : CANCEL
+EVALUATING --> FAILED : FAIL
+
+' 5. SUMMARIZING
+SUMMARIZING --> COMPLETED : SUMMARY_READY
+SUMMARIZING --> CANCELLED : CANCEL
+SUMMARIZING --> FAILED : FAIL
+
+@enduml

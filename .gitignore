@@ -1,0 +1,20 @@
+.DS_Store
+.idea/
+.vscode/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Frontend
+node_modules/
+dist/
+coverage/
+
+# Backend
+target/
+*.log
+
+# Local generated artifacts
+outputs/
