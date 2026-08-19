@@ -1,15 +1,16 @@
-export type WorkspaceLaunchState = 'first-run' | 'workspace'
+export type WorkspaceLaunchState = 'loading' | 'error' | 'first-run' | 'library' | 'target'
 
 export type WorkspaceLaunchInput = {
   loading: boolean
   hasError: boolean
   resumeCount: number
-  jobCount: number
+  targetCount: number
 }
 
 export function resolveWorkspaceLaunchState(input: WorkspaceLaunchInput): WorkspaceLaunchState {
-  if (!input.loading && !input.hasError && input.resumeCount === 0 && input.jobCount === 0) {
-    return 'first-run'
-  }
-  return 'workspace'
+  if (input.loading) return 'loading'
+  if (input.hasError) return 'error'
+  if (input.targetCount > 0) return 'target'
+  if (input.resumeCount > 0) return 'library'
+  return 'first-run'
 }

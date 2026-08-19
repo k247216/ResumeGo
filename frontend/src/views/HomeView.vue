@@ -779,7 +779,7 @@ const launchState = computed(() => resolveWorkspaceLaunchState({
   loading: loading.value,
   hasError: Boolean(errorMessage.value),
   resumeCount: resumes.value.length,
-  jobCount: jobs.value.length,
+  targetCount: jobs.value.length,
 }))
 
 const activeResume = computed(() => (
