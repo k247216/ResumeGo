@@ -2873,7 +2873,8 @@ h3 {
   gap: 12px;
 }
 
-.overview-actions button {
+.overview-actions button,
+.overview-actions a {
   display: inline-flex;
   align-items: center;
   gap: 10px;

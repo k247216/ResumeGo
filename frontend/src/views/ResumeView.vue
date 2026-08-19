@@ -5,18 +5,11 @@
         <p class="eyebrow">简历中心</p>
         <h1>管理简历版本，追踪每一次优化</h1>
         <p class="page-desc">
-          查看当前版本、切换历史版本，并进入诊断与岗位匹配。所有修改都会保留可追溯版本。
+          查看当前版本和切换历史版本。所有修改都会保留可追溯版本。
         </p>
       </div>
       <div class="resume-hero-actions">
         <el-button @click="loadResumes" :loading="loading">刷新</el-button>
-        <el-button
-          type="primary"
-          :disabled="!activeVersion"
-          @click="openAssessment"
-        >
-          进入评分与匹配
-        </el-button>
       </div>
     </section>
 
@@ -104,10 +97,10 @@
             </div>
 
             <div class="overview-actions">
-              <button type="button" @click="openAssessment">
-                开始诊断
+              <router-link :to="buildResumeEditorLocation({ resumeId: selectedResume.id, versionId: activeVersion?.id })">
+                继续编辑
                 <el-icon><ArrowRight /></el-icon>
-              </button>
+              </router-link>
               <small>{{ activeVersion?.changeSummary || '保留原版本，修改过程可追溯' }}</small>
             </div>
           </section>
@@ -229,7 +222,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import {
   ArrowRight,
   Collection,
@@ -241,8 +233,8 @@ import {
 } from '@element-plus/icons-vue'
 import { getResumeVersion, getResumeVersions, listResumes } from '../api/resume'
 import type { Resume, ResumeContent, ResumeVersion } from '../types/resume'
+import { buildResumeEditorLocation } from '../utils/editorRoute'
 
-const router = useRouter()
 const loading = ref(false)
 const versionLoading = ref(false)
 const errorMessage = ref('')
@@ -332,11 +324,4 @@ function formatTime(dateStr: string) {
   })
 }
 
-function openAssessment() {
-  if (!activeVersion.value) return
-  router.push({
-    name: 'resume-assessment',
-    params: { versionId: activeVersion.value.id },
-  })
-}
 </script>

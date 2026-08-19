@@ -32,7 +32,7 @@
             </option>
           </select>
         </label>
-        <p class="hint">目标岗位内容会在进入目标后单独录入，不从公共岗位库选择。</p>
+        <p class="hint">目标岗位内容会在进入该求职目标后单独录入。</p>
         <p v-if="validationMessage || errorMessage" class="error" role="alert">
           {{ validationMessage || errorMessage }}
         </p>

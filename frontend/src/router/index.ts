@@ -16,12 +16,12 @@ const router = createRouter({
     {
       path: '/targets',
       name: 'targets',
-      component: () => import('../views/HomeView.vue'),
+      component: () => import('../views/targets/TargetListView.vue'),
     },
     {
       path: '/editor',
       name: 'resume-editor',
-      component: () => import('../views/HomeView.vue'),
+      component: () => import('../views/resumes/ResumeEditorView.vue'),
       meta: { immersive: true },
     },
     {
@@ -43,26 +43,6 @@ const router = createRouter({
       path: '/resumes',
       name: 'resumes',
       component: () => import('../views/ResumeView.vue'),
-    },
-    {
-      path: '/resume-versions/:versionId/assessment',
-      name: 'resume-assessment',
-      component: () => import('../views/AssessmentView.vue'),
-    },
-    {
-      path: '/jobs',
-      name: 'jobs',
-      component: () => import('../views/JobListView.vue'),
-    },
-    {
-      path: '/job/create',
-      name: 'job-create',
-      component: () => import('../views/JobCreateView.vue'),
-    },
-    {
-      path: '/jobs/:id',
-      name: 'job-detail',
-      component: () => import('../views/JobDetailView.vue'),
     },
   ],
 })
