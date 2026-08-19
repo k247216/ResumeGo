@@ -16,6 +16,7 @@
     :target="targetsStore.activeTarget"
     :job="activeJob"
     :resume-title="activeResumeTitle"
+    :evidence-count="activeEvidenceCount"
     :material-error="targetMaterialError"
     @action="handleTargetAction"
     @switch-target="router.push({ name: 'targets' })"
@@ -50,7 +51,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createJobDescription, getJobDescription } from '../../api/job'
-import { listResumes } from '../../api/resume'
+import { getResumeVersion, listResumes } from '../../api/resume'
 import TargetCreateDialog from '../../components/targets/TargetCreateDialog.vue'
 import TargetJobDialog from '../../components/targets/TargetJobDialog.vue'
 import TargetResumeDialog from '../../components/targets/TargetResumeDialog.vue'
@@ -61,7 +62,7 @@ import TargetDashboard, { type TargetDashboardAction } from '../../components/wo
 import { useTargetsStore } from '../../stores/targets'
 import type { CreateJobProjectRequest } from '../../types/project'
 import type { CreateJobDescriptionRequest, JobDescription } from '../../types/job'
-import type { Resume } from '../../types/resume'
+import type { Resume, ResumeVersion } from '../../types/resume'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
 import { resolveWorkspaceLaunchState } from '../../utils/workspaceLaunchState'
 
@@ -78,9 +79,15 @@ const resumeDialogOpen = ref(false)
 const updatingTargetMaterials = ref(false)
 const targetMaterialError = ref('')
 const activeJob = ref<JobDescription | null>(null)
+const activeTargetVersion = ref<ResumeVersion | null>(null)
 const errorMessage = computed(() => localError.value)
 const state = computed(() => resolveWorkspaceLaunchState({ loading: loading.value || targetsStore.loading, hasError: Boolean(errorMessage.value), resumeCount: resumes.value.length, targetCount: targetsStore.targets.length }))
-const activeResumeTitle = computed(() => resumes.value.find((resume) => resume.currentVersion?.id === targetsStore.activeTarget?.resumeVersionId)?.title ?? '')
+const activeResumeTitle = computed(() => resumes.value.find((resume) => resume.id === activeTargetVersion.value?.resumeId)?.title ?? '')
+const activeEvidenceCount = computed(() => {
+  if (!targetsStore.activeTarget?.resumeVersionId) return 0
+  if (!activeTargetVersion.value) return null
+  return new Set((activeTargetVersion.value.content.projects ?? []).map((project) => project.evidenceId).filter((id): id is number => typeof id === 'number' && id > 0)).size
+})
 
 async function loadWorkspace() {
   loading.value = true
@@ -89,7 +96,7 @@ async function loadWorkspace() {
     const [, resumeResponse] = await Promise.all([targetsStore.load(), listResumes()])
     resumes.value = resumeResponse.data
     if (targetsStore.errorMessage) localError.value = targetsStore.errorMessage
-    await loadActiveJob()
+    await loadActiveMaterials()
   } catch (error) {
     localError.value = error instanceof Error ? error.message : '读取本地工作区失败'
   } finally {
@@ -97,13 +104,18 @@ async function loadWorkspace() {
   }
 }
 
-async function loadActiveJob() {
+async function loadActiveMaterials() {
   activeJob.value = null
+  activeTargetVersion.value = null
   targetMaterialError.value = ''
   const jobId = targetsStore.activeTarget?.jobDescriptionId
-  if (!jobId) return
-  try { activeJob.value = (await getJobDescription(jobId)).data }
-  catch (error) { targetMaterialError.value = error instanceof Error ? error.message : '读取目标岗位失败' }
+  const versionId = targetsStore.activeTarget?.resumeVersionId
+  const errors: string[] = []
+  await Promise.all([
+    jobId ? getJobDescription(jobId).then((response) => { activeJob.value = response.data }).catch((error) => errors.push(error instanceof Error ? error.message : '读取目标岗位失败')) : Promise.resolve(),
+    versionId ? getResumeVersion(versionId).then((response) => { activeTargetVersion.value = response.data }).catch((error) => errors.push(error instanceof Error ? error.message : '读取当前简历失败')) : Promise.resolve(),
+  ])
+  targetMaterialError.value = errors.join('；')
 }
 
 function openTargetDialog() {

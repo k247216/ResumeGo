@@ -5,6 +5,7 @@ import WorkbenchView from './WorkbenchView.vue'
 
 const mocks = vi.hoisted(() => ({
   listResumes: vi.fn(),
+  getResumeVersion: vi.fn(),
   createJob: vi.fn(),
   getJob: vi.fn(),
 }))
@@ -21,7 +22,7 @@ const targetStore = reactive({
   updateLinks: vi.fn(),
 })
 
-vi.mock('../../api/resume', () => ({ listResumes: mocks.listResumes }))
+vi.mock('../../api/resume', () => ({ listResumes: mocks.listResumes, getResumeVersion: mocks.getResumeVersion }))
 vi.mock('../../api/job', () => ({ createJobDescription: mocks.createJob, getJobDescription: mocks.getJob }))
 vi.mock('../../stores/targets', () => ({ useTargetsStore: () => targetStore }))
 
@@ -75,6 +76,17 @@ describe('WorkbenchView', () => {
     await flushPromises()
     await wrapper.get('[data-test="target-next-action"]').trigger('click')
     expect(wrapper.text()).toContain('选择这个目标采用的简历版本')
+  })
+
+  it('shows evidence count from the exact resume version selected by the target', async () => {
+    const target = { id: 3, name: '完整目标', status: 'active', jobDescriptionId: 6, resumeVersionId: 21 }
+    targetStore.targets = [target]
+    targetStore.activeTarget = target
+    mocks.getJob.mockResolvedValue({ success: true, data: { id: 6, jobTitle: '后端实习', rawText: '岗位描述内容足够长并用于组件测试。', parseStatus: 'pending', createdAt: '', updatedAt: '' } })
+    mocks.getResumeVersion.mockResolvedValue({ success: true, data: { id: 21, resumeId: 8, versionNo: 4, createdByType: 'user', createdAt: '', content: { projects: [{ title: '一', evidenceId: 2 }, { title: '二' }, { title: '三', evidenceId: 5 }] } } })
+    const wrapper = mount(WorkbenchView, { global: { stubs: ['RouterLink'] } })
+    await flushPromises()
+    expect(wrapper.get('[data-test="target-dashboard"]').text()).toContain('2 条已引用')
   })
 
   it('keeps target context and form content visible when saving a job fails', async () => {
