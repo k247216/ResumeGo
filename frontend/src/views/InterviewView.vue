@@ -9,10 +9,12 @@
     <template v-if="!activeSessionId">
       <section class="interview-lobby-hero">
         <div class="lobby-hero-copy">
-          <p class="section-kicker">Interview Practice</p>
-          <h1>把这版简历放进一次完整多轮面试里验证</h1>
+          <p class="section-kicker">{{ fromTarget ? 'Target Practice' : 'Interview Practice' }}</p>
+          <h1>{{ fromTarget ? '用当前目标验证这版简历' : '把这版简历放进一次完整多轮面试里验证' }}</h1>
           <p>
-            绑定简历版本与目标岗位，选择多位面试官依次追问；过程、评分与复盘都会沉淀为下一版简历的优化依据。
+            {{ fromTarget
+              ? '岗位和简历版本已经由求职目标锁定。你只需选择本轮面试官与考察重点，面试记录会留在这组真实材料下。'
+              : '绑定简历版本与目标岗位，选择多位面试官依次追问；过程、评分与复盘都会沉淀为下一版简历的优化依据。' }}
           </p>
           <div class="lobby-hero-actions">
             <button class="interview-start-button" type="button" @click="focusCreatePanel">
@@ -43,7 +45,7 @@
           <div class="lobby-stat-grid">
             <div>
               <span>面试档案</span>
-              <strong>{{ interviewRecords.length }}</strong>
+              <strong>{{ visibleInterviewRecords.length }}</strong>
             </div>
             <div>
               <span>完成复盘</span>
@@ -103,7 +105,7 @@
               <CompanyAvatar v-if="selectedJobEntity" :job="selectedJobEntity" size="lg" />
               <div v-else class="bound-context-fallback">职</div>
               <div>
-                <span class="bound-context-label">已绑定当前工作台</span>
+                <span class="bound-context-label">{{ fromTarget ? '已绑定当前求职目标' : '已绑定当前工作台' }}</span>
                 <strong>{{ selectedJobLabel }}</strong>
                 <p>{{ selectedResumeLabel }}</p>
               </div>
@@ -316,7 +318,7 @@
               </div>
             </div>
 
-            <div v-if="interviewRecords.length > 0" class="history-filter-tabs">
+            <div v-if="visibleInterviewRecords.length > 0" class="history-filter-tabs">
               <button
                 v-for="tab in historyFilterTabs"
                 :key="tab.key"
@@ -328,7 +330,7 @@
               </button>
             </div>
 
-            <div v-if="interviewRecords.length === 0" class="history-empty-card">
+            <div v-if="visibleInterviewRecords.length === 0" class="history-empty-card">
               <el-icon><VideoPlay /></el-icon>
               <strong>还没有面试记录</strong>
               <span>先从左侧创建一次面试。</span>
@@ -1082,6 +1084,7 @@ import {
   setWorkspaceSelectedJobId,
 } from '../utils/workspaceContext'
 import { buildResumeEditorLocation } from '../utils/editorRoute'
+import { filterTargetInterviewRecords } from '../utils/interviewContext'
 
 interface ChatMessage {
   role: 'interviewer' | 'user' | 'sending' | 'evaluation' | 'summary'
@@ -1130,6 +1133,8 @@ interface InterviewRecord {
   totalCount: number
   isCompleted: boolean
   isInProgress: boolean
+  jobDescriptionId: number | null
+  resumeVersionId: number | null
 }
 
 type ScoreDimensionKey = keyof GrowthDimensions
@@ -1232,18 +1237,18 @@ const growthChanges = computed(() => growthReport.value?.changes ?? { clarity: 0
 // 历史会话筛选
 const historyFilter = ref<'all' | 'completed' | 'inProgress'>('all')
 const historyFilterTabs = computed(() => {
-  const completed = interviewRecords.value.filter((record) => record.isCompleted).length
-  const inProgress = interviewRecords.value.filter((record) => record.isInProgress).length
+  const completed = visibleInterviewRecords.value.filter((record) => record.isCompleted).length
+  const inProgress = visibleInterviewRecords.value.filter((record) => record.isInProgress).length
   return [
-    { key: 'all' as const, label: '全部', count: interviewRecords.value.length },
+    { key: 'all' as const, label: '全部', count: visibleInterviewRecords.value.length },
     { key: 'completed' as const, label: '已完成', count: completed },
     { key: 'inProgress' as const, label: '进行中', count: inProgress },
   ]
 })
 const filteredInterviewRecords = computed(() => {
-  if (historyFilter.value === 'completed') return interviewRecords.value.filter((record) => record.isCompleted)
-  if (historyFilter.value === 'inProgress') return interviewRecords.value.filter((record) => record.isInProgress)
-  return interviewRecords.value
+  if (historyFilter.value === 'completed') return visibleInterviewRecords.value.filter((record) => record.isCompleted)
+  if (historyFilter.value === 'inProgress') return visibleInterviewRecords.value.filter((record) => record.isInProgress)
+  return visibleInterviewRecords.value
 })
 
 // 多会话状态
@@ -1321,12 +1326,17 @@ const interviewRecords = computed<InterviewRecord[]>(() => {
         totalCount,
         isCompleted: totalCount > 0 && completedCount >= totalCount,
         isInProgress: completedCount < totalCount || sortedSessions.some((session) => !sessionCompleted(session)),
+        jobDescriptionId: plan?.jobDescriptionId ?? null,
+        resumeVersionId: plan?.resumeVersionId ?? null,
       }
     })
     .sort((a, b) => b.latestSession.sessionId - a.latestSession.sessionId)
 })
 
-const recentInterviewRecords = computed(() => interviewRecords.value.slice(0, 3))
+const visibleInterviewRecords = computed(() => fromTarget.value
+  ? filterTargetInterviewRecords(interviewRecords.value, selectedJobId.value, selectedVersionId.value)
+  : interviewRecords.value)
+const recentInterviewRecords = computed(() => visibleInterviewRecords.value.slice(0, 3))
 
 const activeInterviewPlan = computed(() => {
   if (!activeSessionId.value) return null
@@ -1424,8 +1434,8 @@ const companyProfileTags = computed(() => [
 ].filter(Boolean))
 const hasCompanyProfile = computed(() => Boolean(selectedCompanyProfile.value?.companyName && companyProfileTags.value.length))
 const workspaceContextLocked = computed(() => fromWorkspace.value && Boolean(selectedVersionId.value && selectedJobId.value))
-const completedSessionCount = computed(() => interviewRecords.value.filter((r) => r.isCompleted).length)
-const inProgressSessionCount = computed(() => interviewRecords.value.filter((r) => !r.isCompleted).length)
+const completedSessionCount = computed(() => visibleInterviewRecords.value.filter((r) => r.isCompleted).length)
+const inProgressSessionCount = computed(() => visibleInterviewRecords.value.filter((r) => !r.isCompleted).length)
 const startInterviewButtonLabel = computed(() => {
   if (selectedPersonaQueue.value.length > 1) return `开始第 1 位：${selectedPersonaQueue.value[0].name}`
   return '开始本次练习'
