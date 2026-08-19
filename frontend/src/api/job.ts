@@ -27,7 +27,7 @@ export async function createJobDescription(
 }
 
 /**
- * 查询演示用户的所有 JD
+ * 查询当前本地用户的所有 JD
  */
 export async function listJobDescriptions(): Promise<ApiResponse<JobDescription[]>> {
   const res = await apiFetch(BASE)

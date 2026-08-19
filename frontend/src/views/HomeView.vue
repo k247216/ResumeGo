@@ -1,6 +1,11 @@
 <template>
   <div v-if="!editorActive" class="launch-page">
-    <section class="launch-hero">
+    <FirstRunEmptyState
+      v-if="launchState === 'first-run'"
+      @create="startBlankResume"
+    />
+
+    <section v-else class="launch-hero">
       <div class="launch-copy">
         <div class="launch-badge">ResumeGo Studio · AI 求职成长闭环</div>
         <h1>让每一次评分、匹配和面试，都回到一份更强的简历。</h1>
@@ -632,6 +637,7 @@ import CompanyAvatar from '../components/CompanyAvatar.vue'
 import EditorCanvas from '../components/editor/EditorCanvas.vue'
 import EditorPreviewPanel from '../components/editor/EditorPreviewPanel.vue'
 import EditorSidebar from '../components/editor/EditorSidebar.vue'
+import FirstRunEmptyState from '../components/onboarding/FirstRunEmptyState.vue'
 import { listJobDescriptions, resolveCompanyProfile } from '../api/job'
 import { createLayoutProposal } from '../api/layout'
 import { batchMatch, createJobMatch } from '../api/match'
@@ -655,6 +661,7 @@ import type { LayoutProposalResponse } from '../types/layout'
 import type { BatchMatchResult, JobMatch } from '../types/match'
 import type { OptimizationSuggestion } from '../types/optimization'
 import { exportResumeElementToPdf } from '../utils/exportResumePdf'
+import { resolveWorkspaceLaunchState } from '../utils/workspaceLaunchState'
 import {
   clearWorkspaceSelectedJobId,
   consumePendingWorkspaceSelectedJobId,
@@ -767,6 +774,13 @@ const defaultActiveSectionIds = ['personal-info', 'summary', 'education', 'skill
 const sortedResumes = computed(() => [...resumes.value].sort((left, right) => (
   resumeLatestTimestamp(right) - resumeLatestTimestamp(left)
 )))
+
+const launchState = computed(() => resolveWorkspaceLaunchState({
+  loading: loading.value,
+  hasError: Boolean(errorMessage.value),
+  resumeCount: resumes.value.length,
+  jobCount: jobs.value.length,
+}))
 
 const activeResume = computed(() => (
   resumes.value.find((resume) => resume.id === selectedResumeId.value) ?? sortedResumes.value[0] ?? null

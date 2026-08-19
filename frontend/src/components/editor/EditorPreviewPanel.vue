@@ -135,7 +135,7 @@ const printableSections = computed(() => (
 
 const basicName = computed(() => {
   const name = valueOfBasic('basicInfo.name')
-  return name || 'Demo User'
+  return name || '姓名待补充'
 })
 
 const targetRole = computed(() => {

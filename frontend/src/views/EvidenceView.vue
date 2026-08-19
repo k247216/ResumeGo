@@ -27,7 +27,7 @@
         <template #header>
           <div class="card-header">
             <span>新增能力证据</span>
-            <el-tag type="info">demo user = 1</el-tag>
+            <el-tag type="success" effect="plain">本地资料库</el-tag>
           </div>
         </template>
 

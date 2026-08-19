@@ -16,8 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Sprint 1 固定使用演示用户 userId=1。
- * 后续 Sprint 从认证上下文获取当前用户 ID。
+ * 本地单用户版本固定使用 userId=1 作为数据归属。
+ * 若未来引入多用户能力，再从认证上下文获取当前用户 ID。
  */
 @Slf4j
 @Service
@@ -118,7 +118,7 @@ public class JobDescriptionService {
     }
 
     /**
-     * 查询当前演示用户的所有 JD，按创建时间倒序。
+     * 查询当前本地用户的所有 JD，按创建时间倒序。
      */
     public List<JobDescriptionDTO> findAllByUser() {
         QueryWrapper<JobDescription> query = new QueryWrapper<>();

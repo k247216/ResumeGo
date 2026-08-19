@@ -5,7 +5,7 @@
         <p class="eyebrow">简历中心</p>
         <h1>管理简历版本，追踪每一次优化</h1>
         <p class="page-desc">
-          查看当前版本、切换历史版本，并进入评分与岗位匹配。页面默认面向演示和产品使用，隐藏底层数据格式。
+          查看当前版本、切换历史版本，并进入诊断与岗位匹配。所有修改都会保留可追溯版本。
         </p>
       </div>
       <div class="resume-hero-actions">
@@ -141,7 +141,7 @@
             <div class="section-title-row">
               <div>
                 <h3>简历内容预览</h3>
-                <p>用产品化视图查看结构化内容，避免演示时暴露底层数据格式。</p>
+                <p>以清晰视图检查结构化内容，修改前后均可追溯。</p>
               </div>
               <el-button
                 v-if="activeVersion"
