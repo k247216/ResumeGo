@@ -18,3 +18,4 @@ target/
 
 # Local generated artifacts
 outputs/
+.superpowers/
