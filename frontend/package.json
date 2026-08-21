@@ -1,7 +1,7 @@
 {
   "name": "resumego",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "本地优先的简历优化与面试准备工作台",
   "author": "ResumeGo contributors",
   "type": "module",
