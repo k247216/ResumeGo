@@ -21,6 +21,10 @@ describe('desktop api transport', () => {
       hasApiKey: vi.fn(),
       applyApiKey: vi.fn(),
       keyStorageMode: vi.fn(),
+      listBackups: vi.fn(),
+      createBackup: vi.fn(),
+      restoreBackup: vi.fn(),
+      exportBackup: vi.fn(),
     }
     const fetchMock = vi.fn().mockResolvedValue(new Response())
     vi.stubGlobal('fetch', fetchMock)

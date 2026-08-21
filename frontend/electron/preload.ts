@@ -7,4 +7,8 @@ contextBridge.exposeInMainWorld('resumeGoDesktop', {
   hasApiKey: (profileId: number) => ipcRenderer.invoke('resumego:key-has', profileId),
   applyApiKey: (profileId: number) => ipcRenderer.invoke('resumego:key-apply', profileId),
   keyStorageMode: () => ipcRenderer.invoke('resumego:key-storage-mode'),
+  listBackups: () => ipcRenderer.invoke('resumego:backup-list'),
+  createBackup: () => ipcRenderer.invoke('resumego:backup-create'),
+  restoreBackup: (backupId: string) => ipcRenderer.invoke('resumego:backup-restore', backupId),
+  exportBackup: (backupId: string | null) => ipcRenderer.invoke('resumego:backup-export', backupId),
 })

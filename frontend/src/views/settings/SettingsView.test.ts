@@ -114,4 +114,57 @@ describe('SettingsView', () => {
     expect(wrapper.find('[data-test="setup-empty"]').exists()).toBe(true)
     expect(wrapper.find('input[value="DeepSeek"]').exists()).toBe(false)
   })
+
+  it('lists desktop backups and offers restore/export actions', async () => {
+    const listBackups = vi.fn().mockResolvedValue([
+      { id: '2026-08-21T10-00-00-000Z', createdAt: '2026-08-21T10:00:00.000Z', sizeBytes: 2048 },
+    ])
+    const createBackup = vi.fn().mockResolvedValue({ backupDir: '/x' })
+    const restoreBackup = vi.fn().mockResolvedValue({ restored: true, backupDir: '/x' })
+    const exportBackup = vi.fn().mockResolvedValue({ canceled: false, exportedTo: '/out' })
+    window.resumeGoDesktop = {
+      runtime: () => ({ backendOrigin: '', workspaceToken: '' }),
+      saveApiKey: vi.fn(),
+      deleteApiKey: vi.fn(),
+      hasApiKey: vi.fn(),
+      applyApiKey: vi.fn(),
+      keyStorageMode: vi.fn().mockResolvedValue('secure'),
+      listBackups,
+      createBackup,
+      restoreBackup,
+      exportBackup,
+    }
+    const wrapper = mount(SettingsView, {
+      global: { directives: { loading: () => undefined } },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    // switch to the general section where backup management lives
+    const generalNav = wrapper.findAll('.settings-nav button').find((btn) => btn.text().includes('常规'))
+    expect(generalNav).toBeTruthy()
+    await generalNav!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('数据备份')
+    expect(wrapper.text()).toContain('2026-08-21')
+    expect(wrapper.text()).toContain('2.0 KB')
+
+    await wrapper.get('[data-test="backup-create"]').trigger('click')
+    await flushPromises()
+    expect(createBackup).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-test="backup-export"]').trigger('click')
+    await flushPromises()
+    expect(exportBackup).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a plain note instead of backup actions when running in web mode', async () => {
+    const wrapper = mount(SettingsView, {
+      global: { directives: { loading: () => undefined } },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('数据备份与恢复仅桌面版可用')
+    expect(wrapper.find('[data-test="backup-create"]').exists()).toBe(false)
+  })
 })

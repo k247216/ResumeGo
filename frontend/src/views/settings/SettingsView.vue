@@ -30,6 +30,80 @@ const connected = ref(false)
 const showAdvanced = ref(false)
 const activeSection = ref<'general' | 'ai'>('ai')
 const isDesktop = computed(() => Boolean(window.resumeGoDesktop))
+
+interface BackupInfo {
+  id: string
+  createdAt: string
+  sizeBytes: number
+}
+
+const backups = ref<BackupInfo[]>([])
+const backupsLoading = ref(false)
+const backupBusy = ref(false)
+
+async function loadBackups() {
+  if (!window.resumeGoDesktop) return
+  backupsLoading.value = true
+  try {
+    backups.value = await window.resumeGoDesktop.listBackups()
+  } catch {
+    backups.value = []
+  } finally {
+    backupsLoading.value = false
+  }
+}
+
+async function createBackupNow() {
+  if (!window.resumeGoDesktop || backupBusy.value) return
+  backupBusy.value = true
+  try {
+    await window.resumeGoDesktop.createBackup()
+    await loadBackups()
+    ElMessage.success('已创建本地备份')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '创建备份失败')
+  } finally {
+    backupBusy.value = false
+  }
+}
+
+async function exportWorkspace() {
+  if (!window.resumeGoDesktop || backupBusy.value) return
+  backupBusy.value = true
+  try {
+    const result = await window.resumeGoDesktop.exportBackup(null)
+    if (result && !result.canceled) {
+      ElMessage.success('工作区已导出到 ' + result.exportedTo)
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败')
+  } finally {
+    backupBusy.value = false
+  }
+}
+
+async function restoreBackup(backupId: string) {
+  if (!window.resumeGoDesktop || backupBusy.value) return
+  try {
+    await ElMessageBox.confirm(
+      '恢复会先保留当前数据到崩溃现场目录，再用所选备份覆盖工作区。恢复后需要重新启动应用。确定继续吗？',
+      '恢复备份',
+      { confirmButtonText: '恢复并重启', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  backupBusy.value = true
+  try {
+    await window.resumeGoDesktop.restoreBackup(backupId)
+    ElMessage.success('备份已恢复，正在重启应用...')
+    setTimeout(() => window.location.reload(), 800)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '恢复失败')
+  } finally {
+    backupBusy.value = false
+  }
+}
 const hasProfiles = computed(() => profiles.value.length > 0)
 const selected = computed(() => profiles.value.find((profile) => profile.id === selectedId.value) ?? null)
 const active = computed(() => profiles.value.find((profile) => profile.defaultProfile) ?? null)
@@ -243,9 +317,23 @@ async function remove(profile: AiProviderProfile) {
   }
 }
 
+function formatBackupTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function formatBackupSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
 onMounted(async () => {
   if (window.resumeGoDesktop) keyStorageMode.value = await window.resumeGoDesktop.keyStorageMode()
   await loadProfiles()
+  await loadBackups()
 })
 </script>
 
@@ -268,7 +356,7 @@ onMounted(async () => {
         <section v-show="activeSection === 'general'" class="general-section">
           <h3 class="section-title">本地数据</h3>
           <div class="flat-row">
-            <strong>本地数据</strong>
+            <strong>存储位置</strong>
             <span>H2 文件工作区 · 启动前自动保留最近 5 份冷备份</span>
             <em>已启用</em>
           </div>
@@ -276,6 +364,36 @@ onMounted(async () => {
             <strong>运行模式</strong>
             <span>{{ isDesktop ? '桌面端安全存储可用，密钥不进数据库' : '开发模式，密钥仅存于本地服务内存' }}</span>
             <em>{{ isDesktop ? '桌面安全模式' : 'Web 开发模式' }}</em>
+          </div>
+
+          <div v-if="isDesktop" class="backup-panel">
+            <div class="backup-head">
+              <div>
+                <h3 class="section-title">数据备份</h3>
+                <p class="backup-desc">备份保存在本机工作区目录，可随时手动创建、导出或恢复到历史版本。</p>
+              </div>
+              <div class="backup-actions">
+                <button type="button" class="backup-btn" data-test="backup-create" :disabled="backupBusy" @click="createBackupNow">
+                  <span v-if="backupBusy">处理中...</span>
+                  <span v-else>＋ 创建备份</span>
+                </button>
+                <button type="button" class="backup-btn" data-test="backup-export" :disabled="backupBusy" @click="exportWorkspace">导出工作区</button>
+              </div>
+            </div>
+
+            <div v-if="backupsLoading" class="backup-empty">正在读取备份...</div>
+            <div v-else-if="backups.length === 0" class="backup-empty">暂无手动备份。应用启动时会自动保留最近 5 份冷备份。</div>
+            <ul v-else class="backup-list">
+              <li v-for="backup in backups" :key="backup.id" class="backup-item">
+                <span class="backup-time">{{ formatBackupTime(backup.createdAt) }}</span>
+                <span class="backup-size">{{ formatBackupSize(backup.sizeBytes) }}</span>
+                <button type="button" class="backup-restore" :disabled="backupBusy" @click="restoreBackup(backup.id)">恢复</button>
+              </li>
+            </ul>
+          </div>
+
+          <div v-else class="backup-web-note">
+            <p>数据备份与恢复仅桌面版可用。开发模式下数据保存在本地服务数据库，请直接备份数据目录。</p>
           </div>
         </section>
 
@@ -552,6 +670,24 @@ onMounted(async () => {
 .flat-row strong{flex:0 0 96px;font-size:14px;font-weight:600;color:var(--ink)}
 .flat-row span{flex:1;min-width:0;color:var(--copy);font-size:13px;line-height:1.55}
 .flat-row em{flex:0 0 auto;color:var(--brand);font-size:12px;font-weight:600;font-style:normal}
+
+.backup-panel{margin-top:22px;border-top:1px solid var(--border-subtle);padding-top:18px}
+.backup-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.backup-desc{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
+.backup-actions{display:flex;gap:8px;flex:0 0 auto}
+.backup-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--border-default);border-radius:var(--radius-control);background:var(--bg-surface);color:var(--ink);font-size:12px;font-weight:600;cursor:pointer}
+.backup-btn:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}
+.backup-btn:disabled{opacity:.5;cursor:not-allowed}
+.backup-empty{padding:18px 4px;color:var(--muted);font-size:13px;line-height:1.6}
+.backup-list{margin:0;padding:0;list-style:none}
+.backup-item{display:flex;align-items:center;gap:12px;padding:11px 2px;border-top:1px solid var(--border-subtle)}
+.backup-item:first-child{border-top:0}
+.backup-time{flex:1;font-size:13px;font-weight:600;color:var(--ink)}
+.backup-size{color:var(--muted);font-size:12px}
+.backup-restore{border:0;background:transparent;color:var(--brand);font-size:12px;font-weight:600;cursor:pointer;padding:4px 8px;border-radius:6px}
+.backup-restore:hover:not(:disabled){background:var(--brand-soft)}
+.backup-restore:disabled{opacity:.5;cursor:not-allowed}
+.backup-web-note{margin-top:16px;padding:14px;border:1px dashed var(--border-default);border-radius:var(--radius-panel);color:var(--muted);font-size:12px;line-height:1.6}
 
 .ai-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-bottom:16px}
 .eyebrow{margin:0;color:var(--brand);font-size:12px;font-weight:600;letter-spacing:.08em}

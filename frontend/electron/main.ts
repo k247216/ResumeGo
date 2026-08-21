@@ -11,7 +11,12 @@ import { buildBackendLaunchSpec } from './backendProcess.js'
 import { DesktopKeyStore } from './keyStore.js'
 import { isTrustedRendererUrl } from './security.js'
 import { createBeforeQuitHandler, terminateChildProcess } from './processLifecycle.js'
-import { createColdWorkspaceBackup } from './workspaceBackup.js'
+import {
+  createColdWorkspaceBackup,
+  exportWorkspaceBackup,
+  listWorkspaceBackups,
+  restoreWorkspaceBackup,
+} from './workspaceBackup.js'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 app.setName('ResumeGo')
@@ -21,6 +26,7 @@ let runtimeConfig = { backendOrigin: '', workspaceToken: '' }
 let internalToken = ''
 let keyStore: DesktopKeyStore | null = null
 let trustedFrontendOrigin = ''
+let dataDir = ''
 
 function findOpenPort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -97,7 +103,7 @@ async function startFrontendServer(distDir: string): Promise<string> {
 
 async function startApplication(): Promise<void> {
   const projectRoot = path.resolve(currentDir, '..', '..')
-  const dataDir = path.join(app.getPath('userData'), 'workspace')
+  dataDir = path.join(app.getPath('userData'), 'workspace')
   await mkdir(dataDir, { recursive: true })
   await createColdWorkspaceBackup(dataDir)
 
@@ -237,6 +243,37 @@ ipcMain.handle('resumego:key-apply', async (event, profileId: number) => {
 ipcMain.handle('resumego:key-storage-mode', async (event) => {
   assertTrustedIpc(event)
   return keyStore?.mode() ?? 'session'
+})
+
+ipcMain.handle('resumego:backup-list', async (event) => {
+  assertTrustedIpc(event)
+  return listWorkspaceBackups(dataDir)
+})
+ipcMain.handle('resumego:backup-create', async (event) => {
+  assertTrustedIpc(event)
+  return createColdWorkspaceBackup(dataDir)
+})
+ipcMain.handle('resumego:backup-restore', async (event, backupId: string) => {
+  assertTrustedIpc(event)
+  const result = await restoreWorkspaceBackup(dataDir, backupId)
+  if (result.restored) {
+    // A restored database requires the local backend to reload its file; simplest
+    // safe path is to tell the renderer to restart the workspace via app reload.
+    return result
+  }
+  return result
+})
+ipcMain.handle('resumego:backup-export', async (event, backupId: string | null) => {
+  assertTrustedIpc(event)
+  const choice = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: '选择备份保存位置',
+  })
+  if (choice.canceled || choice.filePaths.length === 0) {
+    return { canceled: true }
+  }
+  const result = await exportWorkspaceBackup(dataDir, backupId, choice.filePaths[0])
+  return { canceled: false, ...result }
 })
 
 if (!app.requestSingleInstanceLock()) {

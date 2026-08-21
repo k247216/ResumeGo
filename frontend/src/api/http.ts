@@ -3,6 +3,17 @@ interface DesktopRuntimeConfig {
   workspaceToken: string
 }
 
+export interface DesktopBackupInfo {
+  id: string
+  createdAt: string
+  sizeBytes: number
+}
+
+export interface DesktopExportResult {
+  canceled?: boolean
+  exportedTo?: string
+}
+
 declare global {
   interface Window {
     resumeGoDesktop?: {
@@ -12,6 +23,10 @@ declare global {
       hasApiKey: (profileId: number) => Promise<boolean>
       applyApiKey: (profileId: number) => Promise<boolean>
       keyStorageMode: () => Promise<'secure' | 'session'>
+      listBackups: () => Promise<DesktopBackupInfo[]>
+      createBackup: () => Promise<{ backupDir: string } | null>
+      restoreBackup: (backupId: string) => Promise<{ restored: boolean; backupDir: string }>
+      exportBackup: (backupId: string | null) => Promise<DesktopExportResult>
     }
   }
 }
