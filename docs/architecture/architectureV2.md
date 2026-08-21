@@ -3,7 +3,7 @@
 
 Version: V2.0
 
-Status: Architecture Frozen
+Status: Approved (2026-08-21, see docs/decisions.md)
 
 
 # 1. Architecture Overview

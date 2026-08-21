@@ -209,3 +209,25 @@ PDF 导入作为后续独立事项评估，届时需明确解析失败的处理�
 **影响**
 
 首页 rail 宽度为本地视图状态（不持久化，刷新回默认 330）；compact 模式只是表达层切换，事件数据不变；Settings 后端校验与密钥存储（safeStorage/H2）零改动，仅前端口径与文案重写；Target 页沿用既有 API（schedule/interview plan/JD），新增展示全部来自真实数据。QA 记录见 `design-qa.md` 第 15 轮，roadmap 进度同步更新。
+
+## 2026-08-21｜产品身份确认：向 Career OS（V2）彻底转向
+
+**决定**
+
+ResumeGo 的产品主线从「证据驱动的单目标求职工作台」升级为「职达 Career OS」——本地优先、以个人职业资产为核心的 AI 职业成长操作系统。仓库内已提交的 V2 文档（`docs/product/productV2.md`、`docs/architecture/architectureV2.md`、`docs/ai-architecture.md`、`docs/domain-map.md`、`docs/data-model.md`、`docs/architecture/architecture- freeze.md` 及 `roadmap.md` 后半段 V2 附录）从「未决草案」转为**正式批准的方向**。开发主线围绕五个核心系统组织：
+
+```text
+Career Pipeline（管理目标）→ Resume Version（管理表达）→ Knowledge Base（管理知识资产）→ Interview Engine（管理训练）→ Growth System（管理反馈）
+```
+
+**原因**
+
+产品要回答的不再是「为某个岗位准备一次」，而是「围绕职业目标持续积累资产、训练能力、看到成长」。求职者真正的痛点不仅是写简历，而是信息分散、缺乏岗位针对性、没有训练闭环、AI 不可信；Career OS 以职业资产为长期主线，能同时解决这四类问题。现有桌面基础（本地优先架构、求职目标、简历版本、模拟面试、日程、master-detail 界面）正是 V2 的落地底座，转向是自然演进而非推倒重来。
+
+**影响**
+
+- V2 文档状态从「草案」转为「批准方向」，`docs/product/productV2.md` 等作为产品定义基准；
+- 现有 V1 界面（工作台/目标/简历/面试/日程/设置）作为 Career OS 当前落地形态继续演进，不删除已有能力；
+- 后续开发按 V2 阶段推进：V1.0 Core（Pipeline/Resume/Interview/Calendar）→ V1.5 知识增强（Knowledge Base/RAG/复盘/成长）→ V2.0 Agent（Skill/MCP、Career Agent）；
+- 数据诚实、证据驱动、AI 受约束、本地优先等既有原则全部保留并继续适用；
+- 仓库公开名与产品名统一为 ResumeGo，中文名职达；远端仓库迁移至 `github.com/k247216/ResumeGo`。

@@ -2,6 +2,16 @@
 
 路线图按可交付的用户结果推进。每个版本都必须能够独立运行、回归和发布，不以页面数量作为完成标准。
 
+## 当前主线：职达 Career OS（V2，2026-08-21 批准）
+
+产品主线已从「单目标求职工作台」升级为「以个人职业资产为核心的 AI 职业成长操作系统」（见 `docs/decisions.md` 2026-08-21 决策）。下方 V1 路线图记录产品重置阶段的完成过程与退出条件；后续开发按文件后半段 **Career OS Evolution Roadmap（V2.0）** 的阶段推进：
+
+```text
+V1.0 Core（Pipeline / Resume / Interview / Calendar）→ V1.5 知识增强（Knowledge Base / RAG / 复盘 / 成长）→ V2.0 Agent（Skill/MCP、Career Agent）
+```
+
+现有界面（工作台/求职目标/简历/面试/日程/设置）是 Career OS 的当前落地形态，继续演进不删除。
+
 ## 当前阶段：产品重置
 
 目标：把现有 Web 原型转换为清晰、可信、可继续演进的产品基线。
@@ -175,7 +185,7 @@ RG-001 至 RG-006 的桌面基础主线已完成。下一阶段进入 v0.1 产�
 
 Version: V2.0
 
-Status: Product Direction Frozen
+Status: Approved (2026-08-21, see docs/decisions.md)
 
 
 ## 产品阶段转型说明
