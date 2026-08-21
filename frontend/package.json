@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run --environment happy-dom",
     "build:backend": "cd ../backend && mvn -DskipTests package && node ../frontend/scripts/copy-backend-jar.mjs",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.preload.json",
     "build:runtime": "node scripts/build-runtime.mjs",
     "desktop:prepare": "npm run build:backend && npm run build && npm run build:electron",
     "desktop:start": "npm run desktop:prepare && electron .",

@@ -106,6 +106,69 @@ async function startFrontendServer(distDir: string): Promise<string> {
   return `http://127.0.0.1:${port}`
 }
 
+ipcMain.on('resumego:runtime-config', (event) => {
+  assertTrustedIpc(event)
+  event.returnValue = runtimeConfig
+})
+ipcMain.handle('resumego:key-save', async (event, profileId: number, apiKey: string) => {
+  assertTrustedIpc(event)
+  if (!keyStore) throw new Error('安全存储尚未就绪')
+  await keyStore.save(profileId, apiKey)
+  await applyStoredProvider(profileId)
+  return true
+})
+ipcMain.handle('resumego:key-delete', async (event, profileId: number) => {
+  assertTrustedIpc(event)
+  if (!keyStore) throw new Error('安全存储尚未就绪')
+  await keyStore.delete(profileId)
+  await providerRequest(`/api/ai/runtime/${profileId}`, { method: 'DELETE' })
+  return true
+})
+ipcMain.handle('resumego:key-has', async (event, profileId: number) => {
+  assertTrustedIpc(event)
+  return keyStore?.has(profileId) ?? false
+})
+ipcMain.handle('resumego:key-apply', async (event, profileId: number) => {
+  assertTrustedIpc(event)
+  return applyStoredProvider(profileId)
+})
+ipcMain.handle('resumego:key-storage-mode', async (event) => {
+  assertTrustedIpc(event)
+  return keyStore?.mode() ?? 'session'
+})
+
+ipcMain.handle('resumego:backup-list', async (event) => {
+  assertTrustedIpc(event)
+  return listWorkspaceBackups(dataDir)
+})
+ipcMain.handle('resumego:backup-create', async (event) => {
+  assertTrustedIpc(event)
+  return createColdWorkspaceBackup(dataDir)
+})
+ipcMain.handle('resumego:backup-restore', async (event, backupId: string) => {
+  assertTrustedIpc(event)
+  const result = await restoreWorkspaceBackup(dataDir, backupId)
+  if (result.restored) {
+    // A restored database requires the local backend to reload its file; simplest
+    // safe path is to tell the renderer to restart the workspace via app reload.
+    return result
+  }
+  return result
+})
+ipcMain.handle('resumego:backup-export', async (event, backupId: string | null) => {
+  assertTrustedIpc(event)
+  const choice = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: '选择备份保存位置',
+  })
+  if (choice.canceled || choice.filePaths.length === 0) {
+    return { canceled: true }
+  }
+  const result = await exportWorkspaceBackup(dataDir, backupId, choice.filePaths[0])
+  return { canceled: false, ...result }
+})
+
+
 async function startApplication(): Promise<void> {
   const projectRoot = path.resolve(currentDir, '..', '..')
   dataDir = path.join(app.getPath('userData'), 'workspace')
@@ -223,68 +286,6 @@ function assertTrustedIpc(event: Electron.IpcMainEvent | Electron.IpcMainInvokeE
     throw new Error('拒绝来自非应用页面的请求')
   }
 }
-
-ipcMain.on('resumego:runtime-config', (event) => {
-  assertTrustedIpc(event)
-  event.returnValue = runtimeConfig
-})
-ipcMain.handle('resumego:key-save', async (event, profileId: number, apiKey: string) => {
-  assertTrustedIpc(event)
-  if (!keyStore) throw new Error('安全存储尚未就绪')
-  await keyStore.save(profileId, apiKey)
-  await applyStoredProvider(profileId)
-  return true
-})
-ipcMain.handle('resumego:key-delete', async (event, profileId: number) => {
-  assertTrustedIpc(event)
-  if (!keyStore) throw new Error('安全存储尚未就绪')
-  await keyStore.delete(profileId)
-  await providerRequest(`/api/ai/runtime/${profileId}`, { method: 'DELETE' })
-  return true
-})
-ipcMain.handle('resumego:key-has', async (event, profileId: number) => {
-  assertTrustedIpc(event)
-  return keyStore?.has(profileId) ?? false
-})
-ipcMain.handle('resumego:key-apply', async (event, profileId: number) => {
-  assertTrustedIpc(event)
-  return applyStoredProvider(profileId)
-})
-ipcMain.handle('resumego:key-storage-mode', async (event) => {
-  assertTrustedIpc(event)
-  return keyStore?.mode() ?? 'session'
-})
-
-ipcMain.handle('resumego:backup-list', async (event) => {
-  assertTrustedIpc(event)
-  return listWorkspaceBackups(dataDir)
-})
-ipcMain.handle('resumego:backup-create', async (event) => {
-  assertTrustedIpc(event)
-  return createColdWorkspaceBackup(dataDir)
-})
-ipcMain.handle('resumego:backup-restore', async (event, backupId: string) => {
-  assertTrustedIpc(event)
-  const result = await restoreWorkspaceBackup(dataDir, backupId)
-  if (result.restored) {
-    // A restored database requires the local backend to reload its file; simplest
-    // safe path is to tell the renderer to restart the workspace via app reload.
-    return result
-  }
-  return result
-})
-ipcMain.handle('resumego:backup-export', async (event, backupId: string | null) => {
-  assertTrustedIpc(event)
-  const choice = await dialog.showOpenDialog({
-    properties: ['openDirectory', 'createDirectory'],
-    title: '选择备份保存位置',
-  })
-  if (choice.canceled || choice.filePaths.length === 0) {
-    return { canceled: true }
-  }
-  const result = await exportWorkspaceBackup(dataDir, backupId, choice.filePaths[0])
-  return { canceled: false, ...result }
-})
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
