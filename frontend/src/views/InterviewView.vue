@@ -253,153 +253,15 @@
     </el-dialog>
 
     <!-- ========== 成长趋势弹窗 ========== -->
-    <el-dialog v-model="showGrowthDialog" title="成长趋势" width="800px" :close-on-click-modal="false">
-      <div v-if="growthReport" class="growth-content">
-        <!-- 顶部信息 -->
-        <div class="growth-header">
-          <div class="growth-header-info">
-            <span class="growth-header-label">当前岗位</span>
-            <strong>{{ growthReport.jobTitle }}</strong>
-            <small v-if="growthReport.companyName">{{ growthReport.companyName }}</small>
-          </div>
-          <div class="growth-header-info">
-            <span class="growth-header-label">当前简历</span>
-            <strong>{{ selectedResumeLabel }}</strong>
-          </div>
-        </div>
-
-        <!-- 版本时间线 -->
-        <div class="growth-timeline" v-if="growthSnapshots.length > 1">
-          <div class="growth-timeline-line">
-            <div
-              v-for="(snap, idx) in growthSnapshots"
-              :key="snap.resumeVersionId"
-              class="growth-timeline-dot"
-              :class="{ active: idx === growthSnapshots.length - 1 }"
-            >
-              <span class="growth-timeline-dot-inner"></span>
-              <span class="growth-timeline-label">{{ snap.versionLabel.split('·')[0]?.trim() || snap.versionLabel }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 折线图 -->
-        <div class="growth-chart" v-if="growthSnapshots.length > 1">
-          <h4 class="growth-section-title">四维能力变化趋势</h4>
-          <svg :viewBox="'0 0 600 280'" class="growth-line-chart" preserveAspectRatio="xMidYMid meet">
-            <!-- Y轴网格线 -->
-            <line v-for="y in 5" :key="'grid-' + y" :x1="50" :y1="40 + (y - 1) * 50" :x2="580" :y2="40 + (y - 1) * 50" stroke="#e5e7eb" stroke-width="1" />
-            <!-- Y轴标签 -->
-            <text v-for="y in 5" :key="'ylabel-' + y" :x="42" :y="44 + (y - 1) * 50" text-anchor="end" font-size="10" fill="#94a3b8">{{ 10 - (y - 1) * 2.5 }}</text>
-            <!-- X轴标签 -->
-            <text
-              v-for="(snap, idx) in growthSnapshots"
-              :key="'xlabel-' + idx"
-              :x="50 + (idx / Math.max(growthSnapshots.length - 1, 1)) * 530"
-              :y="272"
-              text-anchor="middle"
-              font-size="10"
-              fill="#64748b"
-            >{{ snap.versionLabel.split('·')[0]?.trim() || snap.versionLabel }}</text>
-
-            <!-- 折线 -->
-            <template v-for="(dim, dimIdx) in dimNames" :key="dim.key">
-              <polyline
-                :points="growthSnapshots.map((snap, idx) => {
-                  const x = 50 + (idx / Math.max(growthSnapshots.length - 1, 1)) * 530
-                  const y = 240 - ((snap.dimensions[dim.key as keyof GrowthDimensions] as number) / 10) * 200
-                  return x + ',' + y
-                }).join(' ')"
-                :stroke="dim.color"
-                :stroke-width="dimIdx === 0 ? 2.5 : 2"
-                fill="none"
-                stroke-linejoin="round"
-                stroke-linecap="round"
-              />
-              <!-- 数据点 -->
-              <circle
-                v-for="(snap, idx) in growthSnapshots"
-                :key="dim.key + '-' + idx"
-                :cx="50 + (idx / Math.max(growthSnapshots.length - 1, 1)) * 530"
-                :cy="240 - ((snap.dimensions[dim.key as keyof GrowthDimensions] as number) / 10) * 200"
-                :r="dimIdx === 0 ? 4 : 3"
-                :fill="dim.color"
-                stroke="white"
-                stroke-width="1.5"
-              />
-            </template>
-          </svg>
-
-          <!-- 图例 -->
-          <div class="growth-legend">
-            <span v-for="dim in dimNames" :key="dim.key" class="growth-legend-item">
-              <span class="growth-legend-dot" :style="{ background: dim.color }"></span>
-              {{ dim.label }}
-            </span>
-          </div>
-        </div>
-
-        <!-- 变化摘要 -->
-        <div class="growth-changes" v-if="growthSnapshots.length > 1">
-          <h4 class="growth-section-title">变化摘要</h4>
-          <div class="growth-changes-grid">
-            <div v-for="dim in dimNames" :key="dim.key" class="growth-change-item">
-              <span class="growth-change-label">{{ dim.label }}</span>
-              <span
-                class="growth-change-value"
-                :class="{
-                  'growth-change-positive': (growthChanges[dim.key as keyof GrowthDimensions] as number) > 0,
-                  'growth-change-negative': (growthChanges[dim.key as keyof GrowthDimensions] as number) < 0,
-                }"
-              >
-                {{ (growthChanges[dim.key as keyof GrowthDimensions] as number) > 0 ? '+' : '' }}{{ (growthChanges[dim.key as keyof GrowthDimensions] as number).toFixed(1) }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 版本卡片 -->
-        <div class="growth-snapshots">
-          <h4 class="growth-section-title">版本详情</h4>
-          <div v-for="snap in growthSnapshots" :key="snap.resumeVersionId" class="growth-snapshot-card">
-            <div class="growth-snapshot-header">
-              <strong>{{ snap.versionLabel.split('·')[0]?.trim() || snap.versionLabel }}</strong>
-              <span class="growth-snapshot-badge">代表面试：Plan #{{ snap.representativePlanId }}</span>
-              <span class="growth-snapshot-badge">该版本共面试 {{ snap.interviewCount }} 次</span>
-            </div>
-            <div class="growth-snapshot-scores">
-              <div v-for="dim in dimNames" :key="dim.key" class="growth-snapshot-score">
-                <span class="growth-snapshot-score-label">{{ dim.label }}</span>
-                <span class="growth-snapshot-score-bar-wrapper">
-                  <span
-                    class="growth-snapshot-score-bar"
-                    :style="{ width: ((snap.dimensions[dim.key as keyof GrowthDimensions] as number) / 10) * 100 + '%', background: dim.color }"
-                  ></span>
-                </span>
-                <span class="growth-snapshot-score-value">{{ (snap.dimensions[dim.key as keyof GrowthDimensions] as number).toFixed(1) }}</span>
-              </div>
-            </div>
-            <div v-if="snap.summary" class="growth-snapshot-summary">
-              <span>总结：</span>{{ snap.summary }}
-            </div>
-          </div>
-        </div>
-
-        <!-- 单次提示 -->
-        <div v-if="growthSnapshots.length <= 1" class="growth-single-hint">
-          <el-icon><Trophy /></el-icon>
-          <p>仅有 1 个版本数据</p>
-          <small>完成更多面试后可见成长趋势对比</small>
-        </div>
-      </div>
-      <div v-else-if="growthLoading" class="growth-loading">
-        <el-icon class="is-loading"><Loading /></el-icon>
-        <span>正在加载成长数据，请稍候...</span>
-      </div>
-      <template #footer>
-        <el-button @click="showGrowthDialog = false">关闭</el-button>
-      </template>
-    </el-dialog>
+    <GrowthTrendDialog
+      v-model="showGrowthDialog"
+      :report="growthReport"
+      :loading="growthLoading"
+      :snapshots="growthSnapshots"
+      :changes="growthChanges"
+      :resume-label="selectedResumeLabel"
+      :dims="dimNames"
+    />
 
     <InterviewPlanReviewDialog
       v-model="showPlanReviewDialog"
@@ -499,187 +361,26 @@
             }}
           </button>
         </div>
-        <div class="chat-messages" ref="chatMessagesRef">
-          <!-- 聊天消息列表 -->
-          <div
-            v-for="(msg, idx) in chatMessages"
-            :key="idx"
-            class="chat-message"
-            :class="msg.role"
-          >
-            <!-- 面试官消息 -->
-            <template v-if="msg.role === 'interviewer'">
-              <div class="msg-avatar" :class="'avatar-' + (activeSessionPersona?.avatar || 'general')">
-                {{ activeSessionPersona?.name?.charAt(0) || '面' }}
-              </div>
-              <div class="msg-bubble interviewer-bubble">
-                <div class="bubble-header">
-                  <span class="bubble-name">{{ activeSession?.personaName || '面试官' }}</span>
-                  <span class="bubble-question-num">第 {{ msg.questionIndex }} / {{ activeSession?.totalQuestions }} 题</span>
-                </div>
-                <div class="bubble-text">{{ msg.text }}</div>
-              </div>
-            </template>
-
-            <!-- 用户消息 -->
-            <template v-else-if="msg.role === 'user'">
-              <div class="msg-bubble user-bubble">
-                <div class="bubble-text">{{ msg.text }}</div>
-              </div>
-              <div class="msg-avatar user-avatar">我</div>
-            </template>
-
-            <!-- 发送中加载指示器 -->
-            <template v-else-if="msg.role === 'sending'">
-              <div class="msg-bubble user-bubble">
-                <div class="bubble-text">{{ msg.text }}</div>
-              </div>
-              <div class="msg-avatar user-avatar">我</div>
-              <div class="sending-indicator">
-                <el-icon class="is-loading"><Loading /></el-icon>
-                <span>{{ formatElapsedTime }}</span>
-              </div>
-            </template>
-
-            <!-- 评价卡片 -->
-            <template v-else-if="msg.role === 'evaluation' && msg.evaluation">
-              <div class="evaluation-inline">
-                <div class="eval-header">
-                  <el-icon><Trophy /></el-icon>
-                  <span>本题评价</span>
-                </div>
-                <div v-if="msg.evaluation.score" class="eval-overall-card">
-                  <span>本题综合表现</span>
-                  <strong>{{ questionEvaluationAverage(msg.evaluation.score) }}<small>/10</small></strong>
-                  <p>{{ questionEvaluationCopy(msg.evaluation.score) }}</p>
-                </div>
-                <div v-if="msg.evaluation.score" class="eval-score-row">
-                  <div class="eval-score-item">
-                    <span>清晰度</span>
-                    <el-progress :percentage="msg.evaluation.score.clarity * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
-                    <strong>{{ msg.evaluation.score.clarity }}/10</strong>
-                  </div>
-                  <div class="eval-score-item">
-                    <span>相关性</span>
-                    <el-progress :percentage="msg.evaluation.score.relevance * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
-                    <strong>{{ msg.evaluation.score.relevance }}/10</strong>
-                  </div>
-                  <div class="eval-score-item">
-                    <span>深度</span>
-                    <el-progress :percentage="msg.evaluation.score.depth * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
-                    <strong>{{ msg.evaluation.score.depth }}/10</strong>
-                  </div>
-                  <div class="eval-score-item">
-                    <span>准确度</span>
-                    <el-progress :percentage="msg.evaluation.score.accuracy * 10" :show-text="false" :stroke-width="5" color="var(--warning)" />
-                    <strong>{{ msg.evaluation.score.accuracy }}/10</strong>
-                  </div>
-                </div>
-                <div v-if="msg.evaluation.strengths?.length" class="eval-section">
-                  <h4><el-icon><CircleCheck /></el-icon> 亮点</h4>
-                  <ul><li v-for="s in msg.evaluation.strengths" :key="s">{{ s }}</li></ul>
-                </div>
-                <div v-if="msg.evaluation.weaknesses?.length" class="eval-section">
-                  <h4><el-icon><Warning /></el-icon> 可加强</h4>
-                  <ul><li v-for="w in msg.evaluation.weaknesses" :key="w">{{ w }}</li></ul>
-                </div>
-                <div v-if="msg.evaluation.suggestions?.length" class="eval-section">
-                  <h4>建议</h4>
-                  <p>{{ msg.evaluation.suggestions.join('；') }}</p>
-                </div>
-                <div v-if="msg.evaluation.referenceAnswer" class="eval-section ref-answer">
-                  <h4><el-icon><Trophy /></el-icon> 参考回答</h4>
-                  <p>{{ msg.evaluation.referenceAnswer }}</p>
-                </div>
-              </div>
-            </template>
-
-            <!-- 总结卡片 -->
-            <template v-else-if="msg.role === 'summary'">
-              <div class="summary-inline">
-                <div class="summary-header">
-                  <el-icon><Trophy /></el-icon>
-                  <h3>练习总结</h3>
-                </div>
-                <p class="summary-desc">{{ summaryDescription }}</p>
-                <div v-if="summaryStrengths.length" class="summary-block">
-                  <h4>本次亮点</h4>
-                  <span v-for="s in summaryStrengths" :key="s"><el-icon><CircleCheck /></el-icon>{{ s }}</span>
-                </div>
-                <div v-if="summarySuggestions.length" class="summary-block">
-                  <h4>下一步建议</h4>
-                  <span v-for="s in summarySuggestions" :key="s"><el-icon><ArrowRight /></el-icon>{{ s }}</span>
-                </div>
-                <div v-if="activeState.perQuestionScores.length > 0" class="summary-scores">
-                  <h4>本轮评分画像</h4>
-                  <div v-if="activeRoundScoreSummary" class="round-score-overview">
-                    <div class="round-score-main">
-                      <span>{{ activeRoundScoreSummary.displayAverage }}</span>
-                      <small>/10</small>
-                    </div>
-                    <div class="round-score-copy">
-                      <strong>薄弱维度：{{ activeRoundScoreSummary.weakest.label }}</strong>
-                      <p>{{ trainingHintForDimension(activeRoundScoreSummary.weakest.key) }}</p>
-                    </div>
-                  </div>
-                  <div class="summary-score-cards">
-                    <div v-for="score in activeState.perQuestionScores" :key="score.questionIndex" class="summary-score-card">
-                      <span class="sq-label">第 {{ score.questionIndex }} 题</span>
-                      <div class="sq-dims">
-                        <span>清晰度 {{ score.clarity }}</span>
-                        <span>相关性 {{ score.relevance }}</span>
-                        <span>深度 {{ score.depth }}</span>
-                        <span>准确度 {{ score.accuracy }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="activeReviewMode" class="summary-actions-row">
-                  <span class="review-inline-hint">可点击上方按钮查看整次复盘，也可以切换左侧轮次查看完整对话。</span>
-                </div>
-                <div v-else class="summary-actions-row">
-                  <button
-                    v-if="nextPlannedPersona"
-                    class="interview-outline-button"
-                    type="button"
-                    :disabled="actionLoading"
-                    @click="startNextPlannedPersona"
-                  >
-                    进入下一位：{{ nextPlannedPersona.name }}
-                    <el-icon v-if="actionLoading" class="is-loading"><Loading /></el-icon>
-                    <el-icon v-else><ArrowRight /></el-icon>
-                  </button>
-                  <button
-                    v-if="canReturnToWorkspace"
-                    class="interview-outline-button"
-                    type="button"
-                    @click="goToOptimization"
-                  >
-                    回到简历优化
-                    <el-icon><ArrowRight /></el-icon>
-                  </button>
-                </div>
-              </div>
-            </template>
-          </div>
-
-          <!-- 重试卡片 -->
-          <div v-if="!activeReviewMode && activeState.retryable" class="retry-card">
-            <div class="retry-message">
-              <el-icon><Warning /></el-icon>
-              <span>AI 评价暂时不可用，你可以重试提交</span>
-            </div>
-            <div v-if="activeState.lastSubmitAnswer" class="retry-answer-preview">
-              <span class="retry-answer-label">已提交的回答：</span>
-              <p>{{ activeState.lastSubmitAnswer }}</p>
-            </div>
-            <button class="interview-outline-button retry-button" type="button" :disabled="actionLoading" @click="retrySubmitAnswer">
-              重试评价
-              <el-icon v-if="actionLoading" class="is-loading"><Loading /></el-icon>
-              <el-icon v-else><RefreshRight /></el-icon>
-            </button>
-          </div>
-        </div>
+        <InterviewChatThread
+          :messages="chatMessages"
+          :active-session="activeSession"
+          :active-session-persona="activeSessionPersona"
+          :format-elapsed-time="formatElapsedTime"
+          :summary-description="summaryDescription"
+          :summary-strengths="summaryStrengths"
+          :summary-suggestions="summarySuggestions"
+          :per-question-scores="activeState.perQuestionScores"
+          :round-score-summary="activeRoundScoreSummary"
+          :review-mode="activeReviewMode"
+          :action-loading="actionLoading"
+          :next-planned-persona="nextPlannedPersona"
+          :can-return-to-workspace="canReturnToWorkspace"
+          :retryable="activeState.retryable"
+          :last-submit-answer="activeState.lastSubmitAnswer"
+          @next-persona="startNextPlannedPersona"
+          @go-optimization="goToOptimization"
+          @retry-submit="retrySubmitAnswer"
+        />
 
         <!-- 输入栏 -->
         <div v-if="activeReviewMode" class="review-mode-bar">
@@ -731,7 +432,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -743,9 +444,7 @@ import {
   Loading,
   Microphone,
   Plus,
-  RefreshRight,
   Trophy,
-  Warning,
 } from '@element-plus/icons-vue'
 import { listJobDescriptions, resolveCompanyProfile } from '../api/job'
 import { useTargetsStore } from '../stores/targets'
@@ -754,6 +453,8 @@ import CompanyProfileSignal from '../components/CompanyProfileSignal.vue'
 import InterviewHistoryPanel, { type CurrentPlanSummary } from '../components/interview/InterviewHistoryPanel.vue'
 import InterviewPlanReviewDialog from '../components/interview/InterviewPlanReviewDialog.vue'
 import InterviewRoomSidebar from '../components/interview/InterviewRoomSidebar.vue'
+import GrowthTrendDialog from '../components/interview/GrowthTrendDialog.vue'
+import InterviewChatThread from '../components/interview/InterviewChatThread.vue'
 import {
   createInterviewPlan,
   deleteInterviewPlan,
@@ -773,7 +474,6 @@ import { getResumeVersion, getResumeVersions, listResumes } from '../api/resume'
 import type { CompanyProfile, JobDescription } from '../types/job'
 import type {
   EvaluationSummary,
-  GrowthDimensions,
   GrowthReport,
   InterviewPlanResponse,
   InterviewPlanRound,
@@ -797,10 +497,7 @@ import {
   type InterviewRecord,
 } from '../utils/interviewRecords'
 import {
-  questionEvaluationAverage,
-  questionEvaluationCopy,
   summarizeQuestionScores,
-  trainingHintForDimension,
   type ScoreSummary,
 } from '../utils/interviewReview'
 import { useInterviewSessions } from '../composables/useInterviewSessions'
@@ -929,7 +626,6 @@ const persistedInterviewPlans = ref<InterviewPlanResponse[]>([])
 
 const elapsedTime = ref(0)
 const actionStage = ref('正在处理...')
-const chatMessagesRef = ref<HTMLElement | null>(null)
 let elapsedTimer: ReturnType<typeof setInterval> | null = null
 
 const speechSupported = ref(false)
@@ -1415,18 +1111,6 @@ function applyBackendPlans(plans: InterviewPlanResponse[]) {
   }
   persistedInterviewPlans.value = [...nextPlansById.values()]
 }
-
-function scrollToBottom() {
-  nextTick(() => {
-    const el = chatMessagesRef.value
-    if (el) el.scrollTop = el.scrollHeight
-  })
-}
-
-watch(chatMessages, () => scrollToBottom(), { deep: true })
-watch(actionLoading, (val) => {
-  if (!val) scrollToBottom()
-})
 
 watch(
   () => selectedJobEntity.value?.companyName,
@@ -3338,230 +3022,6 @@ function formatDate(value?: string | null) {
 .plan-review-empty-summary span {
   font-size: 12px;
 }
-.chat-messages {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 18px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: var(--surface, #f8fafc);
-}
-.chat-message { display: flex; gap: 8px; max-width: 80%; position: relative; }
-.chat-message.interviewer { align-self: flex-start; flex-direction: row; }
-.chat-message.user { align-self: flex-end; flex-direction: row-reverse; }
-.chat-message.sending { align-self: flex-end; flex-direction: row-reverse; flex-wrap: wrap; }
-
-/* 消息头像 */
-.msg-avatar {
-  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 14px; color: #fff; flex-shrink: 0;
-}
-.user-avatar { background: var(--brand); }
-
-/* 消息气泡 */
-.msg-bubble { max-width: 100%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; font-size: 14px; }
-.interviewer-bubble { background: var(--surface-solid, #fff); color: var(--ink, #1e293b); border: 1px solid var(--line, #e5eaf2); border-top-left-radius: 4px; }
-.user-bubble { background: var(--brand); color: #fff; border-top-right-radius: 4px; }
-.bubble-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.bubble-name { font-weight: 700; font-size: 12px; color: var(--muted, #64748b); }
-.bubble-question-num { font-size: 11px; color: var(--muted, #94a3b8); }
-.bubble-text { white-space: pre-wrap; word-break: break-word; }
-
-/* 发送中指示器 */
-.sending-indicator {
-  display: flex; align-items: center; gap: 6px; margin-top: 4px; margin-right: 4px;
-  font-size: 12px; color: var(--copy, #6b7280); align-self: flex-end;
-}
-.sending-indicator .el-icon { font-size: 14px; color: var(--brand, #10b981); }
-
-/* 内联评价 */
-.evaluation-inline {
-  align-self: stretch; max-width: 100%; margin: 4px 0; padding: 14px 16px;
-  border-radius: 16px; background: var(--surface-solid, #fff); border: 1px solid var(--line, #e5eaf2);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
-}
-.eval-header { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: var(--copy, #1f2937); margin-bottom: 10px; }
-.eval-overall-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 12px;
-  align-items: center;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--surface, #f8fafc);
-  border: 1px solid var(--line, #e2e8f0);
-}
-.eval-overall-card span {
-  color: var(--muted, #64748b);
-  font-size: 12px;
-  font-weight: 800;
-}
-.eval-overall-card strong {
-  grid-row: span 2;
-  color: var(--ink, #0f172a);
-  font-size: 24px;
-  font-weight: 950;
-  letter-spacing: -0.04em;
-}
-.eval-overall-card small {
-  color: var(--muted, #94a3b8);
-  font-size: 12px;
-}
-.eval-overall-card p {
-  margin: 0;
-  color: var(--muted, #64748b);
-  font-size: 12px;
-}
-.eval-score-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
-.eval-score-item { display: flex; flex-direction: column; gap: 3px; }
-.eval-score-item > span { font-size: 11px; color: var(--copy, #6b7280); }
-.eval-score-item > strong { font-size: 12px; color: var(--copy, #1f2937); text-align: center; }
-.eval-section { margin-top: 8px; }
-.eval-section h4 { font-size: 12px; font-weight: 700; color: var(--copy, #374151); margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-.eval-section ul { margin: 0; padding-left: 16px; font-size: 13px; color: var(--copy, #4b5563); }
-.eval-section p { font-size: 13px; color: var(--copy, #4b5563); margin: 0; }
-.ref-answer { background: var(--brand-soft, #f0fdf4); border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
-
-/* 内联总结 */
-.summary-inline {
-  align-self: stretch; max-width: 100%; padding: 20px; border-radius: var(--radius-panel);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-}
-.summary-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.summary-header h3 { font-size: 18px; font-weight: 800; color: var(--ink, #101a33); margin: 0; }
-.summary-desc { font-size: 13px; color: var(--muted, #64748b); margin-bottom: 14px; }
-.summary-block { margin-bottom: 12px; }
-.summary-block h4 { font-size: 14px; font-weight: 700; color: var(--copy, #1f2937); margin-bottom: 6px; }
-.summary-block span { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--copy, #4b5563); margin-bottom: 4px; }
-.summary-scores { margin-top: 12px; }
-.summary-scores h4 { font-size: 14px; font-weight: 700; color: var(--copy, #1f2937); margin-bottom: 8px; }
-.round-score-overview {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 10px;
-  padding: 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-}
-.round-score-main {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  min-width: 70px;
-  color: var(--ink, #101a33);
-}
-.round-score-main span {
-  font-size: 30px;
-  font-weight: 950;
-  letter-spacing: -0.06em;
-}
-.round-score-main small {
-  margin-left: 2px;
-  color: var(--muted, #64748b);
-  font-size: 13px;
-  font-weight: 800;
-}
-.round-score-copy strong {
-  display: block;
-  color: var(--ink, #0f172a);
-  font-size: 13px;
-  font-weight: 900;
-}
-.round-score-copy p {
-  margin: 3px 0 0;
-  color: var(--muted, #64748b);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.summary-score-cards { display: flex; flex-direction: column; gap: 6px; }
-.summary-score-card { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: var(--surface-solid, #fff); border: 1px solid var(--line, #e5e7eb); }
-.sq-label { font-weight: 700; font-size: 13px; color: var(--copy, #374151); min-width: 50px; }
-.sq-dims { display: flex; gap: 12px; font-size: 12px; color: var(--copy, #6b7280); }
-.summary-actions-row { margin-top: 14px; }
-.review-inline-hint {
-  display: inline-flex;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: var(--surface, #f8fafc);
-  color: var(--muted, #64748b);
-  font-size: 12px;
-  font-weight: 800;
-}
-.interview-outline-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  border: 1px solid var(--line, #e5eaf2);
-  border-radius: 999px;
-  background: var(--surface-solid, #fff);
-  color: var(--ink, #0f172a);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
-}
-.interview-outline-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.interview-outline-button:hover:not(:disabled) { border-color: var(--brand, #cfeee2); color: var(--brand, #047857); background: var(--brand-soft, #ecfdf5); }
-
-/* 输入栏 */
-.chat-input-bar {
-  display: flex; align-items: flex-end; gap: 8px; padding: 12px 16px;
-  border-top: 1px solid var(--line, #e5eaf2); background: var(--surface, rgba(255, 255, 255, 0.96));
-}
-.chat-input-bar .voice-row { display: flex; align-items: center; flex-shrink: 0; }
-.chat-textarea { flex: 1; }
-.chat-send-btn {
-  flex-shrink: 0; padding: 9px 18px; border: 0; border-radius: var(--radius-control); background: var(--brand);
-  color: #fff; font-weight: 800; font-size: 14px; cursor: pointer;
-}
-.chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.chat-send-btn:hover:not(:disabled) { background: var(--accent-hover); }
-.review-mode-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--line, #e5eaf2);
-  background: rgba(248, 250, 252, 0.96);
-  color: var(--copy, #475569);
-  font-size: 13px;
-  font-weight: 700;
-}
-.review-mode-bar .el-icon { color: var(--brand, #10b981); font-size: 18px; }
-.review-mode-bar span { flex: 1; }
-
-/* 语音 */
-.voice-button {
-  display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;
-  border: 1px solid var(--line, #e5eaf2); border-radius: 999px; background: var(--surface-solid, #fff); cursor: pointer; transition: all 0.2s;
-}
-.voice-button:hover:not(:disabled) { border-color: var(--brand, #cfeee2); color: var(--brand, #047857); background: var(--brand-soft, #ecfdf5); }
-.voice-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.voice-button.listening { border-color: #ef4444; color: var(--danger, #ef4444); background: var(--danger-soft, #fef2f2); }
-.voice-button .is-pulsing { animation: voice-pulse-icon 1s ease-in-out infinite; }
-.voice-hint { font-size: 11px; color: var(--danger, #ef4444); font-weight: 600; white-space: nowrap; }
-@keyframes voice-pulse-icon { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
-
-/* 重试卡片 */
-.retry-card {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px;
-  padding: 12px 16px; border-radius: var(--radius-control); background: var(--warning-soft); border: 1px solid var(--warning); color: var(--warning); font-size: 14px;
-}
-.retry-card .retry-button { margin-left: auto; }
-.retry-message { display: flex; align-items: center; gap: 8px; width: 100%; }
-.retry-answer-preview {
-  width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 8px; background: var(--bg-subtle); border: 1px solid var(--border-default);
-}
-.retry-answer-label { font-size: 12px; color: var(--warning); font-weight: 600; }
-.retry-answer-preview p { margin: 4px 0 0; font-size: 13px; color: var(--copy); line-height: 1.5; max-height: 80px; overflow-y: auto; }
 
 /* 加载条（设置界面用） */
 .interview-loading-bar {
@@ -3682,315 +3142,6 @@ function formatDate(value?: string | null) {
   }
   .chat-plan-tags {
     justify-content: flex-start;
-  }
-}
-
-/* ── 成长趋势 ── */
-
-.growth-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.growth-header {
-  display: flex;
-  gap: 24px;
-}
-
-.growth-header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.growth-header-info strong {
-  font-size: 15px;
-  color: var(--ink, #101a33);
-}
-
-.growth-header-info small {
-  font-size: 12px;
-  color: var(--muted, #94a3b8);
-}
-
-.growth-header-label {
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.growth-timeline {
-  padding: 16px 0;
-}
-
-.growth-timeline-line {
-  display: flex;
-  align-items: center;
-  position: relative;
-  gap: 0;
-}
-
-.growth-timeline-line::before {
-  content: '';
-  position: absolute;
-  top: 12px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--surface, #e5e7eb);
-  z-index: 0;
-}
-
-.growth-timeline-dot {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-  z-index: 1;
-}
-
-.growth-timeline-dot-inner {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--surface, #e5e7eb);
-  border: 2px solid white;
-  transition: all 0.2s;
-}
-
-.growth-timeline-dot.active .growth-timeline-dot-inner {
-  background: var(--brand);
-  width: 14px;
-  height: 14px;
-}
-
-.growth-timeline-label {
-  font-size: 11px;
-  color: var(--muted, #64748b);
-  text-align: center;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.growth-timeline-dot.active .growth-timeline-label {
-  color: var(--ink, #101a33);
-  font-weight: 600;
-}
-
-.growth-section-title {
-  font-size: 14px;
-  color: var(--ink, #101a33);
-  margin: 0 0 12px 0;
-}
-
-.growth-line-chart {
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--line, #f1f5f9);
-  border-radius: 10px;
-  background: var(--surface, #fafbfc);
-}
-
-.growth-legend {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.growth-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted, #64748b);
-}
-
-.growth-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.growth-changes-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.growth-change-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 8px;
-  background: var(--surface, #f8fafc);
-  border-radius: 10px;
-  gap: 4px;
-}
-
-.growth-change-label {
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
-}
-
-.growth-change-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--muted, #94a3b8);
-}
-
-.growth-change-positive {
-  color: var(--brand, #10b981);
-}
-
-.growth-change-negative {
-  color: var(--danger, #ef4444);
-}
-
-.growth-snapshots {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.growth-snapshot-card {
-  padding: 14px;
-  background: var(--surface, #f8fafc);
-  border: 1px solid var(--line, #e5e7eb);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.growth-snapshot-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.growth-snapshot-header strong {
-  font-size: 14px;
-  color: var(--ink, #101a33);
-}
-
-.growth-snapshot-badge {
-  font-size: 11px;
-  color: var(--muted, #64748b);
-  background: var(--surface, #e5e7eb);
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-
-.growth-snapshot-scores {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.growth-snapshot-score {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.growth-snapshot-score-label {
-  font-size: 11px;
-  color: var(--muted, #64748b);
-  width: 72px;
-  flex-shrink: 0;
-}
-
-.growth-snapshot-score-bar-wrapper {
-  flex: 1;
-  height: 8px;
-  background: var(--surface, #e5e7eb);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.growth-snapshot-score-bar {
-  display: block;
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s;
-}
-
-.growth-snapshot-score-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink, #101a33);
-  width: 32px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.growth-snapshot-summary {
-  font-size: 12px;
-  color: var(--muted, #64748b);
-  line-height: 1.5;
-  padding-top: 4px;
-  border-top: 1px solid var(--line, #e5e7eb);
-}
-
-.growth-snapshot-summary span {
-  font-weight: 600;
-  color: var(--ink, #101a33);
-}
-
-.growth-single-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 32px;
-  color: var(--muted, #94a3b8);
-}
-
-.growth-single-hint .el-icon {
-  font-size: 32px;
-  color: var(--muted, #cbd5e1);
-}
-
-.growth-single-hint p {
-  font-size: 14px;
-  color: var(--muted, #64748b);
-  margin: 0;
-}
-
-.growth-single-hint small {
-  font-size: 12px;
-}
-
-.growth-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 48px;
-  color: var(--muted, #94a3b8);
-  font-size: 14px;
-}
-
-.growth-loading .el-icon {
-  font-size: 28px;
-}
-
-@media (max-width: 640px) {
-  .growth-changes-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .growth-header {
-    flex-direction: column;
-    gap: 10px;
   }
 }
 </style>
