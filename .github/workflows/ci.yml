@@ -59,7 +59,7 @@ jobs:
         run: npm ci
         working-directory: frontend
       - name: Build desktop package (backend jar + frontend dist + electron + jlink runtime)
-        run: npm run desktop:pack
+        run: npm run desktop:pack:win
         working-directory: frontend
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -67,5 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ResumeGo-windows-portable
-          path: output/desktop/*.exe
+          path: |
+            output/desktop/win-unpacked/*.exe
+            output/desktop/*.exe
           if-no-files-found: error
