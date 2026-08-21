@@ -39,3 +39,33 @@ jobs:
       - name: Run backend tests
         run: mvn -B test
         working-directory: backend
+
+  desktop-pack:
+    name: Desktop pack (Windows portable)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Build desktop package (backend jar + frontend dist + electron + jlink runtime)
+        run: npm run desktop:pack
+        working-directory: frontend
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Upload portable package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ResumeGo-windows-portable
+          path: output/desktop/*.exe
+          if-no-files-found: error
