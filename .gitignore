@@ -22,3 +22,6 @@ target/
 outputs/
 /output/
 .superpowers/
+.zcode/
+.agent/
+.claude/

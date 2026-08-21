@@ -29,13 +29,14 @@ ResumeGo 面向正在准备实习、校招或初级岗位的求职者。它围�
 
 ## 文档
 
-- [当前基线](docs/baseline.md)
-- [产品定义](docs/product.md)
-- [产品路线图](docs/roadmap.md)
-- [架构说明](docs/architecture.md)
-- [开发与完成标准](docs/development.md)
-- [隐私与 AI 边界](docs/privacy-and-ai.md)
+- [当前基线](docs/architecture/baseline.md)
+- [产品定义](docs/product/product.md)
+- [产品路线图](docs/product/roadmap.md)
+- [架构说明](docs/architecture/architecture.md)
+- [开发与完成标准](docs/architecture/development.md)
+- [隐私与 AI 边界](docs/architecture/privacy-and-ai.md)
 - [关键决策](docs/decisions.md)
+- [设计 QA 记录](docs/design-qa.md)
 
 ## 开发验证
 

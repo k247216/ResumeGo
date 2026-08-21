@@ -85,3 +85,127 @@ AI 可以抽取、改写、生成问题和提供解释，但最终评分、岗�
 **影响**
 
 模型输出需要 Schema、业务校验、降级和审计关系。简历修改使用版本而非覆盖，模型故障不能阻塞基础编辑、导出和删除。
+
+## 2026-08-20｜日程采用自建本地月历，不接系统日历
+
+**决定**
+
+面试、笔试和跟进事项由产品内置的本地月历管理（`schedule_events` 表 + 自绘 CSS 月历界面），不读取或同步操作系统日历（macOS Calendar / iCloud / Outlook 等）。
+
+**原因**
+
+求职日程记录需要与岗位、简历和反馈形成闭环，并且全部保存在本地。接入系统日历会引入第三方同步、授权与遥测边界，与本地优先的产品约束冲突；用户选择的方案就是自建本地月历。
+
+**影响**
+
+后续若需要系统日历提醒，需先更新隐私文档并重新评估同步边界，不能静默接入。
+
+## 2026-08-20｜简历导入先做 Markdown，PDF 留待后续
+
+**决定**
+
+简历导入能力本期只支持 Markdown 文本导入（解析预览 → 用户确认 → 创建简历与初始版本）；PDF 导入不在本期范围。
+
+**原因**
+
+Markdown 是结构清晰、可确定性解析的文本格式，能在不调用外部模型的情况下安全还原简历内容。PDF 版面解析复杂、需要外部依赖，且解析结果不可靠时容易静默破坏用户数据。
+
+**影响**
+
+PDF 导入作为后续独立事项评估，届时需明确解析失败的处理策略（提示而非写入半成品）。
+
+## 2026-08-20｜首页 = 全局工作台（Dock | Agenda Workspace | Inspector），取消首页全局当前目标
+
+**决定**
+
+工作台首页是全局视角（Global Workspace），不再依赖全局 active target：首页展示所有求职目标聚合出的 upcoming 日程（Agenda timeline），选中事件或目标后由 Inspector 回答四个问题——这是什么（公司/岗位/事件类型/时间）、准备得怎样（简历/模拟面试/日程 readiness）、下一步做什么（一条上下文建议 + 一个主操作）、去哪里深入（目标详情 →）。最终空间模型为 `Dock | Agenda Workspace | Inspector`；「当前目标」概念只在 targets 页保留。
+
+**原因**
+
+用户确认首页应回答「接下来有什么安排、针对选中安排我该做什么」，而不是单目标的工作台。全局状态会让多个求职目标互相抢占首页上下文；把当前上下文改为由选中事件/目标驱动，首页才能真正服务多目标并行求职。
+
+**影响**
+
+首页删除 Current Target Banner、全局 active target、独立 Next Action section、dashboard 式准备卡片；选中事件切换时 Inspector 身份、准备状态、Next Action 全部跟随该事件对应的目标；未关联目标的事件如实显示「未关联求职目标」并跳转日程，不虚构准备数据。`targetsStore.activeTarget` 保留给 targets 页使用。
+
+## 2026-08-20｜首页视觉系统：绿色=状态色、黑色=主操作色，空间模型 `Dock | Main Workspace | Inspector`
+
+**决定**
+
+工作台首页按用户确认的 37 节 UI 规范落实视觉系统，作为后续页面统一的视觉基线：页面 `100dvh`、无文档级滚动；空间模型严格为 `Dock | Main Workspace | Inspector` 三区（Dock 72px 常驻左侧，Inspector 右侧为空间区域而非卡片，`<1050px` 时 Inspector 变为 right drawer）；**绿色只表达状态（即将到来的最临近场次、已完成项），黑色/高对比反色表达主操作（主按钮）**，不再用绿色做主按钮；页内最大视觉元素是事件时间数字（40px/300），不用 30px+ 大标题；垂直节奏只用 4/8/12/16/20/24/28/32/40；radius 三档（8-9/11-12/16-18）；shadow 仅 Primary Event 与 Dock 两处例外；dark 模式只换 token 不重排布局（canvas `#111212`、主按钮反色为浅底深字）；禁止 KPI 卡、统计卡、渐变/毛玻璃/辉光、营销标语、多主按钮等 SaaS 网格装饰。
+
+**原因**
+
+此前的卡片化首页（居中网格、多个填充式模块、绿色主按钮）未能回答用户 3 秒测试（下一件事是什么/何时/与谁相关/缺什么准备/下一步能做什么），视觉重心被分散。用户以一份逐节规范明确了空间与层级，要求严格执行、不再重新解释方向。该规范与「绿色=进度/状态、黑色=操作」的颜色语义一致，也能避免首页与工作台页面因视觉语言漂移。
+
+**影响**
+
+首页实现与 QA 记录同步该规范（见 `design-qa.md` 第 6 轮）。其余页面（targets/resumes/interview/schedule/settings）本轮不动，但后续重构应复用同一套 token 与层级规则（radius、字重分布、无卡片倾向、状态色/操作色分离），避免每页各自发明视觉语言。
+
+## 2026-08-20｜首页空间模型改为固定 Master–Detail（Dock | Agenda Rail | Focus Workspace）
+
+**决定**
+
+工作台首页废弃此前两轮确立的 Workspace + Inspector 空间模型（`Dock | Agenda Workspace | Inspector` 与 37 节规范轮），重新实现为固定的 Master–Detail Desktop Layout，页面只允许三个一级空间：**Dock | Agenda Pane | Detail Pane**。1440 基准：Dock 72px；Dock→应用 gap 32px；应用 max-width ≈1270px，左对齐 Dock 不居中；Agenda Rail 310px，为整块 subtle pane surface（非多个 Card）；Divider 1px；Focus Workspace `flex:1`。Agenda Rail 按日期分组展示 upcoming events，每个 event 是 navigation row（约 86px 高 / 12px radius / 极浅 selected 背景）；不再把最近 upcoming event 放进 100% 宽的大 Card。Focus Workspace 顶部直接渲染选中事件事实（`明天 / 09:50 / 字节跳动 · 笔试 / 还有 18 小时`，时间 48px/300、事件名 21px/600）。未关联 target 的事件只显示真实信息（`未关联求职目标 / 关联目标 → / 查看日程 →`），不虚构简历/模拟面试准备状态；已关联事件展示 Target identity → 准备 compact object row → contextual next action。最近活动移入 Detail Workspace 底部；删除首页「使用帮助」；不再创建独立 Inspector / Primary Event Card / 额外 Dashboard module。
+
+**原因**
+
+用户确认新的空间模型作废旧模型，要求严格按照 Master–Detail composition 实现——左侧导航（Agenda）+ 右侧焦点详情（Focus Detail），并明确本轮不要自行重新解释设计哲学。
+
+**影响**
+
+「全局工作台」与「37 节规范」两轮的首页空间模型被取代；其视觉 token（canvas `#F5F5F2`、`--surface-subtle`、`--brand-soft` 等）与「绿色=状态色、黑色=主操作色」语义继续沿用。`TargetDashboard.vue` 完全重写为 Master–Detail；`WorkbenchView` 派生 `DetailView` 状态机（event/target/empty）并新增「关联目标 →」对话框（对 schedule event 执行 PATCH `jobDescriptionId`）。QA 记录见 `design-qa.md` 第 7 轮，roadmap 进度记录同步更新。
+
+## 2026-08-20｜语义 token 单一来源 + 其余页面 master-detail 化 + 面试绑定目标驱动
+
+**决定**
+
+全应用视觉系统收敛到 `src/style.css` 单一 token 来源（浅色 `:root` + 暗色 `body[data-theme='dark']`），桌面工作台之外的页面不再各自携带分歧调色板或浅色 fallback；目标/简历/日程/设置四页改用 `DesktopShell` 全高变体（路由 `meta.fill`，`height:100vh` 内部面板滚动）与 master-detail/Inspector 布局，共享 `PageHeader` 与 1219/1099/959 断点阶梯；面试大厅改为 Session Composer，会话房间仅做硬编码色 token 清理、不改布局与状态机。「开始模拟面试」统一为**目标驱动绑定**：大厅以求职目标实体的 `jobDescriptionId`/`resumeVersionId` 为准，无目标上下文或校验失败时明确显示未绑定态，不再静默回退到上次岗位/简历或列表第一项。
+
+**原因**
+
+各视图自行发明调色板导致暗色主题直接失效（近黑气泡 + 近黑底）、卡套卡与页面级文档滚动违背「工作空间不是网页」原则；「开始模拟面试」的绑定岗位与主界面不统一（主界面看目标、大厅看 jobId/versionId），会让用户误以为已针对目标准备。绑定必须由真实目标数据推导，不编造。
+
+**影响**
+
+暗色切换成为纯 token 替换，重构页面全部消费全局 token 与共享断点；四页文档滚动清零；面试页布局与状态机不变，仅色值 token 化（含三个子组件）；绑定文案/状态随目标实体变化，缺 JD/缺简历的目标如实进入「岗位待选」态。后续新增页面必须复用全局 token 与断点阶梯，不再允许页面级分歧调色板。QA 记录见 `design-qa.md` 第 13 轮。
+
+## 2026-08-20｜页面三模板 + 收敛 token 表正式化，进入收敛阶段
+
+**决定**
+
+全应用页面从此只能从三种模板中选一，AI 后续改动不得再发明新布局：
+
+- **A · Timeline/List → Workspace**：首页（接下来列表 + 焦点详情，沿时间/事件顺序组织）。
+- **B · Library/Master → Inspector**：求职目标、简历库、日历、设置（左 master 列 + 右 320–360px Inspector/面板）。
+- **C · Composer → Inspector**：模拟面试（左侧表单式 Composer + 右侧 Inspector 摘要/历史）。
+
+配套收敛 token 表（Design QA 第 14 轮的实测基准）：Dock 72–76px；Dock→page gap 40–48px；Page top 32–40px；Master column 360–380px（首页 rail 例外，已按用户确认收窄至 290px）；Inspector 320–360px；Workspace 水平 gap 32–40px；Major section gap 32px；Minor gap 16–20px；Row height 56–64px；Icon container 32×32px；Hairline 1px；Selected surface radius 10–12px；body 14px；metadata 12–13px；section label 13–14px/500–600；object title 18–22px；hero time 44–48px/300；page title 28–30px。`src/style.css` 增加 `--space-1..8`（4/8/12/16/20/24/32/40px）spacing 刻度；绿色只用于 selected/success/primary action。
+
+**原因**
+
+第 13 轮完成后五页架构统一但视觉语法仍不齐（首页克制、模拟面试仍带上一代卡套卡与 SaaS 配置感）；用户要求进入「收敛阶段」：统一数字与表达，不再逐页大改。三模板 + token 表把「以后怎么改」锁死，避免 AI 每次重构重新发明布局。
+
+**影响**
+
+本轮只做表达层收敛（首页三个细修点、目标页 identity/meta、简历库卡缩容与绿色去装饰、日历密度与 selected 弱化、面试大厅 Composer→Inspector），数据流/状态机零改动。首页 rail 行高 86px 与 token 表 56–64px 的差异记为已知偏差，留待下一轮「统一五页 spacing/token」处理；未关联目标的事件绝不显示任何目标信息（数据诚实性守卫）。QA 记录见 `design-qa.md` 第 14 轮，roadmap 进度同步更新。
+
+## 2026-08-20｜第 15 轮：首页可拖拽 Split Pane + Settings 配置流程 + Target 求职项目工作台
+
+**决定**
+
+首页左侧「接下来」栏从固定 290px 改为**用户可拖拽的 Split Pane**（覆盖第 14 轮「首页 rail 收窄至 290px」的决策）：默认 330px、最小 270、最大 420；分隔条 = 1px hairline + 4px 透明命中区，hover/focus 加宽变品牌绿并显示 `col-resize`，pointer 拖拽调整宽度，双击恢复 330px，`role="separator"` + 左右方向键 8px 微调；rail 宽 < 290px 时进入 compact 模式（隐藏日分组标签、行内联时间 `● 09:50 公司 · 标题`）。实现为组件内 pointer events，零新依赖；原 1219/1099/959 分档收窄断点删除（宽度改由用户控制）。
+
+同时锁定三项产品语义：
+
+- **Settings = 服务配置流程，不替用户填表**：空态不预填任何 Provider/模型；「添加 AI 服务」只问服务商 + API Key →「验证并继续」→「已连接」→ 模型下拉（来自 Provider 的 `/models`，为空则手动填 Model ID）→「高级设置」（协议/Base URL/Model ID）默认折叠；普通用户不接触高级字段。`defaultModel` 不再硬编码 `deepseek-chat`。
+- **Target 页 = 求职项目状态工作台**：右侧从「这个对象有什么字段」改为「这个求职项目目前是什么状态」——identity → 准备进度三列（简历 / 模拟面试 / 日程）→ 下一场（真实日程 + 建议 + 开始准备）→ 岗位信息（JD 已录入/待解析）。
+- **首页「关联目标」行**：显示 `公司 · 岗位` 单行 + 「目标详情 ›」；公司未知时回退目标名，若目标名已含岗位则不重复追加（数据诚实）。
+
+**原因**
+
+290px 静态左栏无法同时满足信息密度与用户控制权；「尚未配置」被默认值填满会让用户误以为已配置一半；Target 页「字段详情」式表达与「求职项目状态」的用户心智不符。
+
+**影响**
+
+首页 rail 宽度为本地视图状态（不持久化，刷新回默认 330）；compact 模式只是表达层切换，事件数据不变；Settings 后端校验与密钥存储（safeStorage/H2）零改动，仅前端口径与文案重写；Target 页沿用既有 API（schedule/interview plan/JD），新增展示全部来自真实数据。QA 记录见 `design-qa.md` 第 15 轮，roadmap 进度同步更新。
