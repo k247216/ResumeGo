@@ -9,8 +9,18 @@ describe('buildTargetInterviewLocation', () => {
     })
   })
 
-  it('rejects incomplete or invalid context', () => {
-    expect(() => buildTargetInterviewLocation({ targetId: 2, versionId: 0, jobId: 4 })).toThrow('完整的求职目标上下文')
-    expect(() => buildTargetInterviewLocation({ targetId: null, versionId: 3, jobId: 4 })).toThrow('完整的求职目标上下文')
+  it('omits missing ids so partial context stays bound to the target', () => {
+    expect(buildTargetInterviewLocation({ targetId: 2, versionId: 0, jobId: 4 })).toEqual({
+      name: 'interview',
+      query: { from: 'target', targetId: '2', jobId: '4' },
+    })
+    expect(buildTargetInterviewLocation({ targetId: null, versionId: 3, jobId: 4 })).toEqual({
+      name: 'interview',
+      query: { from: 'target', versionId: '3', jobId: '4' },
+    })
+    expect(buildTargetInterviewLocation({})).toEqual({
+      name: 'interview',
+      query: { from: 'target' },
+    })
   })
 })

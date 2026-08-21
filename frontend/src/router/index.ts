@@ -17,6 +17,7 @@ const router = createRouter({
       path: '/targets',
       name: 'targets',
       component: () => import('../views/targets/TargetListView.vue'),
+      meta: { fill: true },
     },
     {
       path: '/editor',
@@ -38,11 +39,19 @@ const router = createRouter({
       path: '/settings',
       name: 'settings',
       component: () => import('../views/settings/SettingsView.vue'),
+      meta: { fill: true },
+    },
+    {
+      path: '/schedule',
+      name: 'schedule',
+      component: () => import('../views/schedule/ScheduleView.vue'),
+      meta: { fill: true },
     },
     {
       path: '/resumes',
       name: 'resumes',
       component: () => import('../views/resumes/ResumeLibraryView.vue'),
+      meta: { fill: true },
     },
   ],
 })

@@ -11,12 +11,14 @@ export interface InterviewPlanContext {
   personaIds: number[]
   personaNames: string[]
   currentPersonaIndex: number
+  createdAt?: string | null
 }
 
 export interface InterviewRecord {
   id: string
   title: string
   subtitle: string
+  dateLabel: string
   sessions: InterviewStatusResponse[]
   latestSession: InterviewStatusResponse
   job: JobDescription | null
@@ -100,6 +102,7 @@ export function buildInterviewRecords({
         title: plan?.jobLabel ?? '本次多轮面试',
         subtitle: plan?.personaNames.join(' / ')
           ?? sortedSessions.map((session) => session.personaName || '面试官').join(' / '),
+        dateLabel: formatPlanDate(plan?.createdAt),
         sessions: sortedSessions,
         latestSession,
         job: plan
@@ -115,4 +118,12 @@ export function buildInterviewRecords({
       }
     })
     .sort((left, right) => right.latestSession.sessionId - left.latestSession.sessionId)
+}
+
+/** 记录行日期：来自面试计划的创建时间；缺失或非法时不渲染。 */
+function formatPlanDate(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getMonth() + 1}月${date.getDate()}日`
 }

@@ -60,15 +60,15 @@ const isEmpty = computed(() => {
 }
 
 .field-group {
-  border: 1px solid #e5eaf2;
+  border: 1px solid var(--line, #e5eaf2);
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--surface-solid, #ffffff);
   padding: 13px;
 }
 
 .field-group h4 {
   margin: 0 0 9px;
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-size: 13px;
   font-weight: 950;
 }
@@ -81,7 +81,7 @@ const isEmpty = computed(() => {
 
 .empty-text {
   margin: 0;
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
   font-size: 13px;
 }
 
@@ -91,7 +91,7 @@ ul {
 }
 
 ul li {
-  color: #475569;
+  color: var(--copy, #475569);
   font-size: 13px;
   line-height: 1.8;
 }

@@ -262,7 +262,7 @@ const paperViewportStyle = computed(() => ({
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: #f1f5f9;
+  background: var(--surface, #f1f5f9);
 }
 
 .preview-header {
@@ -273,9 +273,9 @@ const paperViewportStyle = computed(() => ({
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  border: 1px solid rgba(226, 232, 240, 0.58);
+  border: 1px solid var(--line, rgba(226, 232, 240, 0.58));
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.42);
+  background: var(--surface, rgba(255, 255, 255, 0.42));
   backdrop-filter: blur(18px);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
   opacity: 0.62;
@@ -284,8 +284,8 @@ const paperViewportStyle = computed(() => ({
 }
 
 .preview-header:hover {
-  border-color: rgba(203, 213, 225, 0.86);
-  background: rgba(255, 255, 255, 0.74);
+  border-color: var(--line, rgba(203, 213, 225, 0.86));
+  background: var(--surface, rgba(255, 255, 255, 0.74));
   opacity: 1;
 }
 
@@ -305,7 +305,7 @@ const paperViewportStyle = computed(() => ({
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #334155;
+  color: var(--copy, #334155);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
@@ -314,17 +314,17 @@ const paperViewportStyle = computed(() => ({
 }
 
 .preview-zoom button:hover {
-  background: rgba(241, 245, 249, 0.82);
+  background: var(--surface, rgba(241, 245, 249, 0.82));
 }
 
 .preview-zoom button:disabled {
-  color: #cbd5e1;
+  color: var(--muted, #cbd5e1);
   cursor: not-allowed;
 }
 
 .preview-zoom span {
   width: 31px;
-  color: #64748b;
+  color: var(--muted, #64748b);
   font-size: 10px;
   font-weight: 800;
   line-height: 18px;

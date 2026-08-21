@@ -422,14 +422,14 @@ function emitGenerateSuggestions() {
   min-width: 0;
   height: 100%;
   overflow-y: auto;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface, rgba(255, 255, 255, 0.9));
   padding: 18px;
 }
 
 .ai-card {
-  border: 1px solid #e5eaf2;
+  border: 1px solid var(--line, #e5eaf2);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface-solid, #fff);
   box-shadow: 0 14px 42px rgba(15, 23, 42, 0.04);
   padding: 16px;
   margin-bottom: 14px;
@@ -443,7 +443,7 @@ function emitGenerateSuggestions() {
 }
 
 .ai-card__head span {
-  color: #7c8aa2;
+  color: var(--muted, #7c8aa2);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -452,8 +452,8 @@ function emitGenerateSuggestions() {
 
 .ai-card__head strong {
   border-radius: 999px;
-  background: #e9fff5;
-  color: #07875f;
+  background: var(--brand-soft, #e9fff5);
+  color: var(--brand, #07875f);
   font-size: 12px;
   padding: 4px 8px;
 }
@@ -468,7 +468,7 @@ function emitGenerateSuggestions() {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #087a57;
+  color: var(--brand, #087a57);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
@@ -476,7 +476,7 @@ function emitGenerateSuggestions() {
 }
 
 .ai-card__head button:hover {
-  background: #ecfdf5;
+  background: var(--brand-soft, #ecfdf5);
 }
 
 .target-job-main {
@@ -498,7 +498,7 @@ function emitGenerateSuggestions() {
 
 .target-card h2 {
   overflow: hidden;
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-size: 14px;
   font-weight: 950;
   text-overflow: ellipsis;
@@ -508,7 +508,7 @@ function emitGenerateSuggestions() {
 .target-card p {
   overflow: hidden;
   margin-top: 2px;
-  color: #7c8aa2;
+  color: var(--muted, #7c8aa2);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -524,8 +524,8 @@ function emitGenerateSuggestions() {
 .target-empty-row button {
   border: 0;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--surface, #f1f5f9);
+  color: var(--muted, #64748b);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
@@ -534,8 +534,8 @@ function emitGenerateSuggestions() {
 
 .target-inline-actions button:hover,
 .target-empty-row button:hover {
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--line, #e2e8f0);
+  color: var(--copy, #334155);
 }
 
 .target-empty-row {
@@ -546,31 +546,31 @@ function emitGenerateSuggestions() {
 }
 
 .target-empty-row span {
-  color: #64748b;
+  color: var(--muted, #64748b);
   font-size: 13px;
   font-weight: 800;
 }
 
 .assistant-input {
-  border: 1px solid #dfe6f1;
+  border: 1px solid var(--line, #dfe6f1);
   border-radius: 16px;
-  background: #f8fafc;
+  background: var(--surface, #f8fafc);
   padding: 12px;
   display: grid;
   gap: 12px;
 }
 
 .selected-section-card {
-  border: 1px solid #d8efe6;
+  border: 1px solid var(--brand, #d8efe6);
   border-radius: 16px;
-  background: linear-gradient(135deg, #f5fffb, #ffffff);
+  background: linear-gradient(135deg, var(--brand-soft, #f5fffb), var(--surface-solid, #ffffff));
   padding: 12px;
   margin-bottom: 10px;
 }
 
 .selected-section-card span {
   display: block;
-  color: #0f9f73;
+  color: var(--brand, #0f9f73);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -580,18 +580,18 @@ function emitGenerateSuggestions() {
 .selected-section-card strong {
   display: block;
   margin-top: 5px;
-  color: #101a33;
+  color: var(--ink, #101a33);
 }
 
 .selected-section-card p {
   margin: 5px 0 0;
-  color: #64748b;
+  color: var(--muted, #64748b);
   font-size: 12px;
   line-height: 1.6;
 }
 
 .assistant-input span {
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
   font-size: 13px;
 }
 
@@ -608,12 +608,12 @@ function emitGenerateSuggestions() {
 
 .assistant-input button:disabled,
 .diagnosis-stack button:disabled {
-  background: #cbd5e1;
+  background: var(--muted, #cbd5e1);
   cursor: not-allowed;
 }
 
 .assistant-note {
-  color: #7c8aa2;
+  color: var(--muted, #7c8aa2);
   font-size: 12px;
   line-height: 1.7;
   margin: 10px 0 0;
@@ -624,11 +624,11 @@ function emitGenerateSuggestions() {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  border: 1px solid #d8efe6;
+  border: 1px solid var(--brand, #d8efe6);
   border-radius: 14px;
   background:
     radial-gradient(circle at 0 0, rgba(16, 185, 129, 0.12), transparent 44%),
-    #f7fffb;
+    var(--brand-soft, #f7fffb);
   padding: 10px 12px;
   margin-top: 10px;
 }
@@ -641,14 +641,14 @@ function emitGenerateSuggestions() {
 .match-mini-card small {
   display: block;
   overflow: hidden;
-  color: #7c8aa2;
+  color: var(--muted, #7c8aa2);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .match-mini-card strong {
-  color: #08956a;
+  color: var(--brand, #08956a);
   font-size: 20px;
   font-weight: 950;
 }
@@ -659,9 +659,9 @@ function emitGenerateSuggestions() {
 }
 
 .advice-section {
-  border: 1px solid #e5eaf2;
+  border: 1px solid var(--line, #e5eaf2);
   border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  background: linear-gradient(180deg, var(--surface-solid, #ffffff), var(--surface, #f8fafc));
   padding: 14px;
 }
 
@@ -696,7 +696,7 @@ function emitGenerateSuggestions() {
   display: block;
   overflow: hidden;
   margin-top: 4px;
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-size: 14px;
   font-weight: 950;
   text-overflow: ellipsis;
@@ -706,10 +706,10 @@ function emitGenerateSuggestions() {
 .advice-section > header button,
 .supplement-box > button {
   flex: 0 0 auto;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--line, #dbe3ef);
   border-radius: 999px;
-  background: #ffffff;
-  color: #334155;
+  background: var(--surface-solid, #ffffff);
+  color: var(--copy, #334155);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
@@ -717,9 +717,9 @@ function emitGenerateSuggestions() {
 }
 
 .advice-card {
-  border: 1px solid #e5eaf2;
+  border: 1px solid var(--line, #e5eaf2);
   border-radius: 16px;
-  background: #f8fafc;
+  background: var(--surface, #f8fafc);
   padding: 14px;
 }
 
@@ -728,7 +728,7 @@ function emitGenerateSuggestions() {
 }
 
 .advice-card.followup {
-  background: #fbfbfc;
+  background: var(--surface, #fbfbfc);
 }
 
 .advice-card__top {
@@ -737,7 +737,7 @@ function emitGenerateSuggestions() {
 }
 
 .advice-card__top em {
-  color: #475569;
+  color: var(--copy, #475569);
   font-size: 12px;
   font-style: normal;
   font-weight: 850;
@@ -760,8 +760,8 @@ function emitGenerateSuggestions() {
 
 .advice-observation {
   border-radius: 12px;
-  background: #ffffff;
-  color: #64748b;
+  background: var(--surface-solid, #ffffff);
+  color: var(--muted, #64748b);
   font-size: 12px;
   line-height: 1.65;
   margin: 12px 0 0;
@@ -770,7 +770,7 @@ function emitGenerateSuggestions() {
 
 .advice-block {
   border-radius: 13px;
-  background: #ffffff;
+  background: var(--surface-solid, #ffffff);
   margin-top: 12px;
   padding: 11px;
 }
@@ -802,14 +802,14 @@ function emitGenerateSuggestions() {
 .supplement-final p,
 .supplement-final li,
 .supplement-error {
-  color: #26344d;
+  color: var(--ink, #26344d);
   font-size: 12px;
   line-height: 1.7;
   margin: 5px 0 0;
 }
 
 .advice-reason {
-  color: #64748b;
+  color: var(--muted, #64748b);
 }
 
 .training-plan {
@@ -818,11 +818,11 @@ function emitGenerateSuggestions() {
   margin: 10px 0 0;
   padding: 10px 10px 10px 28px;
   border-radius: 13px;
-  background: #eefcf6;
+  background: var(--brand-soft, #eefcf6);
 }
 
 .training-plan li {
-  color: #0f766e;
+  color: var(--brand, #0f766e);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -831,7 +831,7 @@ function emitGenerateSuggestions() {
   display: grid;
   gap: 8px;
   margin-top: 10px;
-  border-top: 1px dashed #dbe3ef;
+  border-top: 1px dashed var(--line, #dbe3ef);
   padding-top: 10px;
 }
 
@@ -839,10 +839,10 @@ function emitGenerateSuggestions() {
   width: 100%;
   box-sizing: border-box;
   margin-top: 6px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--line, #dbe3ef);
   border-radius: 12px;
-  background: #ffffff;
-  color: #1f2937;
+  background: var(--surface-solid, #ffffff);
+  color: var(--ink, #1f2937);
   font: inherit;
   font-size: 12px;
   line-height: 1.6;
@@ -852,7 +852,7 @@ function emitGenerateSuggestions() {
 }
 
 .supplement-box textarea:focus {
-  border-color: #94a3b8;
+  border-color: var(--muted, #94a3b8);
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
 }
 
@@ -863,30 +863,30 @@ function emitGenerateSuggestions() {
 }
 
 .supplement-box > button:disabled {
-  background: #cbd5e1;
+  background: var(--muted, #cbd5e1);
   cursor: not-allowed;
 }
 
 .supplement-result {
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--surface-solid, #ffffff);
   padding: 10px;
 }
 
 .supplement-result small {
   display: block;
-  color: #64748b;
+  color: var(--muted, #64748b);
 }
 
 .supplement-final {
-  border: 1px solid #e5eaf2;
+  border: 1px solid var(--line, #e5eaf2);
   border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  background: linear-gradient(180deg, var(--surface-solid, #ffffff), var(--surface, #f8fafc));
   padding: 11px;
 }
 
 .supplement-final p {
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-weight: 750;
 }
 
@@ -898,11 +898,11 @@ function emitGenerateSuggestions() {
 }
 
 .supplement-final li {
-  color: #475569;
+  color: var(--copy, #475569);
 }
 
 .supplement-error {
-  color: #dc2626;
+  color: var(--danger, #dc2626);
 }
 
 .diagnosis-stack {
@@ -913,23 +913,23 @@ function emitGenerateSuggestions() {
 .diagnosis-stack article {
   border-radius: 16px;
   padding: 13px;
-  border-left: 3px solid #10b981;
-  background: #f8fffc;
+  border-left: 3px solid var(--brand, #10b981);
+  background: var(--brand-soft, #f8fffc);
 }
 
 .diagnosis-stack article.blocked {
-  border-left-color: #cbd5e1;
-  background: #f8fafc;
+  border-left-color: var(--muted, #cbd5e1);
+  background: var(--surface, #f8fafc);
 }
 
 .diagnosis-stack span {
-  color: #10a878;
+  color: var(--brand, #10a878);
   font-size: 12px;
   font-weight: 900;
 }
 
 .diagnosis-stack article.blocked span {
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
 }
 
 .diagnosis-stack h3,
@@ -939,20 +939,20 @@ function emitGenerateSuggestions() {
 
 .diagnosis-stack h3 {
   margin-top: 5px;
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-size: 14px;
 }
 
 .diagnosis-stack p {
   margin-top: 6px;
-  color: #63718a;
+  color: var(--muted, #63718a);
   font-size: 12px;
   line-height: 1.6;
 }
 
 .diagnosis-stack button {
   margin-top: 10px;
-  background: #10a878;
+  background: var(--brand, #10a878);
   font-size: 12px;
   padding: 7px 10px;
 }

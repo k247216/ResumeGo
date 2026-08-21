@@ -58,6 +58,20 @@ class AiProviderProfileServiceTest {
     }
 
     @Test
+    void probesAnUnsavedProfileBeforeAModelHasBeenChosen() {
+        AiProviderProbeResponse expected = new AiProviderProbeResponse(true, "已获取 2 个模型", java.util.List.of("a", "b"));
+        when(probeService.models(any(), eq("temporary-key"))).thenReturn(expected);
+
+        AiProviderProbeResponse actual = service.models(new AiProviderProbeRequest(
+                "DeepSeek", "openai-compatible", "https://api.deepseek.com/v1", "", "temporary-key"
+        ));
+
+        org.assertj.core.api.Assertions.assertThat(actual).isEqualTo(expected);
+        verify(probeService).models(org.mockito.ArgumentMatchers.argThat(profile ->
+                profile.displayName().equals("DeepSeek") && profile.defaultModel().isEmpty()), eq("temporary-key"));
+    }
+
+    @Test
     void settingDefaultFirstClearsTheExistingDefault() {
         when(repository.findById(1L, 4L)).thenReturn(Optional.of(profile(4L)));
 

@@ -1,63 +1,80 @@
 <template>
-  <div class="desktop-shell">
-    <aside class="desktop-rail">
-      <RouterLink class="desktop-brand" :to="{ name: 'workbench' }" aria-label="ResumeGo 工作台">
-        <span>R</span>
-        <strong>ResumeGo</strong>
-      </RouterLink>
-
+  <div class="desktop-shell" :class="{ 'is-dark': darkMode, 'shell-workspace': route.name === 'workbench', 'shell-fill': Boolean(route.meta.fill) }" :data-theme="darkMode ? 'dark' : 'light'">
+    <aside class="desktop-rail" aria-label="桌面工具栏">
       <nav class="desktop-nav" aria-label="主导航">
         <RouterLink
           v-for="item in navItems"
           :key="item.routeName"
           :to="{ name: item.routeName }"
           class="desktop-nav-item"
+          :aria-label="item.label"
+          :title="item.label"
         >
-          <span class="desktop-nav-mark">{{ item.mark }}</span>
-          <span>{{ item.label }}</span>
+          <el-icon :size="20"><component :is="item.icon" /></el-icon>
+          <span class="nav-tooltip">{{ item.label }}</span>
         </RouterLink>
       </nav>
 
-      <div class="desktop-local-status">
-        <span class="status-dot"></span>
-        <span>数据保存在此设备</span>
+      <div class="desktop-rail-bottom">
+        <RouterLink :to="{ name: 'settings' }" class="desktop-nav-item" aria-label="设置" title="设置">
+          <el-icon :size="20"><Setting /></el-icon>
+          <span class="nav-tooltip">设置</span>
+        </RouterLink>
+        <button
+          type="button"
+          class="desktop-nav-item"
+          :aria-label="darkMode ? '切换日间模式' : '切换夜间模式'"
+          :title="darkMode ? '切换日间模式' : '切换夜间模式'"
+          @click="darkMode = !darkMode"
+        >
+          <el-icon :size="20"><component :is="darkMode ? Sunny : Moon" /></el-icon>
+        </button>
+        <button type="button" class="desktop-user" aria-label="本地用户状态" title="数据仅保存在此设备">
+          <el-icon :size="18"><UserFilled /></el-icon>
+          <span class="local-dot" aria-hidden="true"></span>
+        </button>
       </div>
     </aside>
 
-    <section class="desktop-surface">
-      <header class="desktop-titlebar">
-        <div>
-          <strong>{{ currentTitle }}</strong>
-          <small>本地求职工作台</small>
-        </div>
-        <span class="desktop-mode">本地模式</span>
-      </header>
-      <main class="desktop-content">
-        <slot />
-      </main>
-    </section>
+    <main class="desktop-content">
+      <slot />
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { Aim, Calendar, ChatDotRound, Document, House, Moon, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const themeStorageKey = 'resumego:theme'
+const darkMode = ref(localStorage.getItem(themeStorageKey) === 'dark')
+watch(
+  darkMode,
+  (dark) => {
+    localStorage.setItem(themeStorageKey, dark ? 'dark' : 'light')
+    document.body.dataset.theme = dark ? 'dark' : 'light'
+  },
+  { immediate: true },
+)
 const navItems = [
-  { label: '工作台', mark: '⌂', routeName: 'workbench' },
-  { label: '求职目标', mark: '◎', routeName: 'targets' },
-  { label: '简历', mark: '▤', routeName: 'resumes' },
-  { label: '能力证据', mark: '◇', routeName: 'evidences' },
-  { label: '设置', mark: '⚙', routeName: 'settings' },
+  { label: '工作台', icon: House, routeName: 'workbench' },
+  { label: '求职目标', icon: Aim, routeName: 'targets' },
+  { label: '简历', icon: Document, routeName: 'resumes' },
+  { label: '模拟面试', icon: ChatDotRound, routeName: 'interview' },
+  { label: '日程', icon: Calendar, routeName: 'schedule' },
 ]
-
-const currentTitle = computed(() => (
-  navItems.find((item) => item.routeName === route.name)?.label ?? 'ResumeGo'
-))
 </script>
 
 <style scoped>
-.desktop-shell{display:grid;grid-template-columns:196px minmax(0,1fr);min-height:100vh;background:#f3f5f6;color:#182335}.desktop-rail{display:flex;flex-direction:column;padding:20px 14px;background:#172238;color:#dce5ed}.desktop-brand{display:flex;align-items:center;gap:10px;padding:4px 8px 22px;color:#fff;text-decoration:none}.desktop-brand>span{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#2ab183;color:#0c2c23;font-weight:900}.desktop-brand strong{font-size:15px}.desktop-nav{display:grid;gap:6px}.desktop-nav-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;color:#bdc8d3;text-decoration:none;font-size:13px}.desktop-nav-item:hover{background:#223049;color:#fff}.desktop-nav-item.router-link-active{background:#168866;color:#fff}.desktop-nav-mark{display:grid;place-items:center;width:22px;font-size:15px}.desktop-local-status{display:flex;align-items:center;gap:8px;margin-top:auto;padding:14px 8px 4px;color:#aebbc8;font-size:11px}.status-dot{width:7px;height:7px;border-radius:50%;background:#51c697;box-shadow:0 0 0 3px rgba(81,198,151,.14)}.desktop-surface{min-width:0}.desktop-titlebar{height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid #dfe4e8;background:rgba(255,255,255,.9)}.desktop-titlebar div{display:grid;gap:2px}.desktop-titlebar strong{font-size:15px}.desktop-titlebar small{color:#84909d}.desktop-mode{padding:5px 9px;border-radius:999px;background:#e5f7f0;color:#17795d;font-size:11px}.desktop-content{min-height:calc(100vh - 68px)}
-@media(max-width:760px){.desktop-shell{grid-template-columns:72px minmax(0,1fr)}.desktop-brand{justify-content:center}.desktop-brand strong,.desktop-nav-item>span:last-child,.desktop-local-status>span:last-child{display:none}.desktop-nav-item{justify-content:center}.desktop-titlebar{padding:0 16px}}
+.desktop-shell{--canvas:#F5F5F2;--surface:rgba(255,255,255,.78);--surface-solid:#fff;--line:rgba(28,31,35,.11);--ink:#171717;--copy:#6E6E6A;--muted:#989893;--action-bg:#111212;--action-fg:#fff;--brand:#168B68;--brand-soft:rgba(22,139,104,.09);--danger:#b53c32;--danger-soft:rgba(180,62,53,.09);display:grid;grid-template-columns:56px minmax(0,1fr);gap:34px;min-height:100vh;padding:16px 24px 16px 18px;background:var(--canvas);color:var(--ink);color-scheme:light;transition:background .25s ease,color .25s ease}.desktop-shell.is-dark{--canvas:#111212;--surface:#1a1b1d;--surface-solid:#1a1b1d;--line:rgba(255,255,255,.12);--ink:#F2F2EF;--copy:#A3A39E;--muted:#73736F;--action-bg:#F1F1EE;--action-fg:#171717;--brand:#47B58E;--brand-soft:rgba(71,181,142,.11);--danger:#e06c60;--danger-soft:rgba(224,108,96,.14);color-scheme:dark}.desktop-rail{position:sticky;top:16px;display:flex;align-self:start;flex-direction:column;box-sizing:border-box;width:56px;height:calc(100vh - 32px);min-height:520px;padding:40px 8px 12px;border:1px solid rgba(255,255,255,.08);border-radius:22px;background:#0A0A0B;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.10)}.desktop-nav,.desktop-rail-bottom{display:grid;justify-items:center;gap:8px}.desktop-rail-bottom{margin-top:auto;gap:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,.10)}.desktop-nav-item{position:relative;display:grid;width:40px;height:40px;place-items:center;border:0;border-radius:11px;background:transparent;color:#f3f4f4;text-decoration:none;cursor:pointer;transition:background .18s ease,color .18s ease}.desktop-nav-item:hover{background:#222324}.desktop-nav-item.router-link-active::before{content:'';position:absolute;inset:2px;border-radius:11px;background:#fff}.desktop-nav-item.router-link-active .el-icon{position:relative;z-index:1;color:#050606}.nav-tooltip{position:absolute;z-index:10;left:44px;display:none;padding:7px 10px;border-radius:8px;background:#080909;color:#fff;font-size:12px;font-weight:650;white-space:nowrap;box-shadow:0 8px 22px rgba(0,0,0,.2)}.desktop-nav-item:hover .nav-tooltip,.desktop-nav-item:focus-visible .nav-tooltip{display:block}.desktop-user{position:relative;display:grid;width:36px;height:36px;place-items:center;border:1px solid rgba(255,255,255,.22);border-radius:50%;background:#f2eee7;color:#171819;cursor:default}.local-dot{position:absolute;right:0;bottom:2px;width:9px;height:9px;border:2px solid #0A0A0B;border-radius:50%;background:#25b96c}.desktop-content{justify-self:center;width:100%;max-width:1224px;min-width:0;min-height:calc(100vh - 32px)}
+/* 首页工作台：全高、禁文档滚动、left-anchored；Dock→应用 32px gap，应用 max-width 1270 不居中 */
+.desktop-shell.shell-workspace{height:100vh;overflow:hidden;gap:32px}
+.desktop-shell.shell-workspace .desktop-content{justify-self:stretch;max-width:1270px;box-sizing:border-box;height:100%;min-height:0;padding:0 8px 0 0}
+/* 全高页面（meta.fill：目标/简历/日程/设置）：full-bleed、内部面板滚动，不再居中窄容器 */
+.desktop-shell.shell-fill{height:100vh;overflow:hidden;gap:32px}
+.desktop-shell.shell-fill .desktop-content{justify-self:stretch;max-width:none;box-sizing:border-box;height:100%;min-height:0;padding:0 8px 0 0}
+@media(max-width:900px){.desktop-shell{padding-left:14px}.nav-tooltip{display:none!important}}
+@media(max-height:899px){.desktop-shell{padding-top:12px;padding-bottom:12px}.desktop-rail{top:12px;height:calc(100vh - 24px);min-height:480px;padding-top:36px}.desktop-content{min-height:calc(100vh - 24px)}}
 </style>

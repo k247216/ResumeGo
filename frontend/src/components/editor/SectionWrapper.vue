@@ -278,27 +278,27 @@ function optionLabel(option: EditorFieldOption) {
 
 <style scoped>
 .section-wrapper {
-  border: 1px solid #eceff5;
+  border: 1px solid var(--line, #eceff5);
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface-solid, #fff);
   box-shadow: 0 8px 26px rgba(15, 23, 42, 0.035);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
   cursor: pointer;
 }
 
 .section-wrapper:hover {
-  border-color: #d7dde8;
+  border-color: var(--line, #d7dde8);
   box-shadow: 0 14px 38px rgba(15, 23, 42, 0.06);
   transform: translateY(-1px);
 }
 
 .section-wrapper.selected {
-  border-color: #cfd6e2;
+  border-color: var(--line, #cfd6e2);
   box-shadow: 0 12px 34px rgba(15, 23, 42, 0.055);
 }
 
 .section-wrapper.muted {
-  background: #fff;
+  background: var(--surface-solid, #fff);
 }
 
 .section-wrapper.hidden-in-preview {
@@ -311,7 +311,7 @@ function optionLabel(option: EditorFieldOption) {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--line, #eef2f7);
 }
 
 .section-wrapper__title {
@@ -322,7 +322,7 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .section-wrapper__handle {
-  color: #c4ccda;
+  color: var(--muted, #c4ccda);
   font-size: 16px;
   letter-spacing: -4px;
   transform: rotate(90deg);
@@ -334,13 +334,13 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .section-wrapper h3 {
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-size: 15px;
 }
 
 .section-wrapper__title p {
   margin-top: 3px;
-  color: #8290a7;
+  color: var(--muted, #8290a7);
   font-size: 12px;
 }
 
@@ -373,21 +373,21 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .visibility-action {
-  color: #9aa3b2;
+  color: var(--muted, #9aa3b2);
 }
 
 .visibility-action:hover {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--surface, #f1f5f9);
+  color: var(--copy, #334155);
 }
 
 .remove-section-action {
-  color: #a1a9b8;
+  color: var(--muted, #a1a9b8);
 }
 
 .remove-section-action:hover {
-  background: #fff1f2;
-  color: #dc2626;
+  background: var(--danger-soft, #fff1f2);
+  color: var(--danger, #dc2626);
 }
 
 .section-wrapper__body {
@@ -406,13 +406,13 @@ function optionLabel(option: EditorFieldOption) {
 
 .section-fields div {
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--surface, #f8fafc);
   padding: 8px 10px;
 }
 
 .section-fields span {
   display: block;
-  color: #8b97ac;
+  color: var(--muted, #8b97ac);
   font-size: 12px;
   margin-bottom: 4px;
 }
@@ -423,7 +423,7 @@ function optionLabel(option: EditorFieldOption) {
   border: 0;
   outline: 0;
   background: transparent;
-  color: #17213a;
+  color: var(--ink, #17213a);
   font-size: 14px;
   font-weight: 700;
 }
@@ -461,17 +461,17 @@ function optionLabel(option: EditorFieldOption) {
 .section-item-card {
   display: grid;
   gap: 9px;
-  border: 1px solid #ebeff5;
+  border: 1px solid var(--line, #ebeff5);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-solid, #fff);
   padding: 10px;
 }
 
 .add-item-button {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 12px;
-  background: #fff;
-  color: #64748b;
+  background: var(--surface-solid, #fff);
+  color: var(--muted, #64748b);
   cursor: pointer;
   font-size: 13px;
   font-weight: 900;
@@ -479,9 +479,9 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .add-item-button:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #17213a;
+  border-color: var(--line, #cbd5e1);
+  background: var(--surface, #f8fafc);
+  color: var(--ink, #17213a);
 }
 
 .section-item-card__head {
@@ -491,7 +491,7 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .section-item-card__head strong {
-  color: #17213a;
+  color: var(--ink, #17213a);
   font-size: 13px;
   min-width: 0;
   overflow: hidden;
@@ -500,7 +500,7 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .item-index {
-  color: #a1a9b8;
+  color: var(--muted, #a1a9b8);
   font-size: 12px;
   font-weight: 900;
 }
@@ -524,18 +524,18 @@ function optionLabel(option: EditorFieldOption) {
 
 .section-item-actions span {
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--surface, #f1f5f9);
+  color: var(--muted, #64748b);
   font-size: 12px;
   font-weight: 800;
   padding: 4px 8px;
 }
 
 .section-item-actions button {
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--line, #dbe3ef);
   border-radius: 9px;
-  background: #fff;
-  color: #94a3b8;
+  background: var(--surface-solid, #fff);
+  color: var(--muted, #94a3b8);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
@@ -544,23 +544,23 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .section-item-actions button:hover:not(:disabled) {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #334155;
+  border-color: var(--line, #cbd5e1);
+  background: var(--surface, #f8fafc);
+  color: var(--copy, #334155);
 }
 
 .section-item-actions button:disabled {
-  color: #cbd5e1;
+  color: var(--muted, #cbd5e1);
   cursor: not-allowed;
 }
 
 .section-item-actions button.danger {
-  color: #dc2626;
+  color: var(--danger, #dc2626);
 }
 
 .section-item-actions button.danger:hover {
-  border-color: #fecaca;
-  background: #fff1f2;
+  border-color: var(--danger-soft, #fecaca);
+  background: var(--danger-soft, #fff1f2);
 }
 
 .section-paragraphs label,
@@ -573,7 +573,7 @@ function optionLabel(option: EditorFieldOption) {
 .section-paragraphs label > span,
 .section-item-card label > span,
 .section-list-editor__head > span {
-  color: #77849a;
+  color: var(--muted, #77849a);
   font-size: 12px;
   font-weight: 700;
 }
@@ -583,12 +583,12 @@ function optionLabel(option: EditorFieldOption) {
 .section-item-card input,
 .section-list-row input {
   width: 100%;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 12px;
   outline: 0;
-  background: #fbfdff;
+  background: var(--surface, #fbfdff);
   padding: 8px 10px;
-  color: #40506b;
+  color: var(--copy, #40506b);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -612,10 +612,10 @@ function optionLabel(option: EditorFieldOption) {
 
 .section-list-editor__head button,
 .empty-list-add {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 10px;
-  background: #fff;
-  color: #64748b;
+  background: var(--surface-solid, #fff);
+  color: var(--muted, #64748b);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -624,9 +624,9 @@ function optionLabel(option: EditorFieldOption) {
 
 .section-list-editor__head button:hover,
 .empty-list-add:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #17213a;
+  border-color: var(--line, #cbd5e1);
+  background: var(--surface, #f8fafc);
+  color: var(--ink, #17213a);
 }
 
 .section-list-editor__items {
@@ -642,7 +642,7 @@ function optionLabel(option: EditorFieldOption) {
 
 .section-list-row input {
   min-height: 36px;
-  background: #fff;
+  background: var(--surface-solid, #fff);
 }
 
 .section-list-row-actions {
@@ -659,10 +659,10 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .section-list-row button {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 10px;
-  background: #fff;
-  color: #94a3b8;
+  background: var(--surface-solid, #fff);
+  color: var(--muted, #94a3b8);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -671,15 +671,15 @@ function optionLabel(option: EditorFieldOption) {
 }
 
 .section-list-row button:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #334155;
+  border-color: var(--line, #cbd5e1);
+  background: var(--surface, #f8fafc);
+  color: var(--copy, #334155);
 }
 
 .section-list-row button:last-child:hover {
-  border-color: #fecaca;
-  background: #fff1f2;
-  color: #dc2626;
+  border-color: var(--danger-soft, #fecaca);
+  background: var(--danger-soft, #fff1f2);
+  color: var(--danger, #dc2626);
 }
 
 .section-paragraphs textarea:focus,
@@ -689,12 +689,12 @@ function optionLabel(option: EditorFieldOption) {
 .section-item-card select:focus,
 .section-fields input:focus,
 .section-fields select:focus {
-  border-color: #94a3b8;
+  border-color: var(--muted, #94a3b8);
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.14);
 }
 
 .empty-section {
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
   font-size: 13px;
 }
 

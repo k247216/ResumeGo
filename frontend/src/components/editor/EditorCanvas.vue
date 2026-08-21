@@ -88,7 +88,7 @@ const activeSection = computed(() => {
   min-width: 0;
   height: 100%;
   overflow: hidden;
-  background: #f6f8fb;
+  background: var(--canvas, #f6f8fb);
   display: flex;
   flex-direction: column;
 }
@@ -100,14 +100,14 @@ const activeSection = computed(() => {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  border-bottom: 1px solid #e5eaf2;
-  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--line, #e5eaf2);
+  background: var(--surface, rgba(255, 255, 255, 0.9));
   padding: 9px 16px;
 }
 
 .editor-canvas__toolbar span,
 .toolbar-meta small {
-  color: #7c8aa2;
+  color: var(--muted, #7c8aa2);
   font-size: 11px;
 }
 
@@ -118,7 +118,7 @@ const activeSection = computed(() => {
 .editor-canvas__toolbar h1 {
   margin: 1px 0 0;
   overflow: hidden;
-  color: #101a33;
+  color: var(--ink, #101a33);
   font-size: 16px;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -139,17 +139,17 @@ const activeSection = computed(() => {
 
 .toolbar-meta strong {
   border-radius: 999px;
-  background: #eaf8f3;
-  color: #07875f;
+  background: var(--brand-soft, #eaf8f3);
+  color: var(--brand, #07875f);
   padding: 4px 8px;
   font-size: 12px;
 }
 
 .toolbar-actions button {
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--line, #dbe3ef);
   border-radius: 999px;
-  background: #fff;
-  color: #465671;
+  background: var(--surface-solid, #fff);
+  color: var(--copy, #465671);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -157,19 +157,19 @@ const activeSection = computed(() => {
 }
 
 .toolbar-actions button:disabled {
-  color: #a7b2c2;
+  color: var(--muted, #a7b2c2);
   cursor: not-allowed;
 }
 
 .toolbar-actions .save-button {
-  border-color: #10a878;
-  background: #10a878;
+  border-color: var(--brand, #10a878);
+  background: var(--brand, #10a878);
   color: #fff;
 }
 
 .toolbar-actions .save-button:disabled {
-  border-color: #cbd5e1;
-  background: #cbd5e1;
+  border-color: var(--muted, #cbd5e1);
+  background: var(--muted, #cbd5e1);
 }
 
 .editor-focus-area {

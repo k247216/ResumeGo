@@ -180,8 +180,8 @@ function formatDate(value?: string | null) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid #e7eaf0;
-  background: #ffffff;
+  border-right: 1px solid var(--line, #e7eaf0);
+  background: var(--surface-solid, #ffffff);
   padding: 18px 0 12px;
 }
 
@@ -212,7 +212,7 @@ function formatDate(value?: string | null) {
 }
 
 .sidebar-title {
-  color: #9aa3b2;
+  color: var(--muted, #9aa3b2);
   font-size: 13px;
   font-weight: 800;
   padding: 0;
@@ -230,8 +230,8 @@ function formatDate(value?: string | null) {
   place-items: center;
   border: 0;
   border-radius: 10px;
-  background: #f4f6f9;
-  color: #707989;
+  background: var(--surface, #f4f6f9);
+  color: var(--muted, #707989);
   cursor: pointer;
   font-size: 20px;
   font-weight: 700;
@@ -240,8 +240,8 @@ function formatDate(value?: string | null) {
 }
 
 .sidebar-collapse-button:hover {
-  background: #e9eef5;
-  color: #101a33;
+  background: var(--surface, #e9eef5);
+  color: var(--ink, #101a33);
 }
 
 .module-list {
@@ -259,7 +259,7 @@ function formatDate(value?: string | null) {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #5f6572;
+  color: var(--copy, #5f6572);
   cursor: pointer;
   font-size: 16px;
   padding: 0 18px;
@@ -269,12 +269,12 @@ function formatDate(value?: string | null) {
 
 .sidebar-section:hover,
 .sidebar-section.active {
-  background: #f7f8fb;
-  color: #161d2f;
+  background: var(--surface, #f7f8fb);
+  color: var(--ink, #161d2f);
 }
 
 .sidebar-section.active {
-  box-shadow: inset 3px 0 0 #10a878;
+  box-shadow: inset 3px 0 0 var(--brand, #10a878);
 }
 
 .sidebar-section.hidden {
@@ -288,19 +288,19 @@ function formatDate(value?: string | null) {
   height: 24px;
   place-items: center;
   border-radius: 8px;
-  color: #697181;
-  background: #f3f5f8;
+  color: var(--muted, #697181);
+  background: var(--surface, #f3f5f8);
   font-size: 13px;
   font-weight: 900;
 }
 
 .sidebar-section.addable {
-  color: #5f6572;
+  color: var(--copy, #5f6572);
   font-size: 16px;
 }
 
 .add-icon {
-  color: #9ca3af;
+  color: var(--muted, #9ca3af);
   font-size: 14px;
   opacity: 0;
   transition: opacity 0.16s ease;
@@ -329,26 +329,26 @@ function formatDate(value?: string | null) {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #9ca3af;
+  color: var(--muted, #9ca3af);
   cursor: pointer;
   font-size: 12px;
   font-weight: 900;
 }
 
 .section-actions button:hover {
-  background: #eef2f7;
-  color: #475569;
+  background: var(--surface, #eef2f7);
+  color: var(--copy, #475569);
 }
 
 .section-actions button.danger:hover {
-  background: #fff1f2;
-  color: #dc2626;
+  background: var(--danger-soft, #fff1f2);
+  color: var(--danger, #dc2626);
 }
 
 .sidebar-separator {
   height: 1px;
   margin: 14px 12px 0;
-  background: #edf0f5;
+  background: var(--line, #edf0f5);
 }
 
 .section-name {
@@ -361,7 +361,7 @@ function formatDate(value?: string | null) {
 .sidebar-footer {
   flex: 0 0 auto;
   margin-top: auto;
-  background: #ffffff;
+  background: var(--surface-solid, #ffffff);
   padding: 10px 12px 0;
 }
 
@@ -381,19 +381,19 @@ function formatDate(value?: string | null) {
   align-items: start;
   gap: 1px 8px;
   overflow: hidden;
-  border: 1px solid #e5eaf2;
+  border: 1px solid var(--line, #e5eaf2);
   border-radius: 16px;
   background:
     radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.12), transparent 34%),
-    #fff;
-  color: #334155;
+    var(--surface-solid, #fff);
+  color: var(--copy, #334155);
   cursor: pointer;
   padding: 7px 10px;
 }
 
 .version-card-label {
   grid-area: label;
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
   font-size: 10px;
   font-weight: 900;
   line-height: 11px;
@@ -402,7 +402,7 @@ function formatDate(value?: string | null) {
 
 .sidebar-version-card strong {
   grid-area: version;
-  color: #0f172a;
+  color: var(--ink, #0f172a);
   font-size: 19px;
   line-height: 21px;
   letter-spacing: -0.04em;
@@ -412,7 +412,7 @@ function formatDate(value?: string | null) {
   grid-area: time;
   min-width: 0;
   overflow: hidden;
-  color: #9aa3b2;
+  color: var(--muted, #9aa3b2);
   font-size: 11px;
   font-weight: 700;
   line-height: 14px;
@@ -423,7 +423,7 @@ function formatDate(value?: string | null) {
 .version-card-arrow {
   grid-area: arrow;
   align-self: center;
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
   font-size: 14px;
 }
 
@@ -438,7 +438,7 @@ function formatDate(value?: string | null) {
 }
 
 .sidebar-version-card.locked {
-  background: #f8fafc;
+  background: var(--surface, #f8fafc);
   cursor: not-allowed;
 }
 
@@ -446,7 +446,7 @@ function formatDate(value?: string | null) {
 .sidebar-version-card.locked small,
 .sidebar-version-card.locked .version-card-label,
 .sidebar-version-card.locked .version-card-arrow {
-  color: #a1a9b8;
+  color: var(--muted, #a1a9b8);
 }
 
 .sidebar-version-card.locked select {
@@ -455,7 +455,7 @@ function formatDate(value?: string | null) {
 
 .sidebar-footer p {
   margin: 7px 9px 0;
-  color: #a1a9b8;
+  color: var(--muted, #a1a9b8);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -484,7 +484,7 @@ function formatDate(value?: string | null) {
   width: 36px;
   height: 34px;
   border-radius: 12px;
-  background: #f7f8fb;
+  background: var(--surface, #f7f8fb);
 }
 
 .editor-sidebar.collapsed .module-list {
@@ -503,7 +503,7 @@ function formatDate(value?: string | null) {
 }
 
 .editor-sidebar.collapsed .sidebar-section.active {
-  box-shadow: inset 3px 0 0 #10a878;
+  box-shadow: inset 3px 0 0 var(--brand, #10a878);
 }
 
 .editor-sidebar.collapsed .section-icon {

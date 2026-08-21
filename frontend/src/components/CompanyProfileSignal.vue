@@ -57,11 +57,11 @@ const sourceText = computed(() => props.profile?.sourceNote || '公司偏好资�
 <style scoped>
 .company-profile-signal {
   min-width: 0;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 16px;
   background:
     radial-gradient(circle at 0 0, rgba(37, 99, 235, 0.08), transparent 40%),
-    linear-gradient(180deg, #ffffff, #f8fafc);
+    linear-gradient(180deg, var(--surface-solid, #ffffff), var(--surface, #f8fafc));
   padding: 11px 12px;
 }
 
@@ -82,14 +82,14 @@ const sourceText = computed(() => props.profile?.sourceNote || '公司偏好资�
 }
 
 .signal-head em {
-  color: #64748b;
+  color: var(--muted, #64748b);
   font-weight: 800;
 }
 
 .company-profile-signal strong {
   display: block;
   overflow: hidden;
-  color: #102033;
+  color: var(--ink, #102033);
   font-size: 12px;
   font-weight: 900;
   line-height: 1.5;
@@ -98,7 +98,7 @@ const sourceText = computed(() => props.profile?.sourceNote || '公司偏好资�
 
 .company-profile-signal p {
   margin: 5px 0 0;
-  color: #64748b;
+  color: var(--muted, #64748b);
   font-size: 12px;
   line-height: 1.55;
 }
@@ -123,7 +123,7 @@ const sourceText = computed(() => props.profile?.sourceNote || '公司偏好资�
 .company-profile-signal small {
   display: block;
   margin-top: 8px;
-  color: #94a3b8;
+  color: var(--muted, #94a3b8);
   font-size: 11px;
   line-height: 1.5;
 }

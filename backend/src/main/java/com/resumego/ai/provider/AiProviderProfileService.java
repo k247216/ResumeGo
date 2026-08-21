@@ -111,10 +111,18 @@ public class AiProviderProfileService {
 
     private AiProviderProfile transientProfile(AiProviderProbeRequest input) {
         if (input == null) throw new IllegalArgumentException("模型配置不能为空");
-        AiProviderProfileRequest request = normalize(input.profileRequest());
+        // 探测（验证并继续 / 获取模型）发生在用户选择模型之前，因此这里不要求模型名称；
+        // 已保存的配置在 create/update 中仍强制模型名称非空。
+        AiProviderProfileRequest request = input.profileRequest();
+        String name = trimRequired(request.displayName(), "配置名称", 80);
+        String protocol = trimRequired(request.protocolType(), "协议", 32);
+        String baseUrl = trimRequired(request.baseUrl(), "Base URL", 500).replaceAll("/+$", "");
+        if (!PROTOCOLS.contains(protocol)) throw new IllegalArgumentException("不支持的模型协议");
+        validateUrl(baseUrl);
+        String model = request.defaultModel() == null ? "" : request.defaultModel().trim();
         LocalDateTime now = LocalDateTime.now();
-        return new AiProviderProfile(-1L, CurrentUser.DEMO_USER_ID, request.displayName(), request.protocolType(),
-                request.baseUrl(), request.defaultModel(), false, null, null, null, now, now);
+        return new AiProviderProfile(-1L, CurrentUser.DEMO_USER_ID, name, protocol, baseUrl, model, false, null,
+                null, null, now, now);
     }
 
     private String safeTestMessage(AiResult result) {

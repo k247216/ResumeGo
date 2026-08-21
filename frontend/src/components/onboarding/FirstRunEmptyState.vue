@@ -14,7 +14,7 @@
         type="button"
         @click="$emit('create')"
       >
-        开始创建
+        录入第一个岗位
       </button>
     </div>
 
@@ -22,22 +22,29 @@
       <li>
         <span>01</span>
         <div>
-          <strong>添加目标岗位</strong>
+          <strong>录入一个目标岗位</strong>
           <small>粘贴一份你真正准备投递的 JD。</small>
         </div>
       </li>
       <li>
         <span>02</span>
         <div>
-          <strong>整理简历与证据</strong>
+          <strong>关联或创建简历</strong>
           <small>只使用你确认过的经历、职责和结果。</small>
         </div>
       </li>
       <li>
         <span>03</span>
         <div>
-          <strong>开始针对性迭代</strong>
-          <small>审查建议、保存版本，再进入面试准备。</small>
+          <strong>添加面试/笔试日程</strong>
+          <small>把面试、笔试和跟进安排放进日程。</small>
+        </div>
+      </li>
+      <li>
+        <span>04</span>
+        <div>
+          <strong>开始针对性模拟</strong>
+          <small>针对目标岗位完成第一次模拟面试，让反馈进入下一版。</small>
         </div>
       </li>
     </ol>
@@ -69,7 +76,7 @@ defineEmits<{
 }
 
 .first-run-state__eyebrow {
-  color: #047857;
+  color: var(--brand, #047857);
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -79,7 +86,7 @@ defineEmits<{
 .first-run-state h1 {
   max-width: 620px;
   margin: 20px 0 18px;
-  color: #0f172a;
+  color: var(--ink, #0f172a);
   font-size: clamp(42px, 5vw, 68px);
   line-height: 1.04;
   letter-spacing: -0.05em;
@@ -88,7 +95,7 @@ defineEmits<{
 .first-run-state p {
   max-width: 620px;
   margin: 0;
-  color: #526076;
+  color: var(--copy, #526076);
   font-size: 17px;
   line-height: 1.85;
 }
@@ -99,7 +106,7 @@ defineEmits<{
   margin-top: 34px;
   border: 0;
   border-radius: 14px;
-  background: #10b981;
+  background: var(--brand, #10b981);
   color: #ffffff;
   cursor: pointer;
   font-size: 15px;
@@ -108,7 +115,7 @@ defineEmits<{
 }
 
 .first-run-state__primary:hover {
-  background: #059669;
+  filter: brightness(0.94);
   transform: translateY(-1px);
 }
 
@@ -131,9 +138,9 @@ defineEmits<{
   gap: 16px;
   align-items: center;
   padding: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.26);
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.26));
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--surface, rgba(255, 255, 255, 0.86));
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
 }
 
@@ -143,8 +150,8 @@ defineEmits<{
   height: 48px;
   place-items: center;
   border-radius: 14px;
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--brand-soft, #ecfdf5);
+  color: var(--brand, #047857);
   font-size: 13px;
   font-weight: 900;
 }
@@ -155,12 +162,12 @@ defineEmits<{
 }
 
 .first-run-state__steps strong {
-  color: #172033;
+  color: var(--ink, #172033);
   font-size: 15px;
 }
 
 .first-run-state__steps small {
-  color: #68758a;
+  color: var(--muted, #68758a);
   font-size: 13px;
   line-height: 1.55;
 }
