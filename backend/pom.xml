@@ -110,7 +110,6 @@
     </dependencies>
 
     <build>
-        <finalName>resume-go</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

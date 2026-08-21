@@ -63,6 +63,32 @@ jobs:
         working-directory: frontend
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Smoke-test packaged backend (jlink runtime + H2 health check)
+        shell: pwsh
+        run: |
+          $dbDir = Join-Path $env:RUNNER_TEMP 'smoke-workspace'
+          New-Item -ItemType Directory -Force -Path $dbDir | Out-Null
+          $env:SPRING_PROFILES_ACTIVE = 'local'
+          $env:RESUMEGO_DB_PATH = Join-Path $dbDir 'resumego'
+          $java = Join-Path (Get-Location) 'output/desktop/win-unpacked/resources/runtime/bin/java.exe'
+          $jar = Join-Path (Get-Location) 'output/desktop/win-unpacked/resources/backend/resume-go.jar'
+          Write-Host "java=$java exists=$(Test-Path $java) jar=$jar exists=$(Test-Path $jar)"
+          $proc = Start-Process -FilePath $java -ArgumentList '-jar', $jar, '--spring.profiles.active=local', '--server.port=18777' -PassThru -WindowStyle Hidden
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              Start-Sleep -Milliseconds 500
+              try {
+                $resp = Invoke-RestMethod -Uri 'http://127.0.0.1:18777/actuator/health' -TimeoutSec 2
+                if ($resp.status -eq 'UP') { $healthy = $true; break }
+              } catch { }
+            }
+            if (-not $healthy) { throw 'Backend health check failed' }
+            Write-Host 'Backend smoke test PASSED'
+          } finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          }
+
       - name: Upload portable package artifact
         uses: actions/upload-artifact@v4
         with:
