@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { createReadStream, createWriteStream, readFileSync } from 'node:fs'
+import { closeSync, createReadStream, openSync, readFileSync } from 'node:fs'
 import { mkdir, stat } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import net from 'node:net'
@@ -27,6 +27,7 @@ let internalToken = ''
 let keyStore: DesktopKeyStore | null = null
 let trustedFrontendOrigin = ''
 let dataDir = ''
+let backendLogFd: number | null = null
 
 function findOpenPort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -130,11 +131,11 @@ async function startApplication(): Promise<void> {
     internalToken,
     platform: process.platform,
   })
-  const backendLog = createWriteStream(path.join(app.getPath('userData'), 'backend.log'), { flags: 'a' })
+  backendLogFd = openSync(path.join(app.getPath('userData'), 'backend.log'), 'a')
   backendProcess = spawn(spec.command, spec.args, {
     cwd: app.isPackaged ? process.resourcesPath : projectRoot,
     env: spec.env,
-    stdio: ['ignore', backendLog, backendLog],
+    stdio: ['ignore', backendLogFd, backendLogFd],
   })
   runtimeConfig = {
     backendOrigin: `http://127.0.0.1:${backendPort}`,
@@ -211,6 +212,10 @@ async function stopChildren(): Promise<void> {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
   if (child) await terminateChildProcess(child)
+  if (backendLogFd !== null) {
+    try { closeSync(backendLogFd) } catch { /* already closed */ }
+    backendLogFd = null
+  }
 }
 
 function assertTrustedIpc(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): void {
