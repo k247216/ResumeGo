@@ -29,7 +29,7 @@ export function buildBackendLaunchSpec(options: BackendLaunchOptions): BackendLa
     : 'java'
   const jarPath = options.isPackaged
     ? path.join(options.resourcesPath, 'backend', 'resume-go.jar')
-    : path.join(options.projectRoot, 'backend', 'target', 'resume-go-0.0.1-SNAPSHOT.jar')
+    : path.join(options.projectRoot, 'backend', 'target', 'resume-go.jar')
 
   return {
     command,

@@ -58,7 +58,7 @@
         "to": "frontend"
       },
       {
-        "from": "../backend/target/resume-go-0.0.1-SNAPSHOT.jar",
+        "from": "../backend/target/resume-go.jar",
         "to": "backend/resume-go.jar"
       },
       {
