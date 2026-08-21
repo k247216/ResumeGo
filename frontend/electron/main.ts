@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { createReadStream } from 'node:fs'
+import { createReadStream, createWriteStream, readFileSync } from 'node:fs'
 import { mkdir, stat } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import net from 'node:net'
@@ -45,9 +45,13 @@ function findOpenPort(): Promise<number> {
 }
 
 async function waitForBackend(origin: string, child: ChildProcess): Promise<void> {
-  const deadline = Date.now() + 30_000
+  const deadline = Date.now() + 45_000
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error('本地服务提前退出')
+    if (child.exitCode !== null) {
+      throw new Error(
+        '本地服务提前退出（退出码 ' + child.exitCode + '）。请查看日志文件 backend.log 了解详情；原始本地数据和启动前备份均未删除。',
+      )
+    }
     try {
       const response = await fetch(`${origin}/actuator/health`)
       if (response.ok) return
@@ -56,7 +60,7 @@ async function waitForBackend(origin: string, child: ChildProcess): Promise<void
     }
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
-  throw new Error('本地服务启动超时')
+  throw new Error('本地服务启动超时（45 秒）。请查看日志文件 backend.log 了解详情。')
 }
 
 function contentType(filePath: string): string {
@@ -126,10 +130,11 @@ async function startApplication(): Promise<void> {
     internalToken,
     platform: process.platform,
   })
+  const backendLog = createWriteStream(path.join(app.getPath('userData'), 'backend.log'), { flags: 'a' })
   backendProcess = spawn(spec.command, spec.args, {
     cwd: app.isPackaged ? process.resourcesPath : projectRoot,
     env: spec.env,
-    stdio: 'ignore',
+    stdio: ['ignore', backendLog, backendLog],
   })
   runtimeConfig = {
     backendOrigin: `http://127.0.0.1:${backendPort}`,
@@ -281,7 +286,18 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.whenReady().then(startApplication).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : '未知错误'
-    dialog.showErrorBox('ResumeGo 无法启动', `${message}\n\n原始本地数据和启动前备份均未删除。`)
+    let logTail = ''
+    const logPath = path.join(app.getPath('userData'), 'backend.log')
+    try {
+      const content = readFileSync(logPath, 'utf-8')
+      logTail = content.split('\n').slice(-25).join('\n')
+    } catch {
+      // No log yet; the backend may have failed before writing anything.
+    }
+    dialog.showErrorBox(
+      'ResumeGo 无法启动',
+      `${message}\n\n原始本地数据和启动前备份均未删除。\n\n===== 后端日志（最后 25 行） =====\n${logTail || '（暂无日志）'}\n\n日志文件位置：${logPath}`,
+    )
     app.quit()
   })
 }
