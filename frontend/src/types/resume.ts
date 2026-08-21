@@ -50,16 +50,6 @@ export interface ScoreDeduction {
   [key: string]: unknown
 }
 
-export interface ResumeAssessment {
-  id: number
-  resumeVersionId: number
-  ruleVersion: string
-  totalScore: number
-  dimensionScores: Record<string, number>
-  deductions: ScoreDeduction[]
-  inputFingerprint: string
-  createdAt: string
-}
 
 export interface ResumeContent {
   basicInfo?: {

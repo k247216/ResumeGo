@@ -3,7 +3,6 @@ import type {
   CreateResumeRequest,
   CreateResumeVersionRequest,
   Resume,
-  ResumeAssessment,
   ResumeVersion,
   UpdateResumeTargetJobRequest,
 } from '../types/resume'
@@ -71,9 +70,3 @@ export async function createResumeVersion(
   return parseResponse<ResumeVersion>(res, '保存简历新版本失败')
 }
 
-export async function assessResumeVersion(versionId: number): Promise<ApiResponse<ResumeAssessment>> {
-  const res = await apiFetch(`${VERSION_BASE}/${versionId}/assessments`, {
-    method: 'POST',
-  })
-  return parseResponse<ResumeAssessment>(res, '生成简历评分失败')
-}
