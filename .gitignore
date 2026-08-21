@@ -12,7 +12,7 @@ node_modules/
 dist/
 coverage/
 electron-dist/
-runtime/
+frontend/runtime/
 
 # Backend
 target/
