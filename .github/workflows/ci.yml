@@ -67,7 +67,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ResumeGo-windows-portable
-          path: |
-            output/desktop/win-unpacked/*.exe
-            output/desktop/*.exe
+          path: output/desktop/*.exe
           if-no-files-found: error
