@@ -1,0 +1,97 @@
+package com.resumego.schedule;
+
+import com.resumego.common.CurrentUser;
+import com.resumego.schedule.dto.CreateScheduleEventRequest;
+import com.resumego.schedule.dto.ScheduleEventResponse;
+import com.resumego.schedule.dto.UpdateScheduleEventRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+@Service
+public class ScheduleEventService {
+
+    private static final Set<String> EVENT_TYPES = Set.of("interview", "exam", "followup", "other");
+
+    private final ScheduleEventRepository repository;
+
+    public ScheduleEventService(ScheduleEventRepository repository) {
+        this.repository = repository;
+    }
+
+    public List<ScheduleEventResponse> list(LocalDateTime from, LocalDateTime to) {
+        return repository.findAll(userId(), from, to).stream().map(this::toResponse).toList();
+    }
+
+    public ScheduleEventResponse get(long eventId) {
+        return toResponse(requireEvent(eventId));
+    }
+
+    @Transactional
+    public ScheduleEventResponse create(CreateScheduleEventRequest request) {
+        validate(request.title(), request.eventType(), request.startTime(), request.endTime(), request.jobDescriptionId());
+        long id = repository.create(userId(), normalizeTitle(request.title()), request.eventType(),
+                request.startTime(), request.endTime(), request.notes(), request.jobDescriptionId());
+        return get(id);
+    }
+
+    @Transactional
+    public ScheduleEventResponse update(long eventId, UpdateScheduleEventRequest request) {
+        requireEvent(eventId);
+        validate(request.title(), request.eventType(), request.startTime(), request.endTime(), request.jobDescriptionId());
+        repository.update(userId(), eventId, normalizeTitle(request.title()), request.eventType(),
+                request.startTime(), request.endTime(), request.notes(), request.jobDescriptionId());
+        return get(eventId);
+    }
+
+    @Transactional
+    public boolean delete(long eventId) {
+        return repository.softDelete(userId(), eventId) > 0;
+    }
+
+    private void validate(String title, String eventType, LocalDateTime startTime,
+                          LocalDateTime endTime, Long jobDescriptionId) {
+        if (title == null || title.strip().isEmpty()) {
+            throw new IllegalArgumentException("日程标题不能为空");
+        }
+        if (eventType == null || !EVENT_TYPES.contains(eventType)) {
+            throw new IllegalArgumentException("日程类型不合法");
+        }
+        if (startTime == null) {
+            throw new IllegalArgumentException("开始时间不能为空");
+        }
+        if (endTime != null && endTime.isBefore(startTime)) {
+            throw new IllegalArgumentException("结束时间不能早于开始时间");
+        }
+        if (jobDescriptionId != null && !repository.ownsJobDescription(userId(), jobDescriptionId)) {
+            throw new IllegalArgumentException("所选目标岗位不可用");
+        }
+    }
+
+    private String normalizeTitle(String value) {
+        String title = value.strip();
+        if (title.length() > 120) {
+            throw new IllegalArgumentException("日程标题不能超过 120 个字符");
+        }
+        return title;
+    }
+
+    private ScheduleEvent requireEvent(long eventId) {
+        return repository.findById(userId(), eventId)
+                .orElseThrow(() -> new NoSuchElementException("日程不存在"));
+    }
+
+    private long userId() {
+        return CurrentUser.DEMO_USER_ID;
+    }
+
+    private ScheduleEventResponse toResponse(ScheduleEvent event) {
+        return new ScheduleEventResponse(event.id(), event.title(), event.eventType(),
+                event.startTime(), event.endTime(), event.notes(), event.jobDescriptionId(),
+                event.createdAt(), event.updatedAt());
+    }
+}
