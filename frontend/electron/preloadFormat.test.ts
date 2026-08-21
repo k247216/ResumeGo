@@ -15,8 +15,14 @@ describe('preload module format', () => {
     expect(preload).toContain('contextBridge.exposeInMainWorld')
   })
 
-  it('keeps the main process as ESM for top-level await', () => {
+  it('keeps the main process as ESM', () => {
     const main = readFileSync(path.join(electronDist, 'main.js'), 'utf-8')
     expect(main).toMatch(/^import /m)
+  })
+
+  it('exposes the desktop bridge under sandbox constraints', () => {
+    const preload = readFileSync(path.join(electronDist, 'preload.js'), 'utf-8')
+    expect(preload).toContain("exposeInMainWorld('resumeGoDesktop'")
+    expect(preload).toContain("'resumego:runtime-config'")
   })
 })
