@@ -60,7 +60,7 @@ class KnowledgeImportServiceTest {
     private KnowledgeSourceFile existingSource(long documentId, String sha256) {
         return new KnowledgeSourceFile(20L, documentId, 1L, "笔记.md",
                 "knowledge/sources/1/" + sha256 + ".md", null, "md", 4, sha256,
-                "AVAILABLE", LocalDateTime.now(), LocalDateTime.now());
+                "AVAILABLE", null, LocalDateTime.now(), LocalDateTime.now());
     }
 
     private KnowledgeDocument completedFileDocument(long documentId) {

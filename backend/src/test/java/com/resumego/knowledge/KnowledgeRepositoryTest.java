@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -246,5 +247,63 @@ class KnowledgeRepositoryTest {
         long other = repository.insertDocument(1L, "无关联", "NOTE", "NOT_STARTED");
         assertThat(repository.findDocumentCategory(1L, other)).isEmpty();
         assertThat(repository.listDocumentTags(1L, other)).isEmpty();
+    }
+
+    @Test
+    void tracksAndClearsStagingRelativePathOnSourceFile() {
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        KnowledgeImportIds ids = repository.insertImportRecords(1L, "文件", new KnowledgeSourceFileDraft(
+                "a.md", "knowledge/sources/1/a.md", "md", 4, "sha-1", "STAGED", "knowledge/staging/x.part"));
+        // IO-01 的 insertImportRecords 不传 staging 路径时默认为 null
+        KnowledgeSourceFile source = repository.findSourceFileByDocument(1L, ids.documentId()).orElseThrow();
+        assertThat(source.stagingRelativePath()).isEqualTo("knowledge/staging/x.part");
+
+        repository.updateSourceStagingPath(ids.sourceFileId(), null);
+        KnowledgeSourceFile cleared = repository.findSourceFileByDocument(1L, ids.documentId()).orElseThrow();
+        assertThat(cleared.stagingRelativePath()).isNull();
+        assertThat(docId).isPositive();
+    }
+
+    @Test
+    void claimsImportJobForRetryOnlyFromFailedAndIsolatedPerUser() {
+        KnowledgeImportIds ids = repository.insertImportRecords(1L, "文件", new KnowledgeSourceFileDraft(
+                "a.md", "knowledge/sources/1/a.md", "md", 4, "sha-2", "STAGED", null));
+        repository.updateImportJobStatus(ids.importJobId(), "FAILED", "COPY_FAILED");
+
+        assertThat(repository.claimImportJobForRetry(1L, ids.documentId())).isTrue();
+        assertThat(repository.claimImportJobForRetry(1L, ids.documentId())).isFalse();
+        assertThat(repository.claimImportJobForRetry(2L, ids.documentId())).isFalse();
+    }
+
+    @Test
+    void deleteConfirmationsAreReplacedConsumedAndScoped() {
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        repository.replaceDeletionConfirmation(1L, docId, "hash-a", LocalDateTime.now().plusMinutes(10));
+        repository.replaceDeletionConfirmation(1L, docId, "hash-b", LocalDateTime.now().plusMinutes(10));
+
+        KnowledgeDeleteConfirmation confirmation = repository.findDeletionConfirmation(1L, docId).orElseThrow();
+        assertThat(confirmation.tokenHash()).isEqualTo("hash-b");
+        assertThat(repository.findDeletionConfirmation(2L, docId)).isEmpty();
+
+        repository.consumeDeletionConfirmation(confirmation.id());
+        assertThat(repository.findDeletionConfirmation(1L, docId).orElseThrow().consumedAt()).isNotNull();
+    }
+
+    @Test
+    void cleanupJobsInsertFindClaimAndDeleteDocumentById() {
+        long docId = repository.insertDocument(1L, "待删笔记", "NOTE", "NOT_STARTED");
+        long jobId = repository.insertCleanupJob(1L, docId, "待删笔记", "knowledge/sources/1/a.md", "PENDING");
+        assertThat(repository.findCleanupJobById(1L, jobId)).isPresent();
+        assertThat(repository.findCleanupJobById(2L, jobId)).isEmpty();
+        assertThat(repository.listCleanupJobsByStatus(1L, "PENDING")).hasSize(1);
+
+        assertThat(repository.claimCleanupJob(1L, jobId, "PENDING", "RUNNING")).isTrue();
+        assertThat(repository.claimCleanupJob(1L, jobId, "PENDING", "RUNNING")).isFalse();
+        repository.updateCleanupJobStatus(jobId, "FAILED", "FILE_DELETE_FAILED");
+        assertThat(repository.findCleanupJobById(1L, jobId).orElseThrow().errorCode())
+                .isEqualTo("FILE_DELETE_FAILED");
+
+        repository.deleteDocumentById(1L, docId);
+        assertThat(repository.findById(1L, docId)).isEmpty();
     }
 }

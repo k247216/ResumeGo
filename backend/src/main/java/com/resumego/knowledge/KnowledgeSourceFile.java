@@ -13,6 +13,7 @@ public record KnowledgeSourceFile(
         long sizeBytes,
         String sha256,
         String availability,
+        String stagingRelativePath,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

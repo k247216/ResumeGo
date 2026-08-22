@@ -30,6 +30,7 @@ class KnowledgeControllerTest {
     @Autowired MockMvc mockMvc;
     @MockBean KnowledgeService service;
     @MockBean KnowledgeClassificationService classification;
+    @MockBean KnowledgeRecoveryService recovery;
 
     @Test
     void createsAndListsNoteDocuments() throws Exception {
@@ -136,5 +137,43 @@ class KnowledgeControllerTest {
                 .thenThrow(new NoSuchElementException("知识文档不存在"));
         mockMvc.perform(get("/api/v2/knowledge/documents/404/classification"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void retriesFailedFileDocument() throws Exception {
+        org.mockito.Mockito.when(recovery.retry(7L)).thenReturn(sample(7L));
+        mockMvc.perform(post("/api/v2/knowledge/documents/7/retry"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(7));
+    }
+
+    @Test
+    void nonRetryableStateMapsToConflict() throws Exception {
+        org.mockito.Mockito.when(recovery.retry(7L))
+                .thenThrow(new IllegalStateException("NOT_RETRYABLE: 仅 FAILED 状态的文档可重试"));
+        mockMvc.perform(post("/api/v2/knowledge/documents/7/retry"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("NOT_RETRYABLE")));
+    }
+
+    @Test
+    void deletionImpactReturnsSummaryWithoutPaths() throws Exception {
+        org.mockito.Mockito.when(recovery.deletionImpact(7L)).thenReturn(
+                new com.resumego.knowledge.dto.KnowledgeDeletionImpactResponse(
+                        "标题", true, true, false, true, "abc123", java.time.LocalDateTime.now()));
+        mockMvc.perform(get("/api/v2/knowledge/documents/7/deletion-impact"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("标题"))
+                .andExpect(jsonPath("$.data.hasSource").value(true))
+                .andExpect(jsonPath("$.data.confirmationToken").value("abc123"));
+    }
+
+    @Test
+    void deletesDocumentWithConfirmationToken() throws Exception {
+        mockMvc.perform(delete("/api/v2/knowledge/documents/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmationToken\":\"abc123\"}"))
+                .andExpect(status().isOk());
+        org.mockito.Mockito.verify(recovery).deleteDocument(7L, "abc123");
     }
 }

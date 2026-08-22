@@ -18,10 +18,13 @@ public class KnowledgeController {
 
     private final KnowledgeService service;
     private final KnowledgeClassificationService classification;
+    private final KnowledgeRecoveryService recovery;
 
-    public KnowledgeController(KnowledgeService service, KnowledgeClassificationService classification) {
+    public KnowledgeController(KnowledgeService service, KnowledgeClassificationService classification,
+                               KnowledgeRecoveryService recovery) {
         this.service = service;
         this.classification = classification;
+        this.recovery = recovery;
     }
 
     @PostMapping
@@ -49,6 +52,25 @@ public class KnowledgeController {
     public ApiResponse<com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse> classification(
             @PathVariable long documentId) {
         return ApiResponse.ok(classification.getDocumentClassification(documentId));
+    }
+
+    @PostMapping("/{documentId}/retry")
+    public ApiResponse<KnowledgeDocumentResponse> retry(@PathVariable long documentId) {
+        return ApiResponse.ok(recovery.retry(documentId));
+    }
+
+    @GetMapping("/{documentId}/deletion-impact")
+    public ApiResponse<com.resumego.knowledge.dto.KnowledgeDeletionImpactResponse> deletionImpact(
+            @PathVariable long documentId) {
+        return ApiResponse.ok(recovery.deletionImpact(documentId));
+    }
+
+    @DeleteMapping("/{documentId}")
+    public ApiResponse<Void> deleteDocument(
+            @PathVariable long documentId,
+            @Valid @RequestBody com.resumego.knowledge.dto.DeleteKnowledgeDocumentRequest request) {
+        recovery.deleteDocument(documentId, request.confirmationToken());
+        return ApiResponse.ok(null);
     }
 
     @PutMapping("/{documentId}/category/{categoryId}")

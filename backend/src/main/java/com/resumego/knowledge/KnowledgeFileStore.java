@@ -66,6 +66,38 @@ public class KnowledgeFileStore {
         }
     }
 
+    /** 计算 data dir 下的相对路径（用于 staging 记录）。 */
+    public String relativePath(Path absolute) {
+        return root.relativize(absolute.normalize()).toString().replace('\\', '/');
+    }
+
+    /**
+     * 只允许删除 knowledge/staging/{name} 或 knowledge/sources/{userId}/{name}；
+     * 路径越界或用户目录不匹配直接拒绝。
+     */
+    public void deleteManaged(long userId, String relativePath) {
+        Path resolved = root.resolve(relativePath).normalize();
+        if (!resolved.startsWith(root.normalize())) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "非法清理路径");
+        }
+        Path stagingDir = root.resolve("knowledge/staging").normalize();
+        Path sourcesRoot = root.resolve("knowledge/sources").normalize();
+        Path ownSourceDir = sourcesRoot.resolve(String.valueOf(userId)).normalize();
+        boolean inStaging = resolved.startsWith(stagingDir);
+        boolean inSources = resolved.startsWith(sourcesRoot);
+        if (!inStaging && !inSources) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "清理路径越界");
+        }
+        if (inSources && !resolved.startsWith(ownSourceDir)) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "清理路径不属于当前用户");
+        }
+        try {
+            Files.deleteIfExists(resolved);
+        } catch (IOException exception) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.EXTRACTION_FAILED, "清理受管文件失败");
+        }
+    }
+
     public void deleteQuietly(Path path) {
         try {
             Files.deleteIfExists(path);

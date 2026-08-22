@@ -63,7 +63,8 @@ public class KnowledgeImportService {
                     parsed.extension(),
                     bytes.length,
                     sha256,
-                    "STAGED"));
+                    "STAGED",
+                    fileStore.relativePath(staged)));
         } catch (DuplicateKeyException exception) {
             // 并发同 fingerprint：唯一约束兜底，事务已回滚，不创建第二份
             fileStore.deleteQuietly(staged);
@@ -77,6 +78,7 @@ public class KnowledgeImportService {
 
         try {
             fileStore.moveToSources(userId(), sha256, parsed.extension(), staged);
+            repository.updateSourceStagingPath(ids.sourceFileId(), null);
         } catch (KnowledgeImportException exception) {
             repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
                     exception.errorCode(), false);
