@@ -35,8 +35,8 @@ Dispatch baseline: `b58115e25d37f9b2a032c11d3ea15d7e27e74fa0`
 | V2-F1-UX-01 | Pipeline 交互契约 | `INTEGRATED` | `docs/superpowers/specs/2026-08-22-v2-pipeline-interaction-design.md` | 不创建代码分支 | Pipeline 页面设计规范与验收场景 | F1 数据契约稳定 | 已批准 |
 | V2-F1-FE-03 | V2 Pipeline 页面 | `INTEGRATED` | `2572d60`、`0e65947`、`681a37f` | `codex/v2-f1-fe-03-pipeline-page` | router、Pipeline view/components/tests | V2-F1-FE-02B、UX-01 | 已集成 |
 | V2-F1-QA-01 | Pipeline 纵向验收 | `QUEUED` | FE-03 集成后填写 | `codex/v2-f1-qa-01-pipeline-acceptance` | 集成/E2E/桌面验收资产 | MIG-03、FE-03 | 4 |
-| V2-F2-ARCH-01 | Knowledge 存储与生命周期契约 | `CORE_RESERVED` | F1 数据边界稳定后填写 | `codex/v2-f2-arch-01-knowledge-contract` | 架构、决策、迁移设计 | F1 领域边界稳定 | F2 首项 |
-| V2-F2-BE-01 | Knowledge 元数据基础 | `QUEUED` | ARCH-01 集成后填写 | `codex/v2-f2-be-01-metadata` | 迁移、domain/repository/service/controller/tests | V2-F2-ARCH-01 | 1 |
+| V2-F2-ARCH-01 | Knowledge 存储与生命周期契约 | `INTEGRATED` | `docs/superpowers/specs/2026-08-22-v2-knowledge-library-foundation.md` | `codex/v2-f2-arch-01-knowledge-contract` | 架构、决策、迁移设计 | F1 领域边界稳定 | 已冻结 |
+| V2-F2-BE-01 | Knowledge 元数据基础 | `READY` | `5ea03a73274ccc534e44e6acaeb721fb631f5782` | `codex/v2-f2-be-01-metadata` | 迁移、domain/repository/service/controller/tests | V2-F2-ARCH-01 | 1 |
 | V2-F2-IO-01 | 文件导入与可恢复解析 | `QUEUED` | BE-01 集成后填写 | `codex/v2-f2-io-01-import-extraction` | 文件能力、导入/解析 job、IPC/API/tests | V2-F2-BE-01 | 2 |
 | V2-F2-BE-02 | 分类、标签、搜索与原文定位 | `QUEUED` | IO-01 集成后填写 | `codex/v2-f2-be-02-search` | Knowledge backend API 与测试 | V2-F2-IO-01 | 3 |
 | V2-F2-BE-03 | 重试与派生数据清理 | `QUEUED` | BE-02 集成后填写 | `codex/v2-f2-be-03-recovery-delete` | job retry/delete service/API/tests | V2-F2-BE-02 | 4 |
@@ -47,9 +47,9 @@ Dispatch baseline: `b58115e25d37f9b2a032c11d3ea15d7e27e74fa0`
 
 ## 并行与所有权规则
 
-1. `V2-F1-FE-03` 已集成；当前没有可直接分发的 `READY` 编码卡。
+1. 当前仅 `V2-F2-BE-01` 可分发，必须从冻结基线创建独立 worktree。
 2. `V2-F1-QA-01` 仍等待 MIG-03，不得提前将迁移场景伪装为已验收。
-3. 下一步由 Core Controller 冻结 MIG-01 或 F2-ARCH-01，再按依赖提升对应实现卡。
+3. BE-01 集成后立即提升 IO-01；不得在 BE-01 中提前复制或解析文件。
 4. 迁移和 Pipeline 页面不因“实现容易”而提前；它们的状态只能由 Core Controller 修改。
 5. 外部 Agent 只提交功能分支和 `docs/templates/v2-agent-delivery-report.md` 对应的交付内容，不得合并。
 
