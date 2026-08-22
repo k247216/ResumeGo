@@ -212,10 +212,11 @@ class KnowledgeRecoveryIntegrationTest {
         KnowledgeDeletionImpactResponse impact = recovery.deletionImpact(ids.documentId());
         recovery.deleteDocument(ids.documentId(), impact.confirmationToken());
 
-        // staging 副本消失，不是 null job 伪造完成
+        // staging 副本消失，不是 null job 伪造完成（stored + staging 各一个真实 job）
         assertThat(StoreConfig.dataDir.resolve("knowledge/staging/cp.part")).doesNotExist();
         List<KnowledgeCleanupJob> completed = repository.listCleanupJobsByStatus(1L, "COMPLETED");
-        assertThat(completed).hasSize(1);
+        assertThat(completed).hasSize(2);
+        assertThat(completed).allMatch(j -> j.sourceRelativePath() == null);
     }
 
     @Test
@@ -255,5 +256,47 @@ class KnowledgeRecoveryIntegrationTest {
         assertThat(response.processingStatus()).isEqualTo("COMPLETED");
         assertThat(repository.findExtractedContentByDocument(1L, ids.documentId()).orElseThrow().content())
                 .isEqualTo("# 已落位正文");
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void deletingCopyFailedCrashWindowRemovesStoredTarget() throws Exception {
+        // 移动后崩溃窗口：availability=STAGED、staging 已消失、stored target 已存在
+        KnowledgeImportIds ids = repository.insertImportRecords(1L, "崩溃窗口", new KnowledgeSourceFileDraft(
+                "窗口.md", "knowledge/sources/1/sha-crash.md", "md", 10, "sha-crash", "STAGED",
+                "knowledge/staging/crash.part"));
+        Path target = StoreConfig.dataDir.resolve("knowledge/sources/1/sha-crash.md");
+        Files.createDirectories(target.getParent());
+        Files.write(target, "# 已落位".getBytes(StandardCharsets.UTF_8));
+        repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(), "COPY_FAILED", false);
+
+        KnowledgeDeletionImpactResponse impact = recovery.deletionImpact(ids.documentId());
+        recovery.deleteDocument(ids.documentId(), impact.confirmationToken());
+
+        // stored 文件不再遗留（即使 source availability=STAGED）；stored + staging 各一个真实 job
+        assertThat(target).doesNotExist();
+        List<KnowledgeCleanupJob> completed = repository.listCleanupJobsByStatus(1L, "COMPLETED");
+        assertThat(completed).hasSize(2);
+        assertThat(completed).allMatch(j -> j.sourceRelativePath() == null);
+    }
+
+    @Test
+    void retryRemovesExtraStagingWhenStoredTargetAlsoExists() throws Exception {
+        // staging 与 stored 并存：成功后多余 staging 被删除且路径清空
+        KnowledgeImportIds ids = repository.insertImportRecords(1L, "并存", new KnowledgeSourceFileDraft(
+                "并存.md", "knowledge/sources/1/sha-both.md", "md", 10, "sha-both", "STAGED",
+                "knowledge/staging/both.part"));
+        Path target = StoreConfig.dataDir.resolve("knowledge/sources/1/sha-both.md");
+        Files.createDirectories(target.getParent());
+        Files.write(target, "# 并存正文".getBytes(StandardCharsets.UTF_8));
+        Files.createDirectories(StoreConfig.dataDir.resolve("knowledge/staging"));
+        Files.write(StoreConfig.dataDir.resolve("knowledge/staging/both.part"), "残留".getBytes(StandardCharsets.UTF_8));
+        repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(), "COPY_FAILED", false);
+
+        var response = recovery.retry(ids.documentId());
+
+        assertThat(response.processingStatus()).isEqualTo("COMPLETED");
+        assertThat(StoreConfig.dataDir.resolve("knowledge/staging/both.part")).doesNotExist();
+        assertThat(repository.findSourceFileByDocument(1L, ids.documentId()).orElseThrow().stagingRelativePath()).isNull();
     }
 }

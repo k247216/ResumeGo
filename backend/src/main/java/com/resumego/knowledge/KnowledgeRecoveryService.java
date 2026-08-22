@@ -95,6 +95,13 @@ public class KnowledgeRecoveryService {
                 Path staged = fileStore.resolveStored(source.stagingRelativePath());
                 fileStore.moveToSources(userId(), source.sha256(), source.extension(), staged);
                 repository.updateSourceStagingPath(source.id(), null);
+            } else {
+                // staging 与 stored 并存的窗口：读取 stored 前删除多余 staging，避免泄漏
+                String stagingPath = source.stagingRelativePath();
+                if (stagingPath != null && Files.exists(fileStore.resolveStored(stagingPath))) {
+                    fileStore.deleteManaged(userId(), stagingPath);
+                    repository.updateSourceStagingPath(source.id(), null);
+                }
             }
             Path sourcePath = fileStore.resolveStored(source.storedRelativePath());
             String content = KnowledgeTextExtractor.decodeUtf8(Files.readAllBytes(sourcePath));
@@ -154,12 +161,14 @@ public class KnowledgeRecoveryService {
         KnowledgeSourceFile source = repository.findSourceFileByDocument(userId(), documentId).orElse(null);
         // 为每个真实受管路径创建 cleanup job：AVAILABLE 的 stored path 与非空 staging 路径分别清理，
         // 不能用 null 路径伪造完成（COPY_FAILED 的 staging 副本也必须删除）。
+        // stored 路径非空始终纳入（即使 availability=STAGED 的“移动后崩溃窗口”），
+        // staging 路径非空也纳入；deleteManaged 幂等处理不存在文件；去重避免重复任务。
         List<String> managedPaths = new java.util.ArrayList<>();
         if (source != null) {
-            if (AVAIL_AVAILABLE.equals(source.availability()) && source.storedRelativePath() != null) {
+            if (source.storedRelativePath() != null) {
                 managedPaths.add(source.storedRelativePath());
             }
-            if (source.stagingRelativePath() != null) {
+            if (source.stagingRelativePath() != null && !managedPaths.contains(source.stagingRelativePath())) {
                 managedPaths.add(source.stagingRelativePath());
             }
         }
