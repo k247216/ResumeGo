@@ -5,7 +5,7 @@
 - Status: `QUEUED`，禁止开始
 - Branch: `codex/v2-f1-fe-03-pipeline-page`
 - Base commit: `Assigned when promoted to READY`
-- Depends on: integrated F1-BE-02, F1-FE-02 and approved F1-UX-01
+- Depends on: integrated F1-BE-02, F1-FE-02, F1-FE-02B and approved F1-UX-01
 
 ## User result
 
@@ -24,7 +24,7 @@
 
 ## File ownership to freeze
 
-只授权 router、一个 Pipeline view、`components/pipeline/**` 和对应测试；全局 DesktopShell/style 只有 UX 契约明确需要时单独授权。
+只授权 router、一个 Pipeline view、`components/pipeline/**` 和对应测试；API/types/store 已由 FE-02B 冻结，页面不得再次修改。全局 DesktopShell/style 只有 UX 契约明确需要时单独授权。
 
 ## Required tests
 

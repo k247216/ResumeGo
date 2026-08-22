@@ -36,6 +36,7 @@ Wave exit: Pipeline history is readable and the frontend has one typed state-man
 ## Wave B — Finish Pipeline and V1 import
 
 - [x] `V2-F1-BE-02`: add deterministic Pipeline identity/material update after BE-01 integration.
+- [ ] `V2-F1-FE-02B`: complete frontend update and transition-history contracts before the page task.
 - [ ] `V2-F0-MIG-01`: freeze import manifest, dry-run result, fingerprint and receipt contracts.
 - [ ] `V2-F0-MIG-02`: implement read-only inspection and transactional idempotent import.
 - [ ] `V2-F0-MIG-03`: expose the import review/confirmation desktop flow.
