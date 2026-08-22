@@ -2,7 +2,7 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-be-05-note-content`
 - Base commit: `5d26fa1`
 - Depends on: integrated F2-BE-04

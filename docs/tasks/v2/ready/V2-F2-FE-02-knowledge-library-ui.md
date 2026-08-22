@@ -2,9 +2,9 @@
 
 ## Identity
 
-- Status: `QUEUED`，禁止开始
+- Status: `READY`
 - Branch: `codex/v2-f2-fe-02-library-ui`
-- Base commit: `Assigned when promoted to READY`
+- Base commit: `03788f3`
 - Depends on: integrated F2-IO-02, F2-BE-04, F2-BE-05, F2-FE-01 and approved F2-UX-01
 
 ## User result
@@ -18,6 +18,9 @@
 - import progress、空/加载/失败/重试/无结果/缺失原文件状态。
 - 删除影响摘要、明确确认和成功后的列表一致性。
 - DesktopShell 的 Knowledge 一级入口已存在，不重做全局工具栏。
+- 视觉与交互必须遵循 `docs/superpowers/specs/2026-08-22-v2-knowledge-library-interaction-design.md` 和 `docs/design/v2-knowledge-library-target.png`：层级资料库与标签在左、可收起资料列表居中、正文为主阅读区、来源/属性/关系在可关闭右检查器。
+- NOTE 正文允许用户手动编辑并明确保存；FILE 正文只读。搜索命中正文时打开对应文档并定位/突出命中上下文，不制造不存在的内容。
+- 1080×720 时至少保留全局工具栏、文档主区和必要操作；优先自动收起检查器，其次收起资料列表，不允许横向溢出遮住主操作。
 
 ## Scope out
 
@@ -30,3 +33,10 @@ router、DesktopShell 的单一导航改动、Knowledge view、`components/knowl
 ## Required tests
 
 导入流程、层级分类与标签、列表/检查器收起、搜索与正文定位、NOTE 保存、打开原文失败、重试、删除确认与失败恢复、刷新持久化、1080×720、深浅主题与键盘。运行 Knowledge 定向测试、`npm run build`、`npm run build:electron`；全量只在交付前一次。
+
+## Direct rejection
+
+- 写死“技术知识”“JVM”等示例树、虚构文档关系或用静态卡片伪装后端数据。
+- 把正文、关系或来源信息再次堆进同一主画布；检查器必须可关闭，资料列表必须可收起。
+- 顺带重做全局导航、加入 AI 聊天、知识图谱、RAG、自动保存或任意目录监控。
+- 删除失败后提前从列表移除文档，或保存失败后把未落库正文显示成已保存。
