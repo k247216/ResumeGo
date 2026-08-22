@@ -40,7 +40,6 @@ function storeStub(overrides: Record<string, unknown> = {}) {
     classificationLoadingDocumentId: null,
     classificationErrorsByDocumentId: {} as Record<number, string>,
     classificationSaving: false,
-    classificationErrorMessage: '',
     searchQuery: '',
     searchCategoryId: null,
     searchTagId: null,

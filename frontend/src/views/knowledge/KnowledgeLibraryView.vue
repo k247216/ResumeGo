@@ -59,7 +59,7 @@
           :classification="selectedClassification"
           :loading="store.classificationLoadingDocumentId === store.selectedDocumentId"
           :saving="store.classificationSaving"
-          :error="selectedClassificationError || store.classificationErrorMessage"
+          :error="selectedClassificationError"
           :categories="store.categories"
           :tags="store.tags"
           @reload="loadSelectedClassification"
@@ -185,7 +185,7 @@ async function handleSetCategory(categoryId: number | null) {
   try {
     await store.setCategory(id, categoryId)
   } catch {
-    // 错误已写入 store.classificationErrorMessage
+    // 错误已写入该文档的 classificationErrorsByDocumentId
   }
 }
 
@@ -195,7 +195,7 @@ async function handleToggleTag(tagId: number, add: boolean) {
   try {
     await store.toggleTag(id, tagId, add)
   } catch {
-    // 错误已写入 store.classificationErrorMessage
+    // 错误已写入该文档的 classificationErrorsByDocumentId
   }
 }
 

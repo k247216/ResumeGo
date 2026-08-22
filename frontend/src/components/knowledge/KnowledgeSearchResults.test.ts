@@ -59,4 +59,16 @@ describe('KnowledgeSearchResults', () => {
 
     expect(mountResults({}).get('[data-test="knowledge-search-empty"]').text()).toContain('没有匹配结果')
   })
+
+  it('shows a stale banner above previous results when the latest search fails', () => {
+    const wrapper = mountResults({
+      results: [item(7, 'TITLE', '上一次结果', null)],
+      errorMessage: '搜索失败',
+    })
+    const banner = wrapper.get('[data-test="knowledge-search-error"]')
+    expect(banner.text()).toContain('搜索失败')
+    expect(banner.text()).toContain('以下为上一次结果')
+    // 旧结果仍可见，但明确标注非当前结果
+    expect(wrapper.text()).toContain('上一次结果')
+  })
 })

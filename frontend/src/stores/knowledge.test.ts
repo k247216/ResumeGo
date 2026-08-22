@@ -360,7 +360,7 @@ describe('useKnowledgeStore', () => {
     await store.setCategory(1, 3)
     expect(api.setDocumentCategory).toHaveBeenCalledWith(1, 3)
     expect(store.classificationByDocumentId[1].category?.id).toBe(3)
-    expect(store.classificationErrorMessage).toBe('')
+    expect(store.classificationErrorsByDocumentId[1]).toBeUndefined()
   })
 
   it('FE-01 category write failure keeps the previous state', async () => {
@@ -373,7 +373,7 @@ describe('useKnowledgeStore', () => {
     api.setDocumentCategory.mockRejectedValue(new Error('设置分类失败'))
     await expect(store.setCategory(1, 3)).rejects.toThrow('设置分类失败')
     expect(store.classificationByDocumentId[1]).toEqual(before)
-    expect(store.classificationErrorMessage).toContain('设置分类失败')
+    expect(store.classificationErrorsByDocumentId[1]).toContain('设置分类失败')
   })
 
   it('FE-01 tag toggle re-reads server state on success and keeps old on failure', async () => {
@@ -393,5 +393,49 @@ describe('useKnowledgeStore', () => {
     api.addDocumentTag.mockRejectedValueOnce(new Error('添加标签失败'))
     await expect(store.toggleTag(1, 3, true)).rejects.toThrow('添加标签失败')
     expect(store.classificationByDocumentId[1].tags.map((t) => t.id)).toEqual([2])
+  })
+
+  it('FE-01 save errors are scoped per document and do not leak across selection', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED'), doc(2, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+    await store.loadClassification(1)
+    await store.loadClassification(2)
+
+    // 文档 1 保存失败
+    api.setDocumentCategory.mockRejectedValueOnce(new Error('设置分类失败'))
+    await expect(store.setCategory(1, 3)).rejects.toThrow('设置分类失败')
+    expect(store.classificationErrorsByDocumentId[1]).toContain('设置分类失败')
+    // 文档 2 无错误
+    expect(store.classificationErrorsByDocumentId[2]).toBeUndefined()
+
+    // 切换保存文档 2 成功：只清文档 2，文档 1 的错误保留
+    api.setDocumentCategory.mockResolvedValueOnce(ok(null))
+    api.getDocumentClassification.mockResolvedValueOnce(ok({
+      category: { id: 4, name: '技能', normalizedName: '技能', createdAt: 't', updatedAt: 't' },
+      tags: [],
+    }))
+    await store.setCategory(2, 4)
+    expect(store.classificationErrorsByDocumentId[1]).toContain('设置分类失败')
+    expect(store.classificationErrorsByDocumentId[2]).toBeUndefined()
+  })
+
+  it('FE-01 search failure keeps old results and marks them stale', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+
+    api.searchKnowledge.mockResolvedValueOnce(ok([{
+      document: doc(1, 'COMPLETED'), matchedField: 'TITLE', snippet: '旧结果', lineNumber: null,
+    }]))
+    store.setSearchQuery('a')
+    await vi.waitFor(() => expect(store.searchResults).toHaveLength(1))
+
+    api.searchKnowledge.mockRejectedValueOnce(new Error('搜索失败'))
+    store.setSearchQuery('b')
+    await vi.waitFor(() => expect(store.searchErrorMessage).toContain('搜索失败'))
+    // 旧结果保留（由组件标注"上一次结果"），不伪装成当前结果
+    expect(store.searchResults).toHaveLength(1)
+    expect(store.searchResults[0].snippet).toBe('旧结果')
   })
 })

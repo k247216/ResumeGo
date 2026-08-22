@@ -1,12 +1,11 @@
 <template>
   <aside class="rail results" data-test="knowledge-search-results">
-    <div v-if="loading && !results.length" class="rail-state">正在搜索…</div>
-    <div v-else-if="errorMessage && !results.length" class="rail-state error">
-      <strong>搜索失败</strong>
-      <span>{{ errorMessage }}</span>
+    <div v-if="errorMessage" class="search-error" data-test="knowledge-search-error">
+      <span>搜索失败：{{ errorMessage }}<template v-if="results.length">，以下为上一次结果</template></span>
       <button type="button" class="text-btn" data-test="knowledge-search-retry" @click="$emit('retry')">重试</button>
     </div>
-    <div v-else-if="!results.length" class="rail-state empty" data-test="knowledge-search-empty">
+    <div v-if="loading && !results.length" class="rail-state">正在搜索…</div>
+    <div v-else-if="!errorMessage && !results.length" class="rail-state empty" data-test="knowledge-search-empty">
       <strong>没有匹配结果</strong>
       <span>换个关键词，或调整分类/标签筛选。</span>
     </div>
@@ -64,5 +63,6 @@ defineEmits<{ (e: 'select', id: number): void; (e: 'retry'): void }>()
 .line{font-style:normal;font-size:11px;color:var(--muted)}
 .snippet{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 .rail-refreshing{padding:8px;text-align:center;color:var(--muted);font-size:12px}
+.search-error{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;margin-bottom:8px;border:1px solid var(--border-default);border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:12px}
 .text-btn{border:0;background:transparent;color:var(--brand);font-size:13px;cursor:pointer;padding:0}
 </style>

@@ -54,7 +54,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const classificationLoadingDocumentId = ref<number | null>(null)
   const classificationErrorsByDocumentId = ref<Record<number, string>>({})
   const classificationSaving = ref(false)
-  const classificationErrorMessage = ref('')
   // 搜索状态（递增 sequence 丢弃过期响应）
   const searchQuery = ref('')
   const searchCategoryId = ref<number | null>(null)
@@ -263,10 +262,10 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     classificationByDocumentId.value = { ...classificationByDocumentId.value, [documentId]: response.data }
   }
 
-  /** 设置分类（null 表示无分类）；写入成功后回读，失败保留旧值。 */
+  /** 设置分类（null 表示无分类）；写入成功后回读，失败保留旧值。错误按文档隔离。 */
   async function setCategory(documentId: number, categoryId: number | null) {
     classificationSaving.value = true
-    classificationErrorMessage.value = ''
+    delete classificationErrorsByDocumentId.value[documentId]
     try {
       if (categoryId == null) {
         const current = classificationByDocumentId.value[documentId]?.category
@@ -278,23 +277,29 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       }
       await refreshClassification(documentId)
     } catch (error) {
-      classificationErrorMessage.value = error instanceof Error ? error.message : '更新分类失败'
+      classificationErrorsByDocumentId.value = {
+        ...classificationErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '更新分类失败',
+      }
       throw error
     } finally {
       classificationSaving.value = false
     }
   }
 
-  /** 添加/移除标签；写入成功后回读，失败保留旧值。 */
+  /** 添加/移除标签；写入成功后回读，失败保留旧值。错误按文档隔离。 */
   async function toggleTag(documentId: number, tagId: number, add: boolean) {
     classificationSaving.value = true
-    classificationErrorMessage.value = ''
+    delete classificationErrorsByDocumentId.value[documentId]
     try {
       if (add) await addDocumentTag(documentId, tagId)
       else await removeDocumentTag(documentId, tagId)
       await refreshClassification(documentId)
     } catch (error) {
-      classificationErrorMessage.value = error instanceof Error ? error.message : '更新标签失败'
+      classificationErrorsByDocumentId.value = {
+        ...classificationErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '更新标签失败',
+      }
       throw error
     } finally {
       classificationSaving.value = false
@@ -389,7 +394,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     classificationLoadingDocumentId,
     classificationErrorsByDocumentId,
     classificationSaving,
-    classificationErrorMessage,
     searchQuery,
     searchCategoryId,
     searchTagId,
