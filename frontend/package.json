@@ -1,8 +1,8 @@
 {
-  "name": "resumego",
+  "name": "zhida-career-os-preview",
   "private": true,
-  "version": "1.0.0",
-  "description": "本地优先的简历优化与面试准备工作台",
+  "version": "2.0.0-preview.1",
+  "description": "本地优先的个人职业资产与求职成长操作系统",
   "author": "ResumeGo contributors",
   "type": "module",
   "main": "electron-dist/main.js",
@@ -42,8 +42,8 @@
     "vue-tsc": "^3.3.5"
   },
   "build": {
-    "appId": "com.resumego.desktop",
-    "productName": "ResumeGo",
+    "appId": "com.resumego.careeros.preview",
+    "productName": "职达 Career OS Preview",
     "asar": true,
     "directories": {
       "output": "../output/desktop"
