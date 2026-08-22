@@ -115,22 +115,25 @@ function iconOf(doc: KnowledgeDocument) {
 
 function iconType(doc: KnowledgeDocument): string {
   if (doc.sourceType === 'NOTE') return 'note'
-  return doc.sourceExtension?.toLowerCase() || 'file'
+  const ext = doc.sourceExtension?.toLowerCase()
+  return !ext || ext === 'unknown' ? 'file' : ext
 }
 
 function typeLabel(doc: KnowledgeDocument): string {
   if (doc.sourceType === 'NOTE') return '笔记'
   const extension = doc.sourceExtension?.toLowerCase()
+  if (!extension || extension === 'unknown') return '文件'
   if (extension === 'md') return 'Markdown'
   if (extension === 'txt') return 'TXT'
-  return extension ? extension.toUpperCase() : '文件'
+  return extension.toUpperCase()
 }
 
 function shortTypeLabel(doc: KnowledgeDocument): string {
   if (doc.sourceType === 'NOTE') return 'NOTE'
   const extension = doc.sourceExtension?.toLowerCase()
+  if (!extension || extension === 'unknown') return 'FILE'
   if (extension === 'md') return 'MD'
-  return extension ? extension.toUpperCase().slice(0, 4) : 'FILE'
+  return extension.toUpperCase().slice(0, 4)
 }
 
 function metaOf(doc: KnowledgeDocument): string {
@@ -172,9 +175,9 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 .row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:start;gap:9px;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;cursor:pointer}
 .row:hover{background:var(--bg-hover)}
 .row.selected{background:var(--bg-selected);box-shadow:inset 2px 0 0 var(--brand)}
-.file-visual{position:relative;display:grid;width:30px;height:34px;place-items:start center;color:var(--type-color,var(--copy))}
-.row-icon{font-size:28px;color:currentColor}
-.file-type{position:absolute;left:50%;bottom:3px;min-width:22px;max-width:32px;transform:translateX(-50%);padding:1px 2px;border-radius:3px;background:var(--type-color,var(--copy));color:#fff;font-size:7px;font-weight:750;line-height:1;text-align:center;letter-spacing:-.02em;box-sizing:border-box}
+.file-visual{position:relative;display:grid;width:28px;height:30px;place-items:start center;color:var(--type-color,var(--copy))}
+.row-icon{font-size:20px;color:currentColor}
+.file-type{position:absolute;left:50%;bottom:2px;min-width:24px;max-width:34px;transform:translateX(-50%);padding:1px 3px;border-radius:3px;background:var(--type-color,var(--copy));color:#fff;font-size:7.5px;font-weight:750;line-height:1.1;text-align:center;letter-spacing:-.02em;box-sizing:border-box}
 .file-visual.type-note{--type-color:var(--brand)}
 .file-visual.type-md{--type-color:#36a853}
 .file-visual.type-txt{--type-color:#c48220}

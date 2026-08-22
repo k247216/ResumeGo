@@ -14,16 +14,14 @@
         <p v-if="classification?.category" class="category-path" data-test="inspector-category-path">
           {{ categoryPaths[classification.category.id] ?? classification.category.name }}
         </p>
-        <select
-          class="select"
-          :value="classification?.category?.id ?? ''"
-          data-test="inspector-category"
+        <KnowledgeSelect
+          :model-value="String(classification?.category?.id ?? '')"
+          :options="categoryOptions"
+          placeholder="无分类"
+          test-id="inspector-category"
           :disabled="saving"
           @change="onCategory"
-        >
-          <option value="">无分类</option>
-          <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ '　'.repeat(c.depth) }}{{ c.name }}</option>
-        </select>
+        />
         <p v-if="classificationError" class="block-error" data-test="inspector-category-error">{{ classificationError }}</p>
       </section>
 
@@ -34,10 +32,14 @@
           <span v-for="t in classification?.tags ?? []" :key="t.id" class="tag" :data-test="'inspector-tag-' + t.id">
             {{ t.name }}<button type="button" class="tag-remove" :data-test="'inspector-tag-remove-' + t.id" :disabled="saving" @click="$emit('toggle-tag', t.id, false)">×</button>
           </span>
-          <select class="tag-add" :value="''" data-test="inspector-add-tag" :disabled="saving" @change="onAddTag">
-            <option value="">+ 添加标签</option>
-            <option v-for="t in availableTags" :key="t.id" :value="t.id">{{ t.name }}</option>
-          </select>
+          <KnowledgeSelect
+            :model-value="''"
+            :options="availableTagOptions"
+            placeholder="+ 添加标签"
+            test-id="inspector-add-tag"
+            :disabled="saving"
+            @change="onAddTag"
+          />
         </div>
       </section>
 
@@ -74,6 +76,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Close } from '@element-plus/icons-vue'
+import KnowledgeSelect from './KnowledgeSelect.vue'
 import { knowledgeStatusLabel } from './status'
 import type { KnowledgeCategoryNode, KnowledgeDocument, KnowledgeDocumentClassification, KnowledgeTag } from '../../types/knowledge'
 
@@ -101,11 +104,17 @@ const emit = defineEmits<{
   (e: 'delete'): void
 }>()
 
-const categoryOptions = computed(() => props.categories)
+const categoryOptions = computed(() => {
+  const list: { value: string; label: string; indent?: number }[] = [{ value: '', label: '无分类' }]
+  for (const c of props.categories) {
+    list.push({ value: String(c.id), label: c.name, indent: c.depth })
+  }
+  return list
+})
 
-const availableTags = computed(() => {
+const availableTagOptions = computed(() => {
   const used = new Set(props.classification?.tags.map((t) => t.id) ?? [])
-  return props.tags.filter((t) => !used.has(t.id))
+  return props.tags.filter((t) => !used.has(t.id)).map((t) => ({ value: String(t.id), label: t.name }))
 })
 
 const sourceEnabled = computed(() => (
@@ -113,15 +122,12 @@ const sourceEnabled = computed(() => (
   && props.document.processingStatus === 'COMPLETED'
 ))
 
-function onCategory(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
+function onCategory(value: string) {
   emit('set-category', value === '' ? null : Number(value))
 }
 
-function onAddTag(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
+function onAddTag(value: string) {
   if (value !== '') emit('toggle-tag', Number(value), true)
-  ;(event.target as HTMLSelectElement).value = ''
 }
 
 function statusLabel(status: KnowledgeDocument['processingStatus']): string {
@@ -139,18 +145,14 @@ function statusLabel(status: KnowledgeDocument['processingStatus']): string {
 .block{padding:14px 0;border-bottom:1px solid var(--border-subtle)}
 .block h3{margin:0 0 8px;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em}
 .block.danger h3{color:var(--danger)}
-.select{box-sizing:border-box;width:100%;height:36px;padding:0 32px 0 11px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-solid);color:var(--ink);font-size:13px;font-weight:500;cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease}
-.select:hover{border-color:var(--copy)}
-.select:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
-.select:disabled{cursor:not-allowed;opacity:.58}
+.select-wrap{position:relative}
 .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tags .kselect{width:132px}
 .tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:var(--bg-subtle);color:var(--copy);font-size:12px}
 .tag-remove{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
 .tag-remove:hover{color:var(--danger)}
 .tag-empty{font-size:12px;color:var(--muted)}
-.tag-add{height:30px;padding:0 28px 0 10px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-solid);color:var(--ink);font-size:12px;cursor:pointer}
-.tag-add:hover{border-color:var(--copy)}
-.tag-add:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+
 .source-meta{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0 0 10px;font-size:12px}
 .source-meta dt{color:var(--muted)}
 .source-meta dd{margin:0;color:var(--copy)}

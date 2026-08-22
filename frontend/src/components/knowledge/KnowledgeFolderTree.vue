@@ -44,7 +44,7 @@ const roots = computed(() => props.nodes.filter((n) => n.parentId == null))
 </script>
 
 <style scoped>
-.folder-tree{font-size:13px}
+.folder-tree{font-size:14px}
 .tree-root{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
-.tree-empty{padding:10px 6px;color:var(--muted);font-size:12px}
+.tree-empty{padding:10px 6px;color:var(--muted);font-size:13px}
 </style>

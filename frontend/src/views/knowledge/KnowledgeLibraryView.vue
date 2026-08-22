@@ -148,12 +148,38 @@ import type { KnowledgeDeletionImpact } from '../../types/knowledge'
 const store = useKnowledgeStore()
 const nameDialogKind = ref<'category' | 'tag' | null>(null)
 const nameDialogBusy = ref(false)
-const inspectorOpen = ref(true)
-const navigatorCollapsed = ref(false)
-const listCollapsed = ref(false)
-const navigatorPreferenceSet = ref(false)
-const listPreferenceSet = ref(false)
-const inspectorPreferenceSet = ref(false)
+const PANE_STATE_KEY = 'resumego:knowledge:pane-state'
+function readPaneState(): { navigatorCollapsed: boolean; listCollapsed: boolean; inspectorOpen: boolean } | null {
+  try {
+    const raw = localStorage.getItem(PANE_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (typeof parsed.navigatorCollapsed !== 'boolean' || typeof parsed.listCollapsed !== 'boolean' || typeof parsed.inspectorOpen !== 'boolean') {
+      return null
+    }
+    return parsed as { navigatorCollapsed: boolean; listCollapsed: boolean; inspectorOpen: boolean }
+  } catch {
+    return null
+  }
+}
+function writePaneState() {
+  try {
+    localStorage.setItem(PANE_STATE_KEY, JSON.stringify({
+      navigatorCollapsed: navigatorCollapsed.value,
+      listCollapsed: listCollapsed.value,
+      inspectorOpen: inspectorOpen.value,
+    }))
+  } catch {
+    // 本地存储不可用时静默降级
+  }
+}
+const savedPaneState = readPaneState()
+const inspectorOpen = ref(savedPaneState?.inspectorOpen ?? true)
+const navigatorCollapsed = ref(savedPaneState?.navigatorCollapsed ?? false)
+const listCollapsed = ref(savedPaneState?.listCollapsed ?? false)
+const navigatorPreferenceSet = ref(savedPaneState != null)
+const listPreferenceSet = ref(savedPaneState != null)
+const inspectorPreferenceSet = ref(savedPaneState != null)
 const expandedFolderIds = ref<Set<number>>(new Set())
 const selectedFolderId = ref<number | null>(null)
 const activeTagId = ref<number | null>(null)
@@ -273,31 +299,37 @@ function toggleFolder(id: number) {
 function closeNavigator() {
   navigatorPreferenceSet.value = true
   navigatorCollapsed.value = true
+  writePaneState()
 }
 
 function openNavigator() {
   navigatorPreferenceSet.value = true
   navigatorCollapsed.value = false
+  writePaneState()
 }
 
 function closeDocumentList() {
   listPreferenceSet.value = true
   listCollapsed.value = true
+  writePaneState()
 }
 
 function openDocumentList() {
   listPreferenceSet.value = true
   listCollapsed.value = false
+  writePaneState()
 }
 
 function closeInspector() {
   inspectorPreferenceSet.value = true
   inspectorOpen.value = false
+  writePaneState()
 }
 
 function openInspector() {
   inspectorPreferenceSet.value = true
   inspectorOpen.value = true
+  writePaneState()
 }
 
 function selectFolder(id: number) {

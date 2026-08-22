@@ -42,18 +42,23 @@ function mountPane(overrides: Record<string, unknown> = {}) {
 }
 
 describe('KnowledgeReadingPane', () => {
-  it('edits local notes and real managed Markdown, but keeps TXT read-only', async () => {
+  it('directly edits local notes and real managed Markdown, keeps TXT read-only', () => {
     const note = mountPane()
-    expect(note.find('[data-test="knowledge-edit-start"]').exists()).toBe(true)
+    expect(note.find('[data-test="knowledge-body-editor"]').exists()).toBe(true)
+    expect(note.find('[data-test="knowledge-title-input"]').exists()).toBe(true)
+    expect(note.find('[data-test="knowledge-edit-start"]').exists()).toBe(false)
 
     const markdown = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'notes.md', sourceExtension: 'md' }) })
-    expect(markdown.find('[data-test="knowledge-edit-start"]').exists()).toBe(true)
+    expect(markdown.find('[data-test="knowledge-body-editor"]').exists()).toBe(true)
+    expect(markdown.find('[data-test="knowledge-edit-start"]').exists()).toBe(false)
 
     const text = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'notes.txt', sourceExtension: 'txt' }) })
+    expect(text.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
     expect(text.find('[data-test="knowledge-edit-start"]').exists()).toBe(false)
+    expect(text.get('[data-test="markdown-view"]').text()).toContain('# 原正文')
   })
 
-  it('beginEdit opens inline title and body editing and reports dirty state', async () => {
+  it('beginEdit focuses the inline title and body edits report dirty state', async () => {
     const wrapper = mountPane()
     await (wrapper.vm as unknown as { beginEdit: (options: { focusTitle: boolean }) => Promise<void> }).beginEdit({ focusTitle: true })
 
@@ -61,11 +66,11 @@ describe('KnowledgeReadingPane', () => {
     expect(document.activeElement).toBe(title.element)
     await wrapper.get('[data-test="knowledge-body-editor"]').setValue('# 新正文')
     expect((wrapper.vm as unknown as { hasUnsavedChanges: () => boolean }).hasUnsavedChanges()).toBe(true)
+    expect(wrapper.find('[data-test="knowledge-editor-bar"]').exists()).toBe(true)
   })
 
   it('emits explicit body save and changed title rename without silently autosaving body', async () => {
     const wrapper = mountPane()
-    await wrapper.get('[data-test="knowledge-edit-start"]').trigger('click')
     await wrapper.get('[data-test="knowledge-body-editor"]').setValue('更新正文')
     await wrapper.get('[data-test="knowledge-title-input"]').setValue('Redis 深入复习')
     await wrapper.get('[data-test="knowledge-title-input"]').trigger('blur')
@@ -79,15 +84,14 @@ describe('KnowledgeReadingPane', () => {
 
   it('discards local draft and restores the persisted title and body', async () => {
     const wrapper = mountPane()
-    await wrapper.get('[data-test="knowledge-edit-start"]').trigger('click')
     await wrapper.get('[data-test="knowledge-title-input"]').setValue('临时标题')
     await wrapper.get('[data-test="knowledge-body-editor"]').setValue('临时正文')
 
     ;(wrapper.vm as unknown as { discardChanges: () => void }).discardChanges()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('[data-test="knowledge-title-input"]').exists()).toBe(false)
-    expect(wrapper.get('[data-test="markdown-view"]').text()).toContain('# 原正文')
     expect((wrapper.vm as unknown as { hasUnsavedChanges: () => boolean }).hasUnsavedChanges()).toBe(false)
+    expect((wrapper.get('[data-test="knowledge-title-input"]').element as HTMLInputElement).value).toBe('Redis 笔记')
+    expect((wrapper.get('[data-test="knowledge-body-editor"]').element as HTMLTextAreaElement).value).toBe('# 原正文')
   })
 })

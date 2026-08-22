@@ -9,7 +9,7 @@
       <header class="reading-head">
         <div class="reading-title-row">
           <input
-            v-if="editing"
+            v-if="editable"
             ref="titleInput"
             v-model="titleDraft"
             class="title-input"
@@ -43,47 +43,43 @@
           <button type="button" class="text-btn" data-test="file-content-retry" @click="$emit('load-content')">重试</button>
         </div>
 
-        <div v-else-if="editing" class="document-editor">
+        <!-- 可编辑（NOTE / 受管 Markdown）：像编辑文件一样直接修改，无需先进入编辑模式 -->
+        <template v-else-if="editable">
           <textarea
             v-model="draft"
             class="body-editor"
             data-test="knowledge-body-editor"
-            placeholder="输入正文…"
+            placeholder="直接输入正文，与文件内容同步…"
             :disabled="saving"
+            spellcheck="false"
           ></textarea>
-          <div class="editor-actions">
-            <button type="button" class="text-btn" data-test="knowledge-edit-cancel" :disabled="saving" @click="discardChanges">取消</button>
-            <button
-              type="button"
-              class="save-btn"
-              data-test="knowledge-edit-save"
-              :disabled="saving || draftTooLarge || !hasUnsavedChanges()"
-              @click="saveChanges"
-            >
-              {{ saving ? '保存中…' : '保存更改' }}
-            </button>
+          <div v-if="dirty || saving" class="editor-bar" data-test="knowledge-editor-bar">
+            <span class="editor-dirty"><el-icon :size="13"><EditPen /></el-icon><span>有未保存的修改</span></span>
+            <span class="editor-actions">
+              <button type="button" class="text-btn" data-test="knowledge-edit-cancel" :disabled="saving" @click="discardChanges">放弃修改</button>
+              <button
+                type="button"
+                class="save-btn"
+                data-test="knowledge-edit-save"
+                :disabled="saving || draftTooLarge || !dirty"
+                @click="saveChanges"
+              >
+                {{ saving ? '保存中…' : '保存更改' }}
+              </button>
+            </span>
             <span v-if="draftTooLarge" class="editor-hint" data-test="note-size-hint">正文不能超过 1 MiB</span>
           </div>
           <p v-if="error" class="editor-error" data-test="note-save-error">{{ error }}</p>
-        </div>
+        </template>
 
+        <!-- 只读（TXT / 未知类型 / 未完成）：渲染视图，无编辑入口 -->
         <div v-else class="document-view">
           <KnowledgeMarkdownView :source="content" />
-          <button
-            v-if="editable"
-            type="button"
-            class="edit-btn"
-            data-test="knowledge-edit-start"
-            @click="beginEdit()"
-          >
-            <el-icon><EditPen /></el-icon><span>编辑</span>
-          </button>
         </div>
       </section>
     </template>
   </main>
 </template>
-
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { EditPen, InfoFilled } from '@element-plus/icons-vue'
@@ -108,7 +104,6 @@ const emit = defineEmits<{
   (e: 'rename-title', title: string): void
 }>()
 
-const editing = ref(false)
 const draft = ref('')
 const titleDraft = ref('')
 const titleInput = ref<HTMLInputElement | null>(null)
@@ -118,6 +113,8 @@ const MAX_BYTES = 1024 * 1024
 const draftTooLarge = computed(() => new TextEncoder().encode(draft.value).length > MAX_BYTES)
 const editable = computed(() => props.document?.sourceType === 'NOTE'
   || (props.document?.sourceType === 'FILE' && props.document.sourceExtension?.toLowerCase() === 'md'))
+const dirty = computed(() => !props.document ? false
+  : draft.value !== props.content || normalizedTitle() !== props.document.title)
 
 const metaLine = computed(() => {
   if (!props.document) return ''
@@ -139,11 +136,18 @@ function tone(status: KnowledgeDocument['processingStatus']): string {
   return 'tone-idle'
 }
 
-async function beginEdit(options: { focusTitle?: boolean } = {}) {
-  if (!editable.value || !props.document) return
+function normalizedTitle(): string {
+  return titleDraft.value.trim()
+}
+
+function syncDraftFromContent() {
   draft.value = props.content
-  titleDraft.value = props.document.title
-  editing.value = true
+  titleDraft.value = props.document?.title ?? ''
+}
+
+/** 直接编辑态：同步草稿并聚焦标题（新建笔记后由视图调用）。 */
+async function beginEdit(options: { focusTitle?: boolean } = {}) {
+  if (!props.document || !editable.value) return
   await nextTick()
   if (options.focusTitle) {
     titleInput.value?.focus()
@@ -151,12 +155,8 @@ async function beginEdit(options: { focusTitle?: boolean } = {}) {
   }
 }
 
-function normalizedTitle(): string {
-  return titleDraft.value.trim()
-}
-
 function commitTitle() {
-  if (!props.document || !editing.value) return
+  if (!props.document || !editable.value) return
   const title = normalizedTitle()
   if (!title) {
     titleDraft.value = props.document.title
@@ -166,12 +166,12 @@ function commitTitle() {
 }
 
 function hasUnsavedChanges(): boolean {
-  if (!editing.value || !props.document) return false
-  return draft.value !== props.content || normalizedTitle() !== props.document.title
+  if (!props.document) return false
+  return dirty.value
 }
 
 function pendingChanges() {
-  if (!editing.value || !props.document) return null
+  if (!props.document) return null
   const title = normalizedTitle() || props.document.title
   return {
     title,
@@ -182,9 +182,7 @@ function pendingChanges() {
 }
 
 function discardChanges() {
-  draft.value = props.content
-  titleDraft.value = props.document?.title ?? ''
-  editing.value = false
+  syncDraftFromContent()
 }
 
 function saveChanges() {
@@ -193,21 +191,44 @@ function saveChanges() {
   if (draft.value !== props.content) emit('save-content', draft.value)
 }
 
+// 切换文档：重置草稿到新文档的已保存状态
 watch(() => props.document?.id, () => {
-  discardChanges()
+  syncDraftFromContent()
+})
+
+// 正文异步到达：未改动时保持同步；已改动绝不覆盖用户输入
+watch(() => props.content, (content) => {
+  if (draft.value === '' && content !== '') {
+    draft.value = content
+  }
 })
 
 watch(() => props.document?.title, (title) => {
-  if (editing.value && title) titleDraft.value = title
+  if (title && titleDraft.value === '') titleDraft.value = title
 })
 
+// 保存完成后清除脏状态（error 为空才视为成功）
 watch(() => props.saving, (saving, wasSaving) => {
-  if (wasSaving && !saving && !props.error) discardChanges()
+  if (wasSaving && !saving && !props.error) {
+    draft.value = props.content
+    titleDraft.value = props.document?.title ?? ''
+  }
 })
 
 async function scrollToLine(lineNumber: number | null) {
   if (!props.document || lineNumber == null || !bodyEl.value) return
   await nextTick()
+  const editor = bodyEl.value.querySelector<HTMLTextAreaElement>('.body-editor')
+  if (editor) {
+    const lines = editor.value.split('\n')
+    const target = Math.min(lineNumber, lines.length)
+    let offset = 0
+    for (let i = 0; i < target - 1 && i < lines.length; i++) offset += lines[i].length + 1
+    const total = editor.value.length || 1
+    const ratio = lines.length ? offset / Math.max(total, 1) : 0
+    editor.scrollTop = ratio * (editor.scrollHeight - editor.clientHeight)
+    return
+  }
   const view = bodyEl.value.querySelector('.markdown-view')
   const pre = view?.querySelector('pre') ?? view
   if (!pre) return
@@ -222,39 +243,40 @@ async function scrollToLine(lineNumber: number | null) {
 
 defineExpose({ scrollToLine, beginEdit, hasUnsavedChanges, pendingChanges, discardChanges, saveChanges })
 </script>
-
 <style scoped>
 .reading{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--surface-solid);overflow:hidden}
 .reading-empty{display:grid;gap:8px;align-content:center;justify-items:start;min-height:100%;padding:48px;color:var(--muted);font-size:13px}
-.reading-empty strong{color:var(--ink);font-size:16px}
 .reading-head{flex:none;padding:22px 34px 14px;border-bottom:1px solid var(--border-subtle)}
-.reading-title-row{display:flex;align-items:center;gap:10px}
-.reading-title-row h2{margin:0;font-size:21px;font-weight:650;letter-spacing:-.015em;color:var(--ink);word-break:break-word;flex:1;min-width:0}
+.reading-title-row{display:flex;align-items:center;gap:12px}
 .title-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--border-default);background:transparent;color:var(--ink);font:650 21px/1.35 inherit;letter-spacing:-.015em;padding:2px 0 5px}
 .title-input:focus{outline:0;border-bottom-color:var(--brand)}
+.title-input:disabled{opacity:.6}
+.reading-title-row h2{margin:0;font-size:21px;font-weight:650;letter-spacing:-.015em;color:var(--ink)}
 .reading-status{flex:none;font-size:11px;padding:2px 9px;border-radius:999px}
 .tone-ok{color:var(--brand);background:var(--brand-soft)}
 .tone-busy{color:var(--copy);background:var(--bg-subtle)}
 .tone-danger{color:var(--danger);background:var(--danger-soft)}
 .tone-idle{color:var(--muted);background:var(--bg-subtle)}
 .inspector-btn{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;flex:none;padding:5px}
-.inspector-btn:hover{color:var(--ink)}
-.reading-meta{margin:8px 0 0;color:var(--muted);font-size:12px}
-.title-error,.editor-error{margin:8px 0 0;color:var(--danger);font-size:12px}
-.reading-body{flex:1;min-height:0;overflow:auto;padding:24px 34px 56px}
-.reading-body>*{width:min(100%,760px)}
-.reading-state{display:grid;gap:8px;justify-items:start;color:var(--muted);font-size:13px}
+.inspector-btn:hover{color:var(--brand)}
+.reading-meta{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.title-error{margin:8px 0 0;font-size:12px;color:var(--danger)}
+.reading-body{flex:1;min-height:0;overflow:auto;padding:0}
+.reading-state{display:grid;gap:8px;align-content:center;justify-items:start;min-height:100%;padding:48px 34px;color:var(--muted);font-size:13px}
 .reading-state.error{color:var(--danger)}
-.document-view{position:relative;min-height:240px}
-.edit-btn{display:inline-flex;align-items:center;gap:6px;margin-top:24px;padding:7px 12px;border:1px solid var(--border-default);border-radius:8px;background:transparent;color:var(--copy);font-size:12px;cursor:pointer}
-.edit-btn:hover{border-color:var(--ink);color:var(--ink)}
-.document-editor{display:grid;gap:12px}
-.body-editor{box-sizing:border-box;width:100%;min-height:420px;padding:4px 0 24px;border:0;border-bottom:1px solid var(--border-subtle);background:transparent;color:var(--ink);font-size:14px;line-height:1.75;resize:vertical;font-family:inherit}
-.body-editor:focus{outline:0;border-bottom-color:var(--brand)}
-.editor-actions{display:flex;align-items:center;gap:12px}
-.save-btn{padding:8px 16px;border:0;border-radius:8px;background:var(--action-bg);color:var(--action-fg);font-size:13px;font-weight:600;cursor:pointer}
-.save-btn:disabled{opacity:.5;cursor:not-allowed}
+.text-btn{border:0;background:transparent;color:var(--brand);font-size:13px;cursor:pointer;padding:0}
+.text-btn:disabled{opacity:.5;cursor:default}
+/* 文档式直接编辑：textarea 与只读渲染视图同排版，无边框、无卡片 */
+.body-editor{box-sizing:border-box;display:block;width:100%;min-height:100%;padding:24px 34px 96px;border:0;background:transparent;color:var(--ink);font:14px/1.78 inherit;resize:none;outline:0;caret-color:var(--brand)}
+.body-editor:disabled{opacity:.7}
+.body-editor::placeholder{color:var(--muted)}
+/* 底部保存条：仅脏状态出现 */
+.editor-bar{position:sticky;bottom:0;display:flex;align-items:center;gap:12px;margin:0 34px 18px;padding:9px 14px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-solid);box-shadow:0 -2px 12px rgba(0,0,0,.05)}
+.editor-dirty{display:inline-flex;align-items:center;gap:6px;color:var(--copy);font-size:12.5px;font-weight:550}
+.editor-actions{display:inline-flex;align-items:center;gap:10px;margin-left:auto}
+.save-btn{padding:7px 16px;border:0;border-radius:8px;background:var(--action-bg);color:var(--action-fg);font-size:13px;font-weight:600;cursor:pointer}
+.save-btn:disabled{opacity:.5;cursor:default}
 .editor-hint{color:var(--danger);font-size:12px}
-.text-btn{border:0;background:transparent;color:var(--copy);font-size:13px;cursor:pointer;padding:0}
-.text-btn:hover{color:var(--ink)}
+.editor-error{margin:0 34px 18px;font-size:12.5px;color:var(--danger)}
+.document-view{padding:24px 34px 56px;min-height:100%;box-sizing:border-box}
 </style>

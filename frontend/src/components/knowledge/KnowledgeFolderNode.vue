@@ -15,7 +15,7 @@
           class="folder-icon"
           :data-test="'folder-icon-' + node.id"
           :data-state="expanded ? 'open' : 'closed'"
-          :size="15"
+          :size="16"
         ><component :is="expanded ? FolderOpened : Folder" /></el-icon>
         <span>{{ node.name }}</span>
       </button>
@@ -79,7 +79,7 @@ function toggle() {
 
 <style scoped>
 .tree-node{list-style:none}
-.tree-row{display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:8px;font-size:13px}
+.tree-row{display:flex;align-items:center;gap:4px;padding:5px 6px;border-radius:8px;font-size:14px}
 .tree-row:hover{background:var(--bg-hover)}
 .tree-row.selected{background:var(--bg-selected)}
 .tree-toggle{display:grid;place-items:center;border:0;background:transparent;color:var(--copy);width:16px;padding:0;cursor:pointer;flex:none}

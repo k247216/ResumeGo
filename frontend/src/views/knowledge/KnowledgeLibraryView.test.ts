@@ -125,6 +125,7 @@ function mountView(store: ReturnType<typeof storeStub>) {
 describe('KnowledgeLibraryView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    localStorage.clear()
     viewportWidth = 1440
     vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => viewportWidth)
     setActivePinia(createPinia())
@@ -189,7 +190,6 @@ describe('KnowledgeLibraryView', () => {
     const wrapper = mountView(store)
     await flushPromises()
 
-    await wrapper.get('[data-test="knowledge-edit-start"]').trigger('click')
     await wrapper.get('[data-test="knowledge-body-editor"]').setValue('未保存正文')
     await wrapper.get('[data-test="stub-select-2"]').trigger('click')
 
@@ -224,5 +224,21 @@ describe('KnowledgeLibraryView', () => {
 
     await wrapper.get('[data-test="knowledge-restore-list"]').trigger('click')
     expect(wrapper.find('[data-test="stub-list"]').exists()).toBe(true)
+  })
+
+  it('persists pane collapse state locally and restores it on the next open', async () => {
+    const store = storeStub()
+    const first = mountView(store)
+    await flushPromises()
+    await first.get('[data-test="stub-list-close"]').trigger('click')
+    expect(first.find('[data-test="stub-list"]').exists()).toBe(false)
+    const saved = localStorage.getItem('resumego:knowledge:pane-state')
+    expect(saved).toBeTruthy()
+    expect(saved).toContain('"listCollapsed":true')
+
+    const second = mountView(store)
+    await flushPromises()
+    expect(second.find('[data-test="stub-list"]').exists()).toBe(false)
+    expect(second.find('[data-test="knowledge-restore-list"]').exists()).toBe(true)
   })
 })

@@ -38,14 +38,21 @@ describe('KnowledgeSourceInspector', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  it('shows the current category and emits changes', async () => {
+  it('shows the current category in a custom dropdown and emits changes', async () => {
     const wrapper = mountInspector({
       document: doc(1, 'NOTE', 'COMPLETED'),
       classification: classification({ category: categoryNode(1, '求职') }),
     })
-    expect(wrapper.get('[data-test="inspector-category"]').element).toHaveProperty('value', '1')
-    await wrapper.get('[data-test="inspector-category"]').setValue('')
+    expect(wrapper.get('[data-test="inspector-category"]').text()).toContain('求职')
+    expect(wrapper.find('[data-test="inspector-category-menu"]').exists()).toBe(false)
+
+    await wrapper.get('[data-test="inspector-category"]').trigger('click')
+    expect(wrapper.find('[data-test="inspector-category-menu"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="inspector-category-option-1"]').text()).toContain('求职')
+
+    await wrapper.get('[data-test="inspector-category-option-"]').trigger('click')
     expect(wrapper.emitted('set-category')).toEqual([[null]])
+    expect(wrapper.find('[data-test="inspector-category-menu"]').exists()).toBe(false)
   })
 
   it('enables open/reveal only for completed FILE documents', () => {
