@@ -2,7 +2,7 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-io-01-import-extraction`
 - Base commit: `65c25c09396c5ce3c9574b8d856011ae37bac334`
 - Depends on: integrated F2-BE-01
@@ -63,5 +63,7 @@ backend/src/test/resources/sql/knowledge_schema.sql
 ## Delivery
 
 Commit: `feat(knowledge): import and extract text files`
+
+Integrated commits: `d218ed7`, `a8d4299`.
 
 通过 DSH 回传 commit、端点行为、存储相对路径规则、失败分类和必要测试结果；不得自行合并。

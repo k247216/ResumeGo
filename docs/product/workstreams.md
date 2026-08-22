@@ -6,7 +6,7 @@ Controller: Core Controller
 
 Integration branch: `codex/v2-career-os`
 
-Dispatch baseline: `b58115e25d37f9b2a032c11d3ea15d7e27e74fa0`
+Dispatch baseline: `fbe13e2bbc3366371c5ca0955dc5fd8f6356e1f1`
 
 本文件是 V2 外部 Agent 的唯一任务状态入口。只有位于 `docs/tasks/v2/ready/` 且状态为 `READY` 的任务可以开始。执行者领取任务时，将对应任务卡全文交给该 Agent；不得只转述标题。
 
@@ -37,9 +37,9 @@ Dispatch baseline: `b58115e25d37f9b2a032c11d3ea15d7e27e74fa0`
 | V2-F1-QA-01 | Pipeline 纵向验收 | `QUEUED` | FE-03 集成后填写 | `codex/v2-f1-qa-01-pipeline-acceptance` | 集成/E2E/桌面验收资产 | MIG-03、FE-03 | 4 |
 | V2-F2-ARCH-01 | Knowledge 存储与生命周期契约 | `INTEGRATED` | `docs/superpowers/specs/2026-08-22-v2-knowledge-library-foundation.md` | `codex/v2-f2-arch-01-knowledge-contract` | 架构、决策、迁移设计 | F1 领域边界稳定 | 已冻结 |
 | V2-F2-BE-01 | Knowledge 元数据基础 | `INTEGRATED` | `4946c0c`、`65c25c0` | `codex/v2-f2-be-01-metadata` | 迁移、domain/repository/service/controller/tests | V2-F2-ARCH-01 | 已集成 |
-| V2-F2-IO-01 | 文件导入与可恢复解析 | `READY` | `65c25c09396c5ce3c9574b8d856011ae37bac334` | `codex/v2-f2-io-01-import-extraction` | Knowledge 文件副本、文本提取、job/API/tests | V2-F2-BE-01 | 2 |
-| V2-F2-FE-00 | Knowledge 可用前端切片 | `READY` | `65c25c09396c5ce3c9574b8d856011ae37bac334` | `codex/v2-f2-fe-00-knowledge-usable-slice` | Knowledge types/API/store、基础页面、导航 | V2-F2-BE-01；并行采用冻结 IO-01 接口 | 2，可与 IO-01 并行 |
-| V2-F2-BE-02 | 分类、标签、搜索与原文定位 | `QUEUED` | IO-01 集成后填写 | `codex/v2-f2-be-02-search` | Knowledge backend API 与测试 | V2-F2-IO-01 | 3 |
+| V2-F2-IO-01 | 文件导入与可恢复解析 | `INTEGRATED` | `d218ed7`、`a8d4299` | `codex/v2-f2-io-01-import-extraction` | Knowledge 文件副本、文本提取、job/API/tests | V2-F2-BE-01 | 已集成 |
+| V2-F2-FE-00 | Knowledge 可用前端切片 | `INTEGRATED` | `4979b04`、`fbe13e2` | `codex/v2-f2-fe-00-knowledge-usable-slice` | Knowledge types/API/store、基础页面、导航 | V2-F2-BE-01；并行采用冻结 IO-01 接口 | 已集成 |
+| V2-F2-BE-02 | 分类、标签与关键词搜索 | `READY` | `fbe13e2bbc3366371c5ca0955dc5fd8f6356e1f1` | `codex/v2-f2-be-02-classification-search` | Knowledge backend API、迁移与测试 | V2-F2-IO-01、V2-F2-FE-00 | 3 |
 | V2-F2-BE-03 | 重试与派生数据清理 | `QUEUED` | BE-02 集成后填写 | `codex/v2-f2-be-03-recovery-delete` | job retry/delete service/API/tests | V2-F2-BE-02 | 4 |
 | V2-F2-FE-01 | Knowledge client 与 store | `QUEUED` | BE-02 契约集成后填写 | `codex/v2-f2-fe-01-client-store` | types/API/store/tests | V2-F2-BE-02 | 4，可与 BE-03 并行且不得重叠文件 |
 | V2-F2-UX-01 | Knowledge Library 交互契约 | `DESIGN_REQUIRED` | 不适用 | 不创建代码分支 | Knowledge 页面设计规范与验收场景 | ARCH-01 | FE-02 前 |
@@ -48,9 +48,9 @@ Dispatch baseline: `b58115e25d37f9b2a032c11d3ea15d7e27e74fa0`
 
 ## 并行与所有权规则
 
-1. 当前 `V2-F2-IO-01` 与 `V2-F2-FE-00` 可并行分发，二者必须从相同冻结基线创建独立 worktree且不重叠文件。
+1. `V2-F2-IO-01` 与 `V2-F2-FE-00` 已集成，当前唯一可领取实现卡为 `V2-F2-BE-02`。
 2. `V2-F1-QA-01` 仍等待 MIG-03，不得提前将迁移场景伪装为已验收。
-3. IO-01 与 FE-00 都集成后，继续提升 BE-02；不得提前实现搜索、标签或删除。
+3. BE-02 只实现分类、标签与关键词搜索；安全打开受管原文拆为后续 Electron capability，删除仍由 BE-03 负责。
 4. 迁移和 Pipeline 页面不因“实现容易”而提前；它们的状态只能由 Core Controller 修改。
 5. 外部 Agent 只提交功能分支和 `docs/templates/v2-agent-delivery-report.md` 对应的交付内容，不得合并。
 

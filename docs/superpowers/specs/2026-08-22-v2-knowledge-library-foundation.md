@@ -43,7 +43,7 @@ H2 `V6__knowledge_library_foundation.sql` and MySQL `V26__knowledge_library_foun
 ## Later slices
 
 - IO-01 alone may register `FILE` documents after staging validates and copies bytes.
-- BE-02 owns categories, tags, keyword search and original-location tokens.
+- BE-02 owns categories, tags and keyword search. Secure opening of managed source files is a separate Electron capability slice after search, so the renderer never receives or submits arbitrary paths.
 - BE-03 owns retry and complete deletion. F2 uses no embeddings or vector database.
 
 ## Security and failure behavior

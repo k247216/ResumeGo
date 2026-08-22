@@ -2,7 +2,7 @@
 
 ## Identity
 
-- Status: `READY`，可与 IO-01 并行
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-fe-00-knowledge-usable-slice`
 - Base commit: `65c25c09396c5ce3c9574b8d856011ae37bac334`
 - Depends on: integrated F2-BE-01; IO-01 endpoint contract is frozen and may be mocked until integration
@@ -70,5 +70,7 @@ frontend/src/components/knowledge/**
 ## Delivery
 
 Commit: `feat(knowledge): add usable local library view`
+
+Integrated commits: `4979b04`, `fbe13e2`.
 
 回传 commit、真实用户流程、对 IO-01 mock 的接口假设、测试结果和未完成项；不得自行合并。
