@@ -11,6 +11,7 @@ import { buildBackendLaunchSpec } from './backendProcess.js'
 import { DesktopKeyStore } from './keyStore.js'
 import { isTrustedRendererUrl } from './security.js'
 import { createBeforeQuitHandler, terminateChildProcess } from './processLifecycle.js'
+import { V2_PREVIEW_IDENTITY, resolveV2PreviewUserDataPath } from './productIdentity.js'
 import {
   createColdWorkspaceBackup,
   exportWorkspaceBackup,
@@ -19,7 +20,8 @@ import {
 } from './workspaceBackup.js'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-app.setName('ResumeGo')
+app.setName(V2_PREVIEW_IDENTITY.appName)
+app.setPath('userData', resolveV2PreviewUserDataPath(app.getPath('appData')))
 let backendProcess: ChildProcess | null = null
 let frontendServer: Server | null = null
 let runtimeConfig = { backendOrigin: '', workspaceToken: '' }
