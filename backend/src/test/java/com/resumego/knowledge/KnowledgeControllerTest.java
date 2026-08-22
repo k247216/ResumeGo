@@ -35,7 +35,7 @@ class KnowledgeControllerTest {
     @Test
     void createsAndListsNoteDocuments() throws Exception {
         when(service.create(any())).thenReturn(sample(7L));
-        when(service.list()).thenReturn(List.of(sample(7L)));
+        when(service.list(null, null, false)).thenReturn(List.of(sample(7L)));
 
         mockMvc.perform(post("/api/v2/knowledge/documents")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -206,5 +206,19 @@ class KnowledgeControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"" + "a".repeat(1024 * 1024 + 1) + "\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void listsDocumentsWithBrowseFilters() throws Exception {
+        when(service.list(3L, null, true)).thenReturn(List.of(sample(7L)));
+        mockMvc.perform(get("/api/v2/knowledge/documents")
+                        .param("categoryId", "3").param("includeDescendants", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(7));
+
+        when(service.list(null, 5L, false)).thenReturn(List.of(sample(8L)));
+        mockMvc.perform(get("/api/v2/knowledge/documents").param("tagId", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(8));
     }
 }

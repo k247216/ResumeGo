@@ -91,12 +91,30 @@ public class KnowledgeRepository {
     }
 
     public List<KnowledgeDocument> listByUser(long userId) {
-        return jdbcTemplate.query("""
-                SELECT id, user_id, title, source_type, processing_status, created_at, updated_at
-                FROM knowledge_documents
-                WHERE user_id = ?
-                ORDER BY updated_at DESC, id DESC
-                """, mapper, userId);
+        return listByUserFiltered(userId, null, null);
+    }
+
+    /** 浏览过滤：categoryIds（含后代时由调用方展开）与 tagId 均为可选的当前用户真实关联。 */
+    public List<KnowledgeDocument> listByUserFiltered(long userId, java.util.Collection<Long> categoryIds, Long tagId) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT d.id, d.user_id, d.title, d.source_type, d.processing_status, d.created_at, d.updated_at
+                FROM knowledge_documents d
+                WHERE d.user_id = ?
+                """);
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        params.add(userId);
+        if (categoryIds != null && !categoryIds.isEmpty()) {
+            sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_categories dc WHERE dc.document_id = d.id AND dc.user_id = d.user_id AND dc.category_id IN (");
+            for (int i = 0; i < categoryIds.size(); i++) sql.append(i == 0 ? "?" : ", ?");
+            sql.append("))");
+            params.addAll(categoryIds);
+        }
+        if (tagId != null) {
+            sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_tags dt WHERE dt.document_id = d.id AND dt.user_id = d.user_id AND dt.tag_id = ?)");
+            params.add(tagId);
+        }
+        sql.append(" ORDER BY d.updated_at DESC, d.id DESC");
+        return jdbcTemplate.query(sql.toString(), mapper, params.toArray());
     }
 
     public Optional<KnowledgeDocument> findById(long userId, long id) {
@@ -273,6 +291,7 @@ public class KnowledgeRepository {
             rs.getString("title"),
             rs.getString("source_type"),
             rs.getString("processing_status"),
+            rs.getString("source_file"),
             rs.getTimestamp("created_at").toLocalDateTime().toString(),
             rs.getTimestamp("updated_at").toLocalDateTime().toString(),
             rs.getString("matched_field"),
@@ -480,7 +499,7 @@ public class KnowledgeRepository {
      */
     public List<KnowledgeSearchRow> search(long userId, String pattern, java.util.Collection<Long> categoryIds, Long tagId) {
         StringBuilder sql = new StringBuilder("""
-                SELECT d.id, d.title, d.source_type, d.processing_status,
+                SELECT d.id, d.title, d.source_type, d.processing_status, sf.original_name AS source_file,
                        d.created_at, d.updated_at,
                        CASE WHEN LOWER(d.title) LIKE LOWER(?) ESCAPE '!' THEN 'TITLE' ELSE 'CONTENT' END AS matched_field,
                        c.content
@@ -488,6 +507,8 @@ public class KnowledgeRepository {
                 LEFT JOIN knowledge_extracted_contents c
                        ON c.document_id = d.id AND c.user_id = d.user_id
                       AND d.processing_status = 'COMPLETED'
+                LEFT JOIN knowledge_source_files sf
+                       ON sf.document_id = d.id AND sf.user_id = d.user_id
                 WHERE d.user_id = ?
                   AND (LOWER(d.title) LIKE LOWER(?) ESCAPE '!'
                        OR (d.processing_status = 'COMPLETED' AND c.content IS NOT NULL

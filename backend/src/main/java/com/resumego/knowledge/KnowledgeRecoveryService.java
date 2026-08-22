@@ -285,8 +285,12 @@ public class KnowledgeRecoveryService {
     }
 
     private KnowledgeDocumentResponse toResponse(KnowledgeDocument doc) {
+        String sourceFile = "NOTE".equals(doc.sourceType()) ? null
+                : repository.findSourceFileByDocument(userId(), doc.id())
+                .map(KnowledgeSourceFile::originalName)
+                .orElse(null);
         return new KnowledgeDocumentResponse(doc.id(), doc.title(), doc.sourceType(),
-                doc.processingStatus(), null, doc.createdAt().toString(), doc.updatedAt().toString());
+                doc.processingStatus(), sourceFile, doc.createdAt().toString(), doc.updatedAt().toString());
     }
 
     private long userId() {

@@ -43,15 +43,6 @@ export interface KnowledgeContentResponse {
   content: string
 }
 
-/** 对应后端 KnowledgeCategoryResponse */
-export interface KnowledgeCategory {
-  id: number
-  name: string
-  normalizedName: string
-  createdAt: string
-  updatedAt: string
-}
-
 /** 对应后端 KnowledgeTagResponse */
 export interface KnowledgeTag {
   id: number
@@ -84,4 +75,44 @@ export interface KnowledgeSearchItem {
 export interface KnowledgeSearchFilter {
   categoryId: number | null
   tagId: number | null
+}
+
+/** 对应后端 KnowledgeCategoryResponse（含 parentId） */
+export interface KnowledgeCategory {
+  id: number
+  name: string
+  normalizedName: string
+  parentId: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** 对应后端 KnowledgeCategoryNodeResponse（层级列表节点，前端构树） */
+export interface KnowledgeCategoryNode {
+  id: number
+  name: string
+  normalizedName: string
+  parentId: number | null
+  depth: number
+  directDocumentCount: number
+  descendantDocumentCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** 对应后端 UpdateKnowledgeCategoryRequest（name 与 parentId 必须显式出现） */
+export interface UpdateKnowledgeCategoryRequest {
+  name: string
+  parentId: number | null
+}
+
+/** 对应后端 KnowledgeDeletionImpactResponse */
+export interface KnowledgeDeletionImpact {
+  title: string
+  hasSource: boolean
+  hasContent: boolean
+  hasCategory: boolean
+  hasTags: boolean
+  confirmationToken: string
+  expiresAt: string
 }

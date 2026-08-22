@@ -63,11 +63,24 @@ class KnowledgeServiceTest {
     void listsAndGetsOwnedDocuments() {
         KnowledgeDocument doc = new KnowledgeDocument(1L, 1L, "笔记", "NOTE", "NOT_STARTED",
                 LocalDateTime.now(), LocalDateTime.now());
-        when(repository.listByUser(1L)).thenReturn(List.of(doc));
+        when(repository.listByUserFiltered(1L, null, null)).thenReturn(List.of(doc));
         when(repository.findById(1L, 1L)).thenReturn(Optional.of(doc));
 
         assertThat(service.list()).hasSize(1);
         assertThat(service.get(1L).id()).isEqualTo(1L);
+    }
+
+    @Test
+    void exposesOriginalFileNameSoClientsCanShowTheRealFileType() {
+        KnowledgeDocument doc = new KnowledgeDocument(2L, 1L, "Redis 笔记", "FILE", "COMPLETED",
+                LocalDateTime.now(), LocalDateTime.now());
+        KnowledgeSourceFile source = new KnowledgeSourceFile(20L, 2L, 1L, "redis-notes.md",
+                "sources/1/hash.md", "text/markdown", "md", 12L, "hash", "AVAILABLE", null,
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 2L)).thenReturn(Optional.of(doc));
+        when(repository.findSourceFileByDocument(1L, 2L)).thenReturn(Optional.of(source));
+
+        assertThat(service.get(2L).sourceFile()).isEqualTo("redis-notes.md");
     }
 
     @Test

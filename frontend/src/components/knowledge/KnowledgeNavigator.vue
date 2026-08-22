@@ -1,0 +1,94 @@
+<template>
+  <aside class="navigator" :class="{ collapsed: collapsed }" data-test="knowledge-navigator">
+    <template v-if="!collapsed">
+      <div class="nav-section">
+        <div class="nav-head">
+          <strong>资料库</strong>
+          <button type="button" class="nav-action" data-test="navigator-new-folder" title="新建文件夹" aria-label="新建文件夹" @click="$emit('new-folder')"><el-icon :size="14"><Plus /></el-icon></button>
+        </div>
+        <p v-if="treeError" class="nav-error" data-test="navigator-tree-error">
+          {{ treeError }}
+          <button type="button" class="text-btn" data-test="navigator-tree-retry" @click="$emit('retry-tree')">重试</button>
+        </p>
+        <KnowledgeFolderTree
+          :nodes="nodes"
+          :expanded-ids="expandedIds"
+          :selected-id="selectedId"
+          @toggle="$emit('toggle-folder', $event)"
+          @select="$emit('select-folder', $event)"
+          @new-child="$emit('new-child', $event)"
+          @rename="$emit('rename-folder', $event)"
+          @move="$emit('move-folder', $event)"
+          @delete="$emit('delete-folder', $event)"
+        />
+      </div>
+      <div class="nav-section">
+        <div class="nav-head">
+          <strong>标签</strong>
+          <button type="button" class="nav-action" data-test="navigator-new-tag" title="新建标签" aria-label="新建标签" @click="$emit('new-tag')"><el-icon :size="14"><Plus /></el-icon></button>
+        </div>
+        <ul class="tag-list">
+          <li v-for="tag in tags" :key="tag.id">
+            <button
+              type="button"
+              class="tag-item"
+              :class="{ active: tag.id === activeTagId }"
+              :data-test="'navigator-tag-' + tag.id"
+              @click="$emit('select-tag', tag.id === activeTagId ? null : tag.id)"
+            >{{ tag.name }}</button>
+          </li>
+          <li v-if="!tags.length" class="tag-empty">暂无标签</li>
+        </ul>
+      </div>
+    </template>
+    <button v-else type="button" class="nav-restore" data-test="navigator-restore" aria-label="展开资料库导航" @click="$emit('toggle-collapse')">▸</button>
+  </aside>
+</template>
+
+<script setup lang="ts">
+import { Plus } from '@element-plus/icons-vue'
+import KnowledgeFolderTree from './KnowledgeFolderTree.vue'
+import type { KnowledgeCategoryNode, KnowledgeTag } from '../../types/knowledge'
+
+defineProps<{
+  nodes: KnowledgeCategoryNode[]
+  tags: KnowledgeTag[]
+  expandedIds: Set<number>
+  selectedId: number | null
+  activeTagId: number | null
+  collapsed: boolean
+  treeError: string
+}>()
+
+defineEmits<{
+  (e: 'toggle-collapse'): void
+  (e: 'new-folder'): void
+  (e: 'toggle-folder', id: number): void
+  (e: 'select-folder', id: number): void
+  (e: 'new-child', parentId: number | null): void
+  (e: 'rename-folder', id: number): void
+  (e: 'move-folder', id: number): void
+  (e: 'delete-folder', id: number): void
+  (e: 'select-tag', id: number | null): void
+  (e: 'new-tag'): void
+  (e: 'retry-tree'): void
+}>()
+</script>
+
+<style scoped>
+.navigator{width:220px;min-width:0;border-right:1px solid var(--border-subtle);overflow-y:auto;padding:14px 12px}
+.navigator.collapsed{width:44px;padding:14px 6px}
+.nav-section{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.nav-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
+.nav-head strong{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em}
+.nav-action{border:0;background:transparent;color:var(--copy);font-size:14px;cursor:pointer;padding:0 4px}
+.nav-action:hover{color:var(--brand)}
+.tag-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.tag-item{border:0;background:transparent;color:var(--copy);font-size:13px;text-align:left;padding:5px 8px;border-radius:8px;cursor:pointer;width:100%}
+.tag-item:hover{background:var(--bg-hover)}
+.tag-item.active{background:var(--bg-selected);color:var(--brand)}
+.tag-empty{color:var(--muted);font-size:12px;padding:4px 8px}
+.nav-error{display:grid;gap:6px;padding:6px 8px;color:var(--danger);font-size:12px}
+.text-btn{border:0;background:transparent;color:var(--brand);font-size:12px;cursor:pointer;padding:0;justify-self:start}
+.nav-restore{border:0;background:transparent;color:var(--copy);font-size:14px;cursor:pointer;width:100%;padding:8px 0}
+</style>

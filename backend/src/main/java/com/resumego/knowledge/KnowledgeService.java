@@ -43,8 +43,46 @@ public class KnowledgeService {
         return findResponse(id);
     }
 
+    /** 兼容无过滤调用（全部资料）。 */
     public List<KnowledgeDocumentResponse> list() {
-        return repository.listByUser(userId()).stream().map(this::toResponse).toList();
+        return list(null, null, false);
+    }
+
+    /** 浏览列表：可选 categoryId/tagId 过滤（父分类含后代由 service 展开真实关联）；"全部资料"为无过滤。 */
+    public List<KnowledgeDocumentResponse> list(Long categoryId, Long tagId, boolean includeDescendants) {
+        java.util.Collection<Long> categoryIds = null;
+        if (categoryId != null) {
+            KnowledgeCategory category = repository.findCategoryById(userId(), categoryId)
+                    .orElseThrow(() -> new NoSuchElementException("分类不存在"));
+            if (includeDescendants) {
+                categoryIds = descendantCategoryIds(category.id());
+            } else {
+                categoryIds = List.of(category.id());
+            }
+        }
+        if (tagId != null) {
+            repository.findTagById(userId(), tagId)
+                    .orElseThrow(() -> new NoSuchElementException("标签不存在"));
+        }
+        return repository.listByUserFiltered(userId(), categoryIds, tagId).stream().map(this::toResponse).toList();
+    }
+
+    /** 子树（含自身）分类 id 集合。 */
+    private java.util.Set<Long> descendantCategoryIds(long categoryId) {
+        List<KnowledgeCategory> all = repository.listCategories(userId());
+        java.util.Set<Long> result = new java.util.LinkedHashSet<>();
+        java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>();
+        queue.add(categoryId);
+        while (!queue.isEmpty()) {
+            long id = queue.poll();
+            if (!result.add(id)) continue;
+            for (KnowledgeCategory category : all) {
+                if (category.parentId() != null && category.parentId() == id) {
+                    queue.add(category.id());
+                }
+            }
+        }
+        return result;
     }
 
     public KnowledgeDocumentResponse get(long documentId) {
@@ -87,12 +125,16 @@ public class KnowledgeService {
     }
 
     private KnowledgeDocumentResponse toResponse(KnowledgeDocument doc) {
+        String sourceFile = SOURCE_NOTE.equals(doc.sourceType()) ? null
+                : repository.findSourceFileByDocument(userId(), doc.id())
+                .map(KnowledgeSourceFile::originalName)
+                .orElse(null);
         return new KnowledgeDocumentResponse(
                 doc.id(),
                 doc.title(),
                 doc.sourceType(),
                 doc.processingStatus(),
-                null,
+                sourceFile,
                 doc.createdAt().toString(),
                 doc.updatedAt().toString()
         );

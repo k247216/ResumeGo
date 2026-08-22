@@ -140,7 +140,7 @@ describe('knowledge api client', () => {
     const [url, init] = mockedFetch.mock.calls[1]!
     expect(url).toBe('/api/v2/knowledge/categories')
     expect(init?.method).toBe('POST')
-    expect(JSON.parse((init?.body ?? '') as string)).toEqual({ name: '求职' })
+    expect(JSON.parse((init?.body ?? '') as string)).toEqual({ name: '求职', parentId: null })
   })
 
   it('FE-01 lists and creates tags with exact paths and body', async () => {
@@ -196,7 +196,7 @@ describe('knowledge api client', () => {
 
     await searchKnowledge('笔记', 3, 5)
     const [url] = mockedFetch.mock.calls[1]!
-    expect(url).toBe('/api/v2/knowledge/search?q=%E7%AC%94%E8%AE%B0&categoryId=3&tagId=5')
+    expect(url).toBe('/api/v2/knowledge/search?q=%E7%AC%94%E8%AE%B0&categoryId=3&tagId=5&includeDescendants=true')
 
     await searchKnowledge('x', null, null)
     const [url3] = mockedFetch.mock.calls[2]!

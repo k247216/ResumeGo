@@ -5,27 +5,37 @@ import {
   createKnowledgeCategory,
   createKnowledgeNote,
   createKnowledgeTag,
+  deleteKnowledgeCategory,
+  deleteKnowledgeDocument,
   getDocumentClassification,
   getKnowledgeContent,
+  getKnowledgeDeletionImpact,
   getKnowledgeDocument,
   importKnowledgeFile,
   KnowledgeHttpError,
   listKnowledgeCategories,
+  listKnowledgeCategoryTree,
   listKnowledgeDocuments,
   listKnowledgeTags,
   removeDocumentCategory,
   removeDocumentTag,
+  retryKnowledgeDocument,
+  saveKnowledgeNoteContent,
   searchKnowledge,
   setDocumentCategory,
+  updateKnowledgeCategory,
 } from '../api/knowledge'
 import type {
   KnowledgeCategory,
+  KnowledgeCategoryNode,
+  KnowledgeDeletionImpact,
   KnowledgeDocument,
   KnowledgeDocumentClassification,
   KnowledgeImportResponse,
   KnowledgeSearchItem,
   KnowledgeTag,
 } from '../types/knowledge'
+import { openKnowledgeSource, revealKnowledgeSource } from '../api/knowledgeDesktop'
 
 /**
  * 知识库 store：列表/选择/笔记创建/文件导入/正文按需加载。
@@ -62,9 +72,31 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const searchLoading = ref(false)
   const searchErrorMessage = ref('')
   let searchRequestSequence = 0
+  let browseRequestSequence = 0
+  // 层级资料库（BE-04 树节点）与 includeDescendants
+  const categoryTree = ref<KnowledgeCategoryNode[]>([])
+  const categoryTreeLoading = ref(false)
+  const categoryTreeError = ref('')
+  const searchIncludeDescendants = ref(true)
+  // 浏览（无关键词时资料列表的文件夹/标签过滤）
+  const browseCategoryId = ref<number | null>(null)
+  const browseTagId = ref<number | null>(null)
+  const browseIncludeDescendants = ref(true)
+  const categorizeWarning = ref('')
+  // 重试 / 删除 / NOTE 保存 / 来源操作
+  const retryingDocumentId = ref<number | null>(null)
+  const retryErrorsByDocumentId = ref<Record<number, string>>({})
+  const deletionImpactByDocumentId = ref<Record<number, KnowledgeDeletionImpact>>({})
+  const deletingDocumentId = ref<number | null>(null)
+  const deleteErrorsByDocumentId = ref<Record<number, string>>({})
+  const noteSavingDocumentId = ref<number | null>(null)
+  const noteSaveErrorsByDocumentId = ref<Record<number, string>>({})
+  const noteMetadataWarningsByDocumentId = ref<Record<number, string>>({})
 
   const selectedDocument = computed(() => (
-    documents.value.find((doc) => doc.id === selectedDocumentId.value) ?? null
+    documents.value.find((doc) => doc.id === selectedDocumentId.value)
+    ?? searchResults.value.find((item) => item.document.id === selectedDocumentId.value)?.document
+    ?? null
   ))
 
   function chooseSelection() {
@@ -84,20 +116,43 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     documents.value.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id)
   }
 
+  /** 递增序列丢弃过期浏览响应：快速切换文件夹时较慢的旧响应不得覆盖最新列表。 */
   async function load() {
+    const sequence = ++browseRequestSequence
     loading.value = true
     errorMessage.value = ''
     listRefreshError.value = ''
     try {
-      const response = await listKnowledgeDocuments()
+      const response = await listKnowledgeDocuments(
+        browseCategoryId.value, browseTagId.value, browseIncludeDescendants.value)
+      if (sequence !== browseRequestSequence) return
       documents.value = response.data
       chooseSelection()
     } catch (error) {
+      if (sequence !== browseRequestSequence) return
       errorMessage.value = error instanceof Error ? error.message : '加载知识库失败'
       throw error
     } finally {
-      loading.value = false
+      if (sequence === browseRequestSequence) loading.value = false
     }
+  }
+
+  /** 无关键词浏览：按文件夹（含后代）或标签过滤，由后端真实关联驱动。 */
+  function browseBy(kind: 'category' | 'tag', id: number | null) {
+    if (kind === 'category') {
+      browseCategoryId.value = id
+      browseTagId.value = null
+    } else {
+      browseTagId.value = id
+      browseCategoryId.value = null
+    }
+    void load().catch(() => undefined)
+  }
+
+  function browseAll() {
+    browseCategoryId.value = null
+    browseTagId.value = null
+    void load().catch(() => undefined)
   }
 
   function retry() {
@@ -105,13 +160,15 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   function select(id: number) {
-    if (!documents.value.some((doc) => doc.id === id)) return
+    if (!documents.value.some((doc) => doc.id === id)
+      && !searchResults.value.some((item) => item.document.id === id)) return
     selectedDocumentId.value = id
   }
 
   async function createNote(title: string) {
     creating.value = true
     errorMessage.value = ''
+    categorizeWarning.value = ''
     try {
       const response = await createKnowledgeNote(title)
       upsertDocument(response.data)
@@ -124,15 +181,28 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
+  /** 创建/导入后的归档尝试：成功刷新计数；失败保留真实未归档状态并给出局部警告。 */
+  async function categorizeCreatedDocument(documentId: number, categoryId: number | null): Promise<boolean> {
+    if (categoryId == null) return true
+    try {
+      await setCategory(documentId, categoryId)
+      await loadCategoryTree().catch(() => undefined)
+      return true
+    } catch {
+      categorizeWarning.value = '资料已创建/导入，但归档到当前文件夹失败，可在检查器中重新设置'
+      return false
+    }
+  }
+
   /**
-   * 导入：上传结果与刷新结果分离。
-   * 上传成功后绝不改写为“导入失败”；detail 获取目标文档并 upsert/select，
-   * 列表刷新失败仅显示“已导入，列表刷新失败，可重试刷新”。
+   * 导入：上传结果与刷新结果分离；归档后保持当前浏览范围（调 load() 带 browse filter + sequence）。
+   * 归档失败显示“未归档”警告并保持真实归属，绝不显示其他文件夹文档。
    */
-  async function importFile(file: File): Promise<KnowledgeImportResponse> {
+  async function importFile(file: File, categoryId: number | null = null): Promise<KnowledgeImportResponse> {
     importing.value = true
     importErrorMessage.value = ''
     listRefreshError.value = ''
+    categorizeWarning.value = ''
     let imported: KnowledgeImportResponse
     try {
       imported = (await importKnowledgeFile(file)).data
@@ -150,12 +220,13 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       listRefreshError.value = '已导入，列表刷新失败，可重试刷新'
       return imported
     }
-    try {
-      const response = await listKnowledgeDocuments()
-      documents.value = response.data
-    } catch {
-      listRefreshError.value = '已导入，列表刷新失败，可重试刷新'
+    if (categoryId != null) {
+      await categorizeCreatedDocument(imported.documentId, categoryId)
     }
+    // 保持当前浏览范围刷新（带 browse filter + sequence），不是全量替换
+    await load().catch(() => {
+      listRefreshError.value = '已导入，列表刷新失败，可重试刷新'
+    })
     return imported
   }
 
@@ -276,6 +347,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
         await setDocumentCategory(documentId, categoryId)
       }
       await refreshClassification(documentId)
+      void loadCategoryTree().catch(() => undefined)
     } catch (error) {
       classificationErrorsByDocumentId.value = {
         ...classificationErrorsByDocumentId.value,
@@ -308,6 +380,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
 
   // ---- 搜索（递增 sequence 丢弃过期响应） ----
 
+  function setIncludeDescendants(value: boolean) {
+    searchIncludeDescendants.value = value
+    void runSearch()
+  }
+
   async function runSearch() {
     const query = searchQuery.value.trim()
     if (!query) {
@@ -321,7 +398,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     searchLoading.value = true
     searchErrorMessage.value = ''
     try {
-      const response = await searchKnowledge(query, searchCategoryId.value, searchTagId.value)
+      const response = await searchKnowledge(query, searchCategoryId.value, searchTagId.value, searchIncludeDescendants.value)
       if (sequence !== searchRequestSequence) return
       searchResults.value = response.data
     } catch (error) {
@@ -333,6 +410,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   function setSearchQuery(query: string) {
+    const startsSearch = !searchQuery.value.trim() && query.trim()
+    if (startsSearch) {
+      searchCategoryId.value = browseCategoryId.value
+      searchTagId.value = browseTagId.value
+    }
     searchQuery.value = query
     void runSearch()
   }
@@ -363,6 +445,179 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     searchResults.value = []
     searchErrorMessage.value = ''
     searchLoading.value = false
+  }
+
+
+  // ---- 层级资料库树（BE-04） ----
+
+  async function loadCategoryTree() {
+    categoryTreeLoading.value = true
+    categoryTreeError.value = ''
+    try {
+      const response = await listKnowledgeCategoryTree()
+      categoryTree.value = response.data
+    } catch (error) {
+      categoryTreeError.value = error instanceof Error ? error.message : '加载资料库失败'
+      throw error
+    } finally {
+      categoryTreeLoading.value = false
+    }
+  }
+
+  async function createCategoryNode(name: string, parentId: number | null = null) {
+    categoryTreeError.value = ''
+    try {
+      await createKnowledgeCategory(name, parentId)
+      await loadCategoryTree()
+    } catch (error) {
+      categoryTreeError.value = error instanceof Error ? error.message : '创建分类失败'
+      throw error
+    }
+  }
+
+  async function updateCategoryNode(id: number, name: string, parentId: number | null) {
+    categoryTreeError.value = ''
+    try {
+      await updateKnowledgeCategory(id, { name, parentId })
+      await loadCategoryTree()
+      // 树变化后刷新当前筛选下的列表
+      if (searchCategoryId.value != null) void runSearch()
+    } catch (error) {
+      categoryTreeError.value = error instanceof Error ? error.message : '更新分类失败'
+      throw error
+    }
+  }
+
+  async function deleteCategoryNode(id: number) {
+    categoryTreeError.value = ''
+    try {
+      await deleteKnowledgeCategory(id)
+      await loadCategoryTree()
+      if (browseCategoryId.value === id) {
+        browseCategoryId.value = null
+        await load()
+      }
+      if (searchCategoryId.value === id) {
+        searchCategoryId.value = null
+        void runSearch()
+      }
+    } catch (error) {
+      categoryTreeError.value = error instanceof Error ? error.message : '删除分类失败'
+      throw error
+    }
+  }
+
+  // ---- 重试（BE-03） ----
+
+  async function retryDocument(documentId: number) {
+    retryingDocumentId.value = documentId
+    delete retryErrorsByDocumentId.value[documentId]
+    try {
+      const response = await retryKnowledgeDocument(documentId)
+      upsertDocument(response.data)
+      // 成功后刷新正文缓存
+      if (response.data.processingStatus === 'COMPLETED') {
+        const next = { ...contentByDocumentId.value }
+        delete next[documentId]
+        contentByDocumentId.value = next
+        void loadContent(documentId).catch(() => undefined)
+      }
+    } catch (error) {
+      retryErrorsByDocumentId.value = {
+        ...retryErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '重试失败',
+      }
+      throw error
+    } finally {
+      retryingDocumentId.value = null
+    }
+  }
+
+  // ---- 删除（BE-03） ----
+
+  async function loadDeletionImpact(documentId: number): Promise<KnowledgeDeletionImpact> {
+    delete deleteErrorsByDocumentId.value[documentId]
+    try {
+      const response = await getKnowledgeDeletionImpact(documentId)
+      deletionImpactByDocumentId.value = { ...deletionImpactByDocumentId.value, [documentId]: response.data }
+      return response.data
+    } catch (error) {
+      deleteErrorsByDocumentId.value = {
+        ...deleteErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '读取删除影响失败',
+      }
+      throw error
+    }
+  }
+
+  /** 删除成功：从列表/搜索结果/详情同时移除，保持其他文档与选择不受影响。 */
+  async function deleteDocument(documentId: number, confirmationToken: string) {
+    deletingDocumentId.value = documentId
+    delete deleteErrorsByDocumentId.value[documentId]
+    try {
+      await deleteKnowledgeDocument(documentId, confirmationToken)
+      documents.value = documents.value.filter((d) => d.id !== documentId)
+      searchResults.value = searchResults.value.filter((r) => r.document.id !== documentId)
+      if (selectedDocumentId.value === documentId) {
+        selectedDocumentId.value = documents.value[0]?.id ?? null
+      }
+      delete contentByDocumentId.value[documentId]
+      delete classificationByDocumentId.value[documentId]
+      delete deletionImpactByDocumentId.value[documentId]
+      delete deleteErrorsByDocumentId.value[documentId]
+      await loadCategoryTree().catch(() => undefined)
+    } catch (error) {
+      deleteErrorsByDocumentId.value = {
+        ...deleteErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '删除资料失败',
+      }
+      throw error
+    } finally {
+      deletingDocumentId.value = null
+    }
+  }
+
+  // ---- NOTE 正文保存（BE-05） ----
+
+  /**
+   * 明确保存 NOTE 正文：PUT 成功即返回成功并更新正文缓存；
+   * 元数据回读失败只给局部提示，绝不把已持久化成功误报为保存失败。
+   */
+  async function saveNoteContent(documentId: number, content: string) {
+    noteSavingDocumentId.value = documentId
+    delete noteSaveErrorsByDocumentId.value[documentId]
+    delete noteMetadataWarningsByDocumentId.value[documentId]
+    try {
+      await saveKnowledgeNoteContent(documentId, content)
+      contentByDocumentId.value = { ...contentByDocumentId.value, [documentId]: content }
+    } catch (error) {
+      noteSaveErrorsByDocumentId.value = {
+        ...noteSaveErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '保存笔记正文失败',
+      }
+      throw error
+    } finally {
+      noteSavingDocumentId.value = null
+    }
+    try {
+      const detail = await getKnowledgeDocument(documentId)
+      upsertDocument(detail.data)
+    } catch {
+      noteMetadataWarningsByDocumentId.value = {
+        ...noteMetadataWarningsByDocumentId.value,
+        [documentId]: '已保存，元数据刷新失败，可重试',
+      }
+    }
+  }
+
+  // ---- 受管原文（IO-02） ----
+
+  async function openSource(documentId: number) {
+    return openKnowledgeSource(documentId)
+  }
+
+  async function revealSource(documentId: number) {
+    return revealKnowledgeSource(documentId)
   }
 
   function contentErrorMessage(error: unknown): string {
@@ -397,9 +652,25 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     searchQuery,
     searchCategoryId,
     searchTagId,
+    searchIncludeDescendants,
     searchResults,
     searchLoading,
     searchErrorMessage,
+    categoryTree,
+    categoryTreeLoading,
+    categoryTreeError,
+    browseCategoryId,
+    browseTagId,
+    browseIncludeDescendants,
+    categorizeWarning,
+    retryingDocumentId,
+    retryErrorsByDocumentId,
+    deletionImpactByDocumentId,
+    deletingDocumentId,
+    deleteErrorsByDocumentId,
+    noteSavingDocumentId,
+    noteSaveErrorsByDocumentId,
+    noteMetadataWarningsByDocumentId,
     load,
     retry,
     select,
@@ -409,12 +680,26 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     loadCatalog,
     createCategory,
     createTag,
+    loadCategoryTree,
+    createCategoryNode,
+    browseBy,
+    browseAll,
+    categorizeCreatedDocument,
+    updateCategoryNode,
+    deleteCategoryNode,
     loadClassification,
     setCategory,
     toggleTag,
     runSearch,
     setSearchQuery,
     setSearchFilter,
+    setIncludeDescendants,
     clearSearch,
+    retryDocument,
+    loadDeletionImpact,
+    deleteDocument,
+    saveNoteContent,
+    openSource,
+    revealSource,
   }
 })

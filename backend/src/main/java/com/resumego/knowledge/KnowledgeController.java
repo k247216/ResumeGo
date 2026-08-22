@@ -34,8 +34,11 @@ public class KnowledgeController {
     }
 
     @GetMapping
-    public ApiResponse<List<KnowledgeDocumentResponse>> list() {
-        return ApiResponse.ok(service.list());
+    public ApiResponse<List<KnowledgeDocumentResponse>> list(
+            @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @RequestParam(value = "tagId", required = false) Long tagId,
+            @RequestParam(value = "includeDescendants", defaultValue = "false") boolean includeDescendants) {
+        return ApiResponse.ok(service.list(categoryId, tagId, includeDescendants));
     }
 
     @GetMapping("/{id}")

@@ -149,7 +149,7 @@ class KnowledgeClassificationServiceTest {
     void contentHitProducesSnippetAndOneBasedLineNumber() {
         String content = "第一行\nTensorFlow 学习笔记\n第三行";
         when(repository.search(eq(1L), any(), isNull(), isNull())).thenReturn(List.of(
-                new KnowledgeSearchRow(1L, "标题", "FILE", "COMPLETED", "t", "t", "CONTENT", content)));
+                new KnowledgeSearchRow(1L, "标题", "FILE", "COMPLETED", "source.md", "t", "t", "CONTENT", content)));
 
         List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null, false);
 
@@ -163,7 +163,7 @@ class KnowledgeClassificationServiceTest {
     @Test
     void titleHitHasNullLineNumberAndNoFullText() {
         when(repository.search(eq(1L), any(), isNull(), isNull())).thenReturn(List.of(
-                new KnowledgeSearchRow(1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED", "t", "t", "TITLE", null)));
+                new KnowledgeSearchRow(1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED", null, "t", "t", "TITLE", null)));
 
         List<KnowledgeSearchItemResponse> results = service.search("tensorflow", null, null, false);
 
@@ -215,7 +215,7 @@ class KnowledgeClassificationServiceTest {
     void snippetStaysWithinLimitWithEllipsesAndLineNumberAtStartIsOne() {
         String longContent = "a".repeat(500) + "关键词" + "b".repeat(500);
         when(repository.search(eq(1L), any(), isNull(), isNull())).thenReturn(List.of(
-                new KnowledgeSearchRow(1L, "标题", "FILE", "COMPLETED", "t", "t", "CONTENT", longContent)));
+                new KnowledgeSearchRow(1L, "标题", "FILE", "COMPLETED", "source.txt", "t", "t", "CONTENT", longContent)));
 
         List<KnowledgeSearchItemResponse> results = service.search("关键词", null, null, false);
 

@@ -430,7 +430,7 @@ public class KnowledgeClassificationService {
     private KnowledgeSearchItemResponse toSearchItem(KnowledgeSearchRow row, String query) {
         String lowerQuery = query.toLowerCase(Locale.ROOT);
         KnowledgeDocumentResponse document = new KnowledgeDocumentResponse(
-                row.documentId(), row.title(), row.sourceType(), row.processingStatus(), null,
+                row.documentId(), row.title(), row.sourceType(), row.processingStatus(), row.sourceFile(),
                 row.createdAt(), row.updatedAt());
         if ("CONTENT".equals(row.matchedField()) && row.content() != null) {
             int hit = indexOfIgnoreCase(row.content(), lowerQuery);

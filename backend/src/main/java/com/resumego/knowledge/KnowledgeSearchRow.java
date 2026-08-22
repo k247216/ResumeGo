@@ -6,6 +6,7 @@ public record KnowledgeSearchRow(
         String title,
         String sourceType,
         String processingStatus,
+        String sourceFile,
         String createdAt,
         String updatedAt,
         String matchedField,
