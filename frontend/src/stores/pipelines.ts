@@ -158,6 +158,8 @@ export const usePipelinesStore = defineStore('pipelines', () => {
   }
 
   function guardMutation<T>(action: () => Promise<T>): Promise<T> {
+    // 每次 mutation 开始前清除旧错误：成功不残留旧失败信息，失败则写入本次错误
+    errorMessage.value = ''
     return action().catch((error: unknown) => {
       errorMessage.value = error instanceof Error ? error.message : '操作失败'
       throw error

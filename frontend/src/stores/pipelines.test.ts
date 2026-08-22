@@ -120,6 +120,20 @@ describe('usePipelinesStore', () => {
     expect(store.errorMessage).toContain('归档失败')
   })
 
+  it('STORE-06b clears a previous error when a retried mutation succeeds', async () => {
+    api.listPipelines.mockResolvedValue(ok([p(1)]))
+    const store = usePipelinesStore()
+    await store.load()
+
+    api.archivePipeline.mockRejectedValueOnce(new Error('归档失败'))
+    await expect(store.archive(1)).rejects.toThrow('归档失败')
+    expect(store.errorMessage).toContain('归档失败')
+
+    api.archivePipeline.mockResolvedValueOnce(ok(p(1, 'ARCHIVED')))
+    await store.archive(1)
+    expect(store.errorMessage).toBe('')
+  })
+
   it('STORE-07 archive keeps the current selection so it can be restored', async () => {
     api.listPipelines.mockResolvedValue(ok([p(1)]))
     const store = usePipelinesStore()
