@@ -42,3 +42,46 @@ export interface KnowledgeContentResponse {
   documentId: number
   content: string
 }
+
+/** 对应后端 KnowledgeCategoryResponse */
+export interface KnowledgeCategory {
+  id: number
+  name: string
+  normalizedName: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** 对应后端 KnowledgeTagResponse */
+export interface KnowledgeTag {
+  id: number
+  name: string
+  normalizedName: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** 对应后端 CreateKnowledgeNameRequest（分类/标签共用） */
+export interface CreateKnowledgeNameRequest {
+  name: string
+}
+
+/** 对应后端 KnowledgeDocumentClassificationResponse：所选文档的现有关联 */
+export interface KnowledgeDocumentClassification {
+  category: KnowledgeCategory | null
+  tags: KnowledgeTag[]
+}
+
+/** 对应后端 KnowledgeSearchItemResponse */
+export interface KnowledgeSearchItem {
+  document: KnowledgeDocument
+  matchedField: 'TITLE' | 'CONTENT'
+  snippet: string
+  lineNumber: number | null
+}
+
+/** 搜索过滤条件 */
+export interface KnowledgeSearchFilter {
+  categoryId: number | null
+  tagId: number | null
+}

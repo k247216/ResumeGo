@@ -1,14 +1,31 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
+  addDocumentTag,
+  createKnowledgeCategory,
   createKnowledgeNote,
+  createKnowledgeTag,
+  getDocumentClassification,
   getKnowledgeContent,
   getKnowledgeDocument,
   importKnowledgeFile,
   KnowledgeHttpError,
+  listKnowledgeCategories,
   listKnowledgeDocuments,
+  listKnowledgeTags,
+  removeDocumentCategory,
+  removeDocumentTag,
+  searchKnowledge,
+  setDocumentCategory,
 } from '../api/knowledge'
-import type { KnowledgeDocument, KnowledgeImportResponse } from '../types/knowledge'
+import type {
+  KnowledgeCategory,
+  KnowledgeDocument,
+  KnowledgeDocumentClassification,
+  KnowledgeImportResponse,
+  KnowledgeSearchItem,
+  KnowledgeTag,
+} from '../types/knowledge'
 
 /**
  * 知识库 store：列表/选择/笔记创建/文件导入/正文按需加载。
@@ -27,6 +44,25 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const contentByDocumentId = ref<Record<number, string>>({})
   const contentLoadingDocumentId = ref<number | null>(null)
   const contentErrorsByDocumentId = ref<Record<number, string>>({})
+  // 分类/标签目录
+  const categories = ref<KnowledgeCategory[]>([])
+  const tags = ref<KnowledgeTag[]>([])
+  const catalogLoading = ref(false)
+  const catalogErrorMessage = ref('')
+  // 文档现有关联（后端为准，不乐观伪造）
+  const classificationByDocumentId = ref<Record<number, KnowledgeDocumentClassification>>({})
+  const classificationLoadingDocumentId = ref<number | null>(null)
+  const classificationErrorsByDocumentId = ref<Record<number, string>>({})
+  const classificationSaving = ref(false)
+  const classificationErrorMessage = ref('')
+  // 搜索状态（递增 sequence 丢弃过期响应）
+  const searchQuery = ref('')
+  const searchCategoryId = ref<number | null>(null)
+  const searchTagId = ref<number | null>(null)
+  const searchResults = ref<KnowledgeSearchItem[]>([])
+  const searchLoading = ref(false)
+  const searchErrorMessage = ref('')
+  let searchRequestSequence = 0
 
   const selectedDocument = computed(() => (
     documents.value.find((doc) => doc.id === selectedDocumentId.value) ?? null
@@ -146,6 +182,184 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
+
+  // ---- 分类/标签目录 ----
+
+  async function loadCatalog() {
+    catalogLoading.value = true
+    catalogErrorMessage.value = ''
+    try {
+      const [cats, tg] = await Promise.all([listKnowledgeCategories(), listKnowledgeTags()])
+      categories.value = cats.data
+      tags.value = tg.data
+    } catch (error) {
+      catalogErrorMessage.value = error instanceof Error ? error.message : '加载分类标签失败'
+      throw error
+    } finally {
+      catalogLoading.value = false
+    }
+  }
+
+  function upsertCategory(category: KnowledgeCategory) {
+    const index = categories.value.findIndex((c) => c.id === category.id)
+    if (index >= 0) categories.value[index] = category
+    else categories.value.push(category)
+  }
+
+  function upsertTag(tag: KnowledgeTag) {
+    const index = tags.value.findIndex((t) => t.id === tag.id)
+    if (index >= 0) tags.value[index] = tag
+    else tags.value.push(tag)
+  }
+
+  async function createCategory(name: string): Promise<KnowledgeCategory> {
+    catalogErrorMessage.value = ''
+    try {
+      const response = await createKnowledgeCategory(name)
+      upsertCategory(response.data)
+      return response.data
+    } catch (error) {
+      catalogErrorMessage.value = error instanceof Error ? error.message : '创建分类失败'
+      throw error
+    }
+  }
+
+  async function createTag(name: string): Promise<KnowledgeTag> {
+    catalogErrorMessage.value = ''
+    try {
+      const response = await createKnowledgeTag(name)
+      upsertTag(response.data)
+      return response.data
+    } catch (error) {
+      catalogErrorMessage.value = error instanceof Error ? error.message : '创建标签失败'
+      throw error
+    }
+  }
+
+  // ---- 文档关联（写入成功后再回读服务端状态） ----
+
+  /** 选择文档后按需读取关联；已有缓存不重复请求，失败只写该文档错误。 */
+  async function loadClassification(documentId: number) {
+    if (classificationByDocumentId.value[documentId]) return
+    if (classificationLoadingDocumentId.value === documentId) return
+    classificationLoadingDocumentId.value = documentId
+    delete classificationErrorsByDocumentId.value[documentId]
+    try {
+      const response = await getDocumentClassification(documentId)
+      classificationByDocumentId.value = { ...classificationByDocumentId.value, [documentId]: response.data }
+    } catch (error) {
+      classificationErrorsByDocumentId.value = {
+        ...classificationErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '读取文档关联失败',
+      }
+      throw error
+    } finally {
+      classificationLoadingDocumentId.value = null
+    }
+  }
+
+  async function refreshClassification(documentId: number) {
+    const response = await getDocumentClassification(documentId)
+    classificationByDocumentId.value = { ...classificationByDocumentId.value, [documentId]: response.data }
+  }
+
+  /** 设置分类（null 表示无分类）；写入成功后回读，失败保留旧值。 */
+  async function setCategory(documentId: number, categoryId: number | null) {
+    classificationSaving.value = true
+    classificationErrorMessage.value = ''
+    try {
+      if (categoryId == null) {
+        const current = classificationByDocumentId.value[documentId]?.category
+        if (current) {
+          await removeDocumentCategory(documentId, current.id)
+        }
+      } else {
+        await setDocumentCategory(documentId, categoryId)
+      }
+      await refreshClassification(documentId)
+    } catch (error) {
+      classificationErrorMessage.value = error instanceof Error ? error.message : '更新分类失败'
+      throw error
+    } finally {
+      classificationSaving.value = false
+    }
+  }
+
+  /** 添加/移除标签；写入成功后回读，失败保留旧值。 */
+  async function toggleTag(documentId: number, tagId: number, add: boolean) {
+    classificationSaving.value = true
+    classificationErrorMessage.value = ''
+    try {
+      if (add) await addDocumentTag(documentId, tagId)
+      else await removeDocumentTag(documentId, tagId)
+      await refreshClassification(documentId)
+    } catch (error) {
+      classificationErrorMessage.value = error instanceof Error ? error.message : '更新标签失败'
+      throw error
+    } finally {
+      classificationSaving.value = false
+    }
+  }
+
+  // ---- 搜索（递增 sequence 丢弃过期响应） ----
+
+  async function runSearch() {
+    const query = searchQuery.value.trim()
+    if (!query) {
+      searchRequestSequence++
+      searchResults.value = []
+      searchErrorMessage.value = ''
+      searchLoading.value = false
+      return
+    }
+    const sequence = ++searchRequestSequence
+    searchLoading.value = true
+    searchErrorMessage.value = ''
+    try {
+      const response = await searchKnowledge(query, searchCategoryId.value, searchTagId.value)
+      if (sequence !== searchRequestSequence) return
+      searchResults.value = response.data
+    } catch (error) {
+      if (sequence !== searchRequestSequence) return
+      searchErrorMessage.value = error instanceof Error ? error.message : '搜索失败'
+    } finally {
+      if (sequence === searchRequestSequence) searchLoading.value = false
+    }
+  }
+
+  function setSearchQuery(query: string) {
+    searchQuery.value = query
+    void runSearch()
+  }
+
+  /** filter 失效时清空对应 filter；改变后重新搜索。 */
+  function setSearchFilter(kind: 'category' | 'tag', id: number | null) {
+    if (kind === 'category') {
+      if (id != null && !categories.value.some((c) => c.id === id)) {
+        searchCategoryId.value = null
+      } else {
+        searchCategoryId.value = id
+      }
+    } else {
+      if (id != null && !tags.value.some((t) => t.id === id)) {
+        searchTagId.value = null
+      } else {
+        searchTagId.value = id
+      }
+    }
+    void runSearch()
+  }
+
+  function clearSearch() {
+    searchRequestSequence++
+    searchQuery.value = ''
+    searchCategoryId.value = null
+    searchTagId.value = null
+    searchResults.value = []
+    searchErrorMessage.value = ''
+    searchLoading.value = false
+  }
+
   function contentErrorMessage(error: unknown): string {
     if (error instanceof KnowledgeHttpError) {
       if (error.status === 409) return '内容仍在处理中，请稍后重试'
@@ -167,11 +381,36 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     contentByDocumentId,
     contentLoadingDocumentId,
     contentErrorsByDocumentId,
+    categories,
+    tags,
+    catalogLoading,
+    catalogErrorMessage,
+    classificationByDocumentId,
+    classificationLoadingDocumentId,
+    classificationErrorsByDocumentId,
+    classificationSaving,
+    classificationErrorMessage,
+    searchQuery,
+    searchCategoryId,
+    searchTagId,
+    searchResults,
+    searchLoading,
+    searchErrorMessage,
     load,
     retry,
     select,
     createNote,
     importFile,
     loadContent,
+    loadCatalog,
+    createCategory,
+    createTag,
+    loadClassification,
+    setCategory,
+    toggleTag,
+    runSearch,
+    setSearchQuery,
+    setSearchFilter,
+    clearSearch,
   }
 })

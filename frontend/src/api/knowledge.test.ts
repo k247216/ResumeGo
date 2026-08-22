@@ -2,12 +2,22 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  addDocumentTag,
+  createKnowledgeCategory,
   createKnowledgeNote,
+  createKnowledgeTag,
+  getDocumentClassification,
   getKnowledgeContent,
   getKnowledgeDocument,
   importKnowledgeFile,
   KnowledgeHttpError,
+  listKnowledgeCategories,
   listKnowledgeDocuments,
+  listKnowledgeTags,
+  removeDocumentCategory,
+  removeDocumentTag,
+  searchKnowledge,
+  setDocumentCategory,
 } from './knowledge'
 import type { KnowledgeDocument, KnowledgeImportResponse } from '../types/knowledge'
 
@@ -119,5 +129,85 @@ describe('knowledge api client', () => {
     const error = await getKnowledgeContent(9).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(KnowledgeHttpError)
     expect((error as KnowledgeHttpError).message).toBe('读取提取内容失败')
+  })
+
+  it('FE-01 lists and creates categories with exact paths and body', async () => {
+    mockedFetch.mockImplementation(() => Promise.resolve(okResponse({ id: 1, name: '求职', normalizedName: '求职', createdAt: 't', updatedAt: 't' })))
+    await listKnowledgeCategories()
+    expect(mockedFetch).toHaveBeenCalledWith('/api/v2/knowledge/categories')
+
+    await createKnowledgeCategory('求职')
+    const [url, init] = mockedFetch.mock.calls[1]!
+    expect(url).toBe('/api/v2/knowledge/categories')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse((init?.body ?? '') as string)).toEqual({ name: '求职' })
+  })
+
+  it('FE-01 lists and creates tags with exact paths and body', async () => {
+    mockedFetch.mockImplementation(() => Promise.resolve(okResponse({ id: 2, name: '机器学习', normalizedName: '机器学习', createdAt: 't', updatedAt: 't' })))
+    await listKnowledgeTags()
+    expect(mockedFetch).toHaveBeenCalledWith('/api/v2/knowledge/tags')
+
+    await createKnowledgeTag('机器学习')
+    const [url, init] = mockedFetch.mock.calls[1]!
+    expect(url).toBe('/api/v2/knowledge/tags')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse((init?.body ?? '') as string)).toEqual({ name: '机器学习' })
+  })
+
+  it('FE-01 reads document classification from the frozen path', async () => {
+    mockedFetch.mockResolvedValue(okResponse({ category: null, tags: [] }))
+    const result = await getDocumentClassification(9)
+    expect(mockedFetch).toHaveBeenCalledWith('/api/v2/knowledge/documents/9/classification')
+    expect(result.data.category).toBeNull()
+    expect(result.data.tags).toEqual([])
+  })
+
+  it('FE-01 sets and removes document category with PUT/DELETE', async () => {
+    mockedFetch.mockImplementation(() => Promise.resolve(okResponse(null)))
+    await setDocumentCategory(9, 3)
+    let [url, init] = mockedFetch.mock.calls[0]!
+    expect(url).toBe('/api/v2/knowledge/documents/9/category/3')
+    expect(init?.method).toBe('PUT')
+
+    await removeDocumentCategory(9, 3)
+    ;[url, init] = mockedFetch.mock.calls[1]!
+    expect(url).toBe('/api/v2/knowledge/documents/9/category/3')
+    expect(init?.method).toBe('DELETE')
+  })
+
+  it('FE-01 adds and removes document tags with PUT/DELETE', async () => {
+    mockedFetch.mockImplementation(() => Promise.resolve(okResponse(null)))
+    await addDocumentTag(9, 5)
+    let [url, init] = mockedFetch.mock.calls[0]!
+    expect(url).toBe('/api/v2/knowledge/documents/9/tags/5')
+    expect(init?.method).toBe('PUT')
+
+    await removeDocumentTag(9, 5)
+    ;[url, init] = mockedFetch.mock.calls[1]!
+    expect(url).toBe('/api/v2/knowledge/documents/9/tags/5')
+    expect(init?.method).toBe('DELETE')
+  })
+
+  it('FE-01 searches with query and optional filters', async () => {
+    mockedFetch.mockImplementation(() => Promise.resolve(okResponse([])))
+    await searchKnowledge('笔记')
+    expect(mockedFetch).toHaveBeenCalledWith('/api/v2/knowledge/search?q=%E7%AC%94%E8%AE%B0')
+
+    await searchKnowledge('笔记', 3, 5)
+    const [url] = mockedFetch.mock.calls[1]!
+    expect(url).toBe('/api/v2/knowledge/search?q=%E7%AC%94%E8%AE%B0&categoryId=3&tagId=5')
+
+    await searchKnowledge('x', null, null)
+    const [url3] = mockedFetch.mock.calls[2]!
+    expect(url3).toBe('/api/v2/knowledge/search?q=x')
+  })
+
+  it('FE-01 surfaces ownership errors from classification reads', async () => {
+    mockedFetch.mockResolvedValue(errResponse(404, '知识文档不存在'))
+    const error = await getDocumentClassification(404).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(KnowledgeHttpError)
+    expect((error as KnowledgeHttpError).status).toBe(404)
+    expect((error as KnowledgeHttpError).message).toBe('知识文档不存在')
   })
 })

@@ -1,8 +1,12 @@
 import type {
   ApiResponse,
+  KnowledgeCategory,
   KnowledgeContentResponse,
   KnowledgeDocument,
+  KnowledgeDocumentClassification,
   KnowledgeImportResponse,
+  KnowledgeSearchItem,
+  KnowledgeTag,
 } from '../types/knowledge'
 import { apiFetch } from './http'
 
@@ -61,4 +65,80 @@ export async function importKnowledgeFile(file: File): Promise<ApiResponse<Knowl
 export async function getKnowledgeContent(documentId: number): Promise<ApiResponse<KnowledgeContentResponse>> {
   const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/content`)
   return parseResponse<KnowledgeContentResponse>(res, '读取提取内容失败')
+}
+
+export async function listKnowledgeCategories(): Promise<ApiResponse<KnowledgeCategory[]>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/categories`)
+  return parseResponse<KnowledgeCategory[]>(res, '获取分类列表失败')
+}
+
+export async function createKnowledgeCategory(name: string): Promise<ApiResponse<KnowledgeCategory>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  return parseResponse<KnowledgeCategory>(res, '创建分类失败')
+}
+
+export async function listKnowledgeTags(): Promise<ApiResponse<KnowledgeTag[]>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/tags`)
+  return parseResponse<KnowledgeTag[]>(res, '获取标签列表失败')
+}
+
+export async function createKnowledgeTag(name: string): Promise<ApiResponse<KnowledgeTag>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  return parseResponse<KnowledgeTag>(res, '创建标签失败')
+}
+
+/** 所选文档的现有关联（category 可为 null，tags 为空数组）。 */
+export async function getDocumentClassification(documentId: number): Promise<ApiResponse<KnowledgeDocumentClassification>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/classification`)
+  return parseResponse<KnowledgeDocumentClassification>(res, '读取文档关联失败')
+}
+
+export async function setDocumentCategory(documentId: number, categoryId: number): Promise<ApiResponse<null>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/category/${categoryId}`, {
+    method: 'PUT',
+  })
+  return parseResponse<null>(res, '设置分类失败')
+}
+
+export async function removeDocumentCategory(documentId: number, categoryId: number): Promise<ApiResponse<null>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/category/${categoryId}`, {
+    method: 'DELETE',
+  })
+  return parseResponse<null>(res, '移除分类失败')
+}
+
+export async function addDocumentTag(documentId: number, tagId: number): Promise<ApiResponse<null>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/tags/${tagId}`, {
+    method: 'PUT',
+  })
+  return parseResponse<null>(res, '添加标签失败')
+}
+
+export async function removeDocumentTag(documentId: number, tagId: number): Promise<ApiResponse<null>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/tags/${tagId}`, {
+    method: 'DELETE',
+  })
+  return parseResponse<null>(res, '移除标签失败')
+}
+
+/** 关键词搜索：q trim 1-100，可选 categoryId/tagId；结果含 matchedField/snippet/lineNumber。 */
+export async function searchKnowledge(
+  q: string,
+  categoryId?: number | null,
+  tagId?: number | null,
+): Promise<ApiResponse<KnowledgeSearchItem[]>> {
+  const params = new URLSearchParams()
+  params.set('q', q)
+  if (categoryId != null) params.set('categoryId', String(categoryId))
+  if (tagId != null) params.set('tagId', String(tagId))
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/search?${params.toString()}`)
+  return parseResponse<KnowledgeSearchItem[]>(res, '搜索失败')
 }

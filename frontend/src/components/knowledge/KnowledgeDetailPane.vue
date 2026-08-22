@@ -77,7 +77,7 @@ function statusTone(status: KnowledgeProcessingStatus): string {
 </script>
 
 <style scoped>
-.detail{display:flex;flex-direction:column;min-width:0;min-height:0;padding:22px 26px 28px;overflow-y:auto}
+.detail{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;padding:22px 26px 16px;overflow-y:auto}
 .detail-empty{display:grid;gap:8px;justify-items:start;align-content:center;flex:1;color:var(--muted);font-size:13px}
 .detail-empty strong{color:var(--ink);font-size:15px}
 .detail-head{flex:none;padding-bottom:14px;border-bottom:1px solid var(--border-subtle)}

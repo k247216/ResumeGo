@@ -10,6 +10,16 @@ vi.mock('../api/knowledge', () => {
     importKnowledgeFile: vi.fn(),
     getKnowledgeDocument: vi.fn(),
     getKnowledgeContent: vi.fn(),
+    listKnowledgeCategories: vi.fn(),
+    createKnowledgeCategory: vi.fn(),
+    listKnowledgeTags: vi.fn(),
+    createKnowledgeTag: vi.fn(),
+    getDocumentClassification: vi.fn(),
+    setDocumentCategory: vi.fn(),
+    removeDocumentCategory: vi.fn(),
+    addDocumentTag: vi.fn(),
+    removeDocumentTag: vi.fn(),
+    searchKnowledge: vi.fn(),
     KnowledgeHttpError: class KnowledgeHttpError extends Error {
       status: number
       constructor(status: number, message: string) {
@@ -254,5 +264,134 @@ describe('useKnowledgeStore', () => {
     api.listKnowledgeDocuments.mockResolvedValueOnce(ok([doc(9, 'COMPLETED'), doc(1, 'COMPLETED')]))
     await store.retry()
     expect(store.listRefreshError).toBe('')
+  })
+
+  it('FE-01 loads the category and tag catalog', async () => {
+    api.listKnowledgeCategories.mockResolvedValue(ok([{ id: 1, name: '求职', normalizedName: '求职', createdAt: 't', updatedAt: 't' }]))
+    api.listKnowledgeTags.mockResolvedValue(ok([{ id: 2, name: '机器学习', normalizedName: '机器学习', createdAt: 't', updatedAt: 't' }]))
+    const store = useKnowledgeStore()
+    await store.loadCatalog()
+    expect(store.categories.map((c) => c.name)).toEqual(['求职'])
+    expect(store.tags.map((t) => t.name)).toEqual(['机器学习'])
+  })
+
+  it('FE-01 empty search does not call the API and clears results', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+    store.searchResults = [{ document: doc(1, 'COMPLETED'), matchedField: 'TITLE', snippet: 'x', lineNumber: null }]
+
+    store.setSearchQuery('')
+    await vi.waitFor(() => expect(store.searchResults).toEqual([]))
+    expect(api.searchKnowledge).not.toHaveBeenCalled()
+  })
+
+  it('FE-01 discards stale search responses with request sequence', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+
+    let resolveFirst: (v: { success: true; data: never[]; message: null }) => void = () => {}
+    const first = new Promise<{ success: true; data: never[]; message: null }>((resolve) => { resolveFirst = resolve })
+    api.searchKnowledge.mockImplementationOnce(() => first)
+      .mockResolvedValueOnce(ok([{ document: doc(1, 'COMPLETED'), matchedField: 'TITLE', snippet: '第二条', lineNumber: null }]))
+
+    store.setSearchQuery('a')
+    store.setSearchQuery('b')
+    await vi.waitFor(() => expect(store.searchResults).toHaveLength(1))
+    // 晚到的第一条响应不得覆盖第二条结果
+    resolveFirst({ success: true, data: [], message: null })
+    await vi.waitFor(() => expect(store.searchLoading).toBe(false))
+    expect(store.searchResults).toHaveLength(1)
+    expect(store.searchResults[0].snippet).toBe('第二条')
+  })
+
+  it('FE-01 search failure is local and does not clear documents', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+
+    api.searchKnowledge.mockRejectedValueOnce(new Error('搜索失败'))
+    store.setSearchQuery('词')
+    await vi.waitFor(() => expect(store.searchErrorMessage).toContain('搜索失败'))
+    expect(store.documents).toHaveLength(1)
+  })
+
+  it('FE-01 clears invalid filters instead of applying them', async () => {
+    api.listKnowledgeCategories.mockResolvedValue(ok([{ id: 1, name: '求职', normalizedName: '求职', createdAt: 't', updatedAt: 't' }]))
+    api.listKnowledgeTags.mockResolvedValue(ok([{ id: 2, name: '机器学习', normalizedName: '机器学习', createdAt: 't', updatedAt: 't' }]))
+    api.searchKnowledge.mockResolvedValue(ok([]))
+    const store = useKnowledgeStore()
+    await store.loadCatalog()
+
+    store.setSearchQuery('词')
+    store.setSearchFilter('category', 99) // 失效
+    expect(store.searchCategoryId).toBeNull()
+    store.setSearchFilter('category', 1)
+    expect(store.searchCategoryId).toBe(1)
+    store.setSearchFilter('tag', 2)
+    expect(store.searchTagId).toBe(2)
+    expect(api.searchKnowledge).toHaveBeenCalledWith('词', 1, 2)
+  })
+
+  it('FE-01 loads classification per document on demand', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    api.getDocumentClassification.mockResolvedValue(ok({ category: null, tags: [] }))
+    const store = useKnowledgeStore()
+    await store.load()
+    await store.loadClassification(1)
+    await store.loadClassification(1)
+    expect(api.getDocumentClassification).toHaveBeenCalledTimes(1)
+    expect(store.classificationByDocumentId[1]).toEqual({ category: null, tags: [] })
+  })
+
+  it('FE-01 category write re-reads server state on success', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+    await store.loadClassification(1)
+
+    api.setDocumentCategory.mockResolvedValue(ok(null))
+    api.getDocumentClassification.mockResolvedValueOnce(ok({
+      category: { id: 3, name: '求职', normalizedName: '求职', createdAt: 't', updatedAt: 't' },
+      tags: [],
+    }))
+
+    await store.setCategory(1, 3)
+    expect(api.setDocumentCategory).toHaveBeenCalledWith(1, 3)
+    expect(store.classificationByDocumentId[1].category?.id).toBe(3)
+    expect(store.classificationErrorMessage).toBe('')
+  })
+
+  it('FE-01 category write failure keeps the previous state', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+    await store.loadClassification(1)
+    const before = store.classificationByDocumentId[1]
+
+    api.setDocumentCategory.mockRejectedValue(new Error('设置分类失败'))
+    await expect(store.setCategory(1, 3)).rejects.toThrow('设置分类失败')
+    expect(store.classificationByDocumentId[1]).toEqual(before)
+    expect(store.classificationErrorMessage).toContain('设置分类失败')
+  })
+
+  it('FE-01 tag toggle re-reads server state on success and keeps old on failure', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+    await store.loadClassification(1)
+
+    api.addDocumentTag.mockResolvedValue(ok(null))
+    api.getDocumentClassification.mockResolvedValueOnce(ok({
+      category: null,
+      tags: [{ id: 2, name: '机器学习', normalizedName: '机器学习', createdAt: 't', updatedAt: 't' }],
+    }))
+    await store.toggleTag(1, 2, true)
+    expect(store.classificationByDocumentId[1].tags.map((t) => t.id)).toEqual([2])
+
+    api.addDocumentTag.mockRejectedValueOnce(new Error('添加标签失败'))
+    await expect(store.toggleTag(1, 3, true)).rejects.toThrow('添加标签失败')
+    expect(store.classificationByDocumentId[1].tags.map((t) => t.id)).toEqual([2])
   })
 })

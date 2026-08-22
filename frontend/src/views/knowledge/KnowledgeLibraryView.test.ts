@@ -32,12 +32,36 @@ function storeStub(overrides: Record<string, unknown> = {}) {
     contentByDocumentId: {} as Record<number, string>,
     contentLoadingDocumentId: null,
     contentErrorsByDocumentId: {} as Record<number, string>,
+    categories: [] as { id: number; name: string }[],
+    tags: [] as { id: number; name: string }[],
+    catalogLoading: false,
+    catalogErrorMessage: '',
+    classificationByDocumentId: {} as Record<number, { category: unknown | null; tags: unknown[] }>,
+    classificationLoadingDocumentId: null,
+    classificationErrorsByDocumentId: {} as Record<number, string>,
+    classificationSaving: false,
+    classificationErrorMessage: '',
+    searchQuery: '',
+    searchCategoryId: null,
+    searchTagId: null,
+    searchResults: [] as { document: { id: number; title: string }; matchedField: string; snippet: string; lineNumber: number | null }[],
+    searchLoading: false,
+    searchErrorMessage: '',
     load: vi.fn().mockResolvedValue(undefined),
     retry: vi.fn().mockResolvedValue(undefined),
     select: vi.fn(),
     createNote: vi.fn().mockResolvedValue(undefined),
     importFile: vi.fn().mockResolvedValue(undefined),
     loadContent: vi.fn().mockResolvedValue(undefined),
+    loadCatalog: vi.fn().mockResolvedValue(undefined),
+    createCategory: vi.fn().mockResolvedValue(undefined),
+    createTag: vi.fn().mockResolvedValue(undefined),
+    loadClassification: vi.fn().mockResolvedValue(undefined),
+    setCategory: vi.fn().mockResolvedValue(undefined),
+    toggleTag: vi.fn().mockResolvedValue(undefined),
+    runSearch: vi.fn().mockResolvedValue(undefined),
+    setSearchQuery: vi.fn(),
+    setSearchFilter: vi.fn(),
     ...overrides,
   })
 }
@@ -54,6 +78,9 @@ function mountView(store: ReturnType<typeof storeStub>) {
           props: ['content', 'contentError', 'contentLoading'],
           template: '<div data-test="stub-detail" :data-content="content" :data-error="contentError" :data-loading="String(contentLoading)" />',
         },
+        KnowledgeSearchResults: { template: '<div data-test="stub-search-results" />' },
+        KnowledgeClassificationPanel: { template: '<div data-test="stub-classification" />' },
+        KnowledgeNameDialog: { template: '<div data-test="stub-name-dialog" />' },
       },
     },
   })
@@ -161,5 +188,47 @@ describe('KnowledgeLibraryView', () => {
     const wrapper = mountView(store)
     await flushPromises()
     expect(wrapper.find('[data-test="knowledge-list-refresh-error"]').exists()).toBe(false)
+  })
+
+  it('searches from the top bar and shows results instead of the document rail', async () => {
+    const store = storeStub({ searchQuery: '笔记' })
+    const wrapper = mountView(store)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="stub-search-results"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="stub-rail"]').exists()).toBe(false)
+  })
+
+  it('typing in the search bar forwards the query to the store', async () => {
+    const store = storeStub()
+    const wrapper = mountView(store)
+    await flushPromises()
+
+    await wrapper.get('[data-test="knowledge-search-input"]').setValue('TensorFlow')
+    expect(store.setSearchQuery).toHaveBeenCalledWith('TensorFlow')
+  })
+
+  it('clearing the query returns to the document list', async () => {
+    const store = storeStub({ searchQuery: '' })
+    const wrapper = mountView(store)
+    await flushPromises()
+    expect(wrapper.find('[data-test="stub-search-results"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="stub-rail"]').exists()).toBe(true)
+  })
+
+  it('renders the classification panel for the selected document', async () => {
+    const store = storeStub()
+    const wrapper = mountView(store)
+    await flushPromises()
+    expect(wrapper.find('[data-test="stub-classification"]').exists()).toBe(true)
+  })
+
+  it('loads catalog on mount without breaking document load', async () => {
+    const store = storeStub()
+    const wrapper = mountView(store)
+    await flushPromises()
+    expect(store.load).toHaveBeenCalled()
+    expect(store.loadCatalog).toHaveBeenCalled()
+    expect(wrapper.find('[data-test="stub-detail"]').exists()).toBe(true)
   })
 })
