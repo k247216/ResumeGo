@@ -59,6 +59,18 @@ public class CareerPipelineRepository {
         return requiredKey(keys, "创建求职管线");
     }
 
+    public int updatePipeline(long userId, long pipelineId, String name, String companyName,
+                               String roleTitle, Long jobDescriptionId, Long resumeVersionId) {
+        return jdbcTemplate.update("""
+                UPDATE career_pipelines
+                SET name = ?, company_name = ?, role_title = ?,
+                    job_description_id = ?, resume_version_id = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+                """, name, companyName, roleTitle, jobDescriptionId, resumeVersionId,
+                pipelineId, userId);
+    }
+
     public long createStage(long pipelineId, String name, int position, PipelineStageState state) {
         KeyHolder keys = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {

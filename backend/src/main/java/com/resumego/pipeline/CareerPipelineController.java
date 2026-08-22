@@ -8,6 +8,7 @@ import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
+import com.resumego.pipeline.dto.UpdateCareerPipelineRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,13 @@ public class CareerPipelineController {
     public ResponseEntity<ApiResponse<CareerPipelineResponse>> create(
             @Valid @RequestBody CreateCareerPipelineRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(service.create(request)));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<CareerPipelineResponse>> update(
+            @PathVariable long id,
+            @Valid @RequestBody UpdateCareerPipelineRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(service.update(id, request)));
     }
 
     @PostMapping("/{id}/transitions")

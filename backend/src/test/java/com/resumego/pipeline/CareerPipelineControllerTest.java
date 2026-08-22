@@ -137,6 +137,37 @@ class CareerPipelineControllerTest {
                 .andExpect(jsonPath("$.message").value("求职管线不存在"));
     }
 
+    @Test
+    void updatesPipelineIdentityAndMaterials() throws Exception {
+        when(service.update(anyLong(), any())).thenReturn(sample());
+        mockMvc.perform(patch("/api/v2/pipelines/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"腾讯 Java 后端\",\"companyName\":\"腾讯\",\"roleTitle\":\"Java 后端实习\",\"jobDescriptionId\":20,\"resumeVersionId\":31}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(7));
+    }
+
+    @Test
+    void updateRejectsArchivedPipelineWithBadRequest() throws Exception {
+        when(service.update(anyLong(), any()))
+                .thenThrow(new IllegalStateException("已归档或已关闭的求职管线不可修改"));
+        mockMvc.perform(patch("/api/v2/pipelines/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"腾讯\",\"companyName\":\"腾讯\",\"roleTitle\":\"Java\",\"jobDescriptionId\":null,\"resumeVersionId\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("已归档或已关闭的求职管线不可修改"));
+    }
+
+    @Test
+    void updateMapsMissingPipelineToNotFound() throws Exception {
+        when(service.update(anyLong(), any())).thenThrow(new NoSuchElementException("求职管线不存在"));
+        mockMvc.perform(patch("/api/v2/pipelines/404")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"腾讯\",\"companyName\":\"腾讯\",\"roleTitle\":\"Java\",\"jobDescriptionId\":null,\"resumeVersionId\":null}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("求职管线不存在"));
+    }
+
     private CareerPipelineResponse sample() {
         return sample(List.of(), List.of());
     }

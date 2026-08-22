@@ -179,4 +179,39 @@ class CareerPipelineRepositoryTest {
                 "SELECT COUNT(*) FROM career_pipelines WHERE id = ?", Integer.class, pipelineId))
                 .isEqualTo(beforePipelines);
     }
+
+    @Test
+    void updatePipelineChangesOnlyIdentityAndMaterialLinks() {
+        long pipelineId = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", 10L, 31L);
+        long prepare = repository.createStage(pipelineId, "准备中", 0, PipelineStageState.CURRENT);
+        long interview = repository.createStage(pipelineId, "技术面", 1, PipelineStageState.PENDING);
+        repository.setCurrentStage(1L, pipelineId, prepare);
+        repository.appendTransition(pipelineId, null, prepare, "USER", "创建管线");
+
+        int affected = repository.updatePipeline(1L, pipelineId, "腾讯 Java 后端", "腾讯", "Java 后端实习", 20L, 33L);
+
+        assertThat(affected).isOne();
+        CareerPipeline after = repository.findById(1L, pipelineId).orElseThrow();
+        assertThat(after.name()).isEqualTo("腾讯 Java 后端");
+        assertThat(after.companyName()).isEqualTo("腾讯");
+        assertThat(after.roleTitle()).isEqualTo("Java 后端实习");
+        assertThat(after.jobDescriptionId()).isEqualTo(20L);
+        assertThat(after.resumeVersionId()).isEqualTo(33L);
+        // 阶段、历史、当前阶段不变
+        assertThat(repository.findStages(1L, pipelineId)).hasSize(2);
+        assertThat(repository.findTransitions(1L, pipelineId)).hasSize(1);
+        assertThat(repository.findById(1L, pipelineId).orElseThrow().currentStageId()).isEqualTo(prepare);
+    }
+
+    @Test
+    void updatePipelineDoesNotAffectOtherPipelines() {
+        long first = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        long second = repository.createPipeline(1L, "字节后端", "字节跳动", "后端开发", null, null);
+
+        repository.updatePipeline(1L, first, "腾讯 Java 后端", "腾讯", "Java 后端实习", null, null);
+
+        CareerPipeline unchanged = repository.findById(1L, second).orElseThrow();
+        assertThat(unchanged.name()).isEqualTo("字节后端");
+        assertThat(unchanged.roleTitle()).isEqualTo("后端开发");
+    }
 }

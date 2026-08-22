@@ -9,6 +9,7 @@ import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
+import com.resumego.pipeline.dto.UpdateCareerPipelineRequest;
 import com.resumego.pipeline.port.PipelineInterviewPlanAccess;
 import com.resumego.pipeline.port.PipelineScheduleEventAccess;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,21 @@ public class CareerPipelineService {
         }
         repository.setCurrentStage(userId(), pipelineId, firstStageId);
         repository.appendTransition(pipelineId, null, firstStageId, "USER", "创建求职管线");
+        return get(pipelineId);
+    }
+
+    @Transactional
+    public CareerPipelineResponse update(long pipelineId, UpdateCareerPipelineRequest request) {
+        CareerPipeline pipeline = requirePipeline(pipelineId);
+        if (pipeline.lifecycle() == PipelineLifecycle.ARCHIVED || pipeline.lifecycle() == PipelineLifecycle.CLOSED) {
+            throw new IllegalStateException("已归档或已关闭的求职管线不可修改");
+        }
+        String name = normalize(request.name(), "管线名称", 120);
+        String company = normalize(request.companyName(), "公司", 120);
+        String role = normalize(request.roleTitle(), "岗位", 160);
+        validateLinks(request.jobDescriptionId(), request.resumeVersionId());
+        repository.updatePipeline(userId(), pipelineId, name, company, role,
+                request.jobDescriptionId(), request.resumeVersionId());
         return get(pipelineId);
     }
 

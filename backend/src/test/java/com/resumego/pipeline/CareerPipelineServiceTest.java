@@ -1,11 +1,13 @@
 package com.resumego.pipeline;
 
+import com.resumego.pipeline.dto.CareerPipelineResponse;
 import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
 import com.resumego.pipeline.dto.AddPipelineStageRequest;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
+import com.resumego.pipeline.dto.UpdateCareerPipelineRequest;
 import com.resumego.pipeline.port.PipelineInterviewPlanAccess;
 import com.resumego.pipeline.port.PipelineScheduleEventAccess;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class CareerPipelineServiceTest {
@@ -184,5 +188,86 @@ class CareerPipelineServiceTest {
 
         assertThatThrownBy(() -> service.findTransitionHistory(404L))
                 .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void updateNormalizesAndPersistsIdentityAndMaterialLinks() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.ownsJobDescription(1L, 20L)).thenReturn(true);
+        when(repository.ownsResumeVersion(1L, 31L)).thenReturn(true);
+        CareerPipeline updated = new CareerPipeline(7L, 1L, "腾讯 Java 后端", "腾讯", "Java 后端实习",
+                20L, 31L, PipelineLifecycle.ACTIVE, null, 11L, null,
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 7L)).thenReturn(Optional.of(updated));
+        when(repository.findStages(1L, 7L)).thenReturn(List.of(
+                new PipelineStage(11L, 7L, "准备中", 0, PipelineStageState.CURRENT,
+                        LocalDateTime.now(), LocalDateTime.now())));
+
+        CareerPipelineResponse result = service.update(7L, new UpdateCareerPipelineRequest(
+                " 腾讯 Java 后端 ", " 腾讯 ", " Java 后端实习 ", 20L, 31L));
+
+        verify(repository).updatePipeline(1L, 7L, "腾讯 Java 后端", "腾讯", "Java 后端实习", 20L, 31L);
+        assertThat(result.companyName()).isEqualTo("腾讯");
+    }
+
+    @Test
+    void updateExplicitNullUnlinksMaterialAssociations() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        CareerPipeline updated = new CareerPipeline(7L, 1L, "腾讯 Java", "腾讯", "Java 后端",
+                null, null, PipelineLifecycle.ACTIVE, null, 11L, null,
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 7L)).thenReturn(Optional.of(updated));
+        when(repository.findStages(1L, 7L)).thenReturn(List.of(
+                new PipelineStage(11L, 7L, "准备中", 0, PipelineStageState.CURRENT,
+                        LocalDateTime.now(), LocalDateTime.now())));
+
+        service.update(7L, new UpdateCareerPipelineRequest("腾讯 Java", "腾讯", "Java 后端", null, null));
+
+        verify(repository).updatePipeline(1L, 7L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+    }
+
+    @Test
+    void updateRejectsBlankOrOverlongFields() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        assertThatThrownBy(() -> service.update(7L, new UpdateCareerPipelineRequest("  ", "腾讯", "Java", null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("管线名称");
+        assertThatThrownBy(() -> service.update(7L, new UpdateCareerPipelineRequest(
+                "a".repeat(121), "腾讯", "Java", null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(repository, never()).updatePipeline(anyLong(), anyLong(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void updateRejectsForeignMaterialLinks() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.ownsJobDescription(1L, 20L)).thenReturn(false);
+        assertThatThrownBy(() -> service.update(7L, new UpdateCareerPipelineRequest("腾讯", "腾讯", "Java", 20L, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("目标岗位");
+        verify(repository, never()).updatePipeline(anyLong(), anyLong(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void updateRejectsArchivedOrClosedPipeline() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ARCHIVED);
+        assertThatThrownBy(() -> service.update(7L, new UpdateCareerPipelineRequest("腾讯", "腾讯", "Java", null, null)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("归档");
+        verify(repository, never()).updatePipeline(anyLong(), anyLong(), any(), any(), any(), any(), any());
+
+        stubPipeline(8L, 12L, PipelineLifecycle.CLOSED);
+        assertThatThrownBy(() -> service.update(8L, new UpdateCareerPipelineRequest("腾讯", "腾讯", "Java", null, null)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void updateAllowsActiveAndPaused() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.updatePipeline(1L, 7L, "腾讯", "腾讯", "Java", null, null)).thenReturn(1);
+        service.update(7L, new UpdateCareerPipelineRequest("腾讯", "腾讯", "Java", null, null));
+        verify(repository).updatePipeline(1L, 7L, "腾讯", "腾讯", "Java", null, null);
+
+        stubPipeline(8L, 12L, PipelineLifecycle.PAUSED);
+        when(repository.updatePipeline(1L, 8L, "字节", "字节跳动", "后端", null, null)).thenReturn(1);
+        service.update(8L, new UpdateCareerPipelineRequest("字节", "字节跳动", "后端", null, null));
+        verify(repository).updatePipeline(1L, 8L, "字节", "字节跳动", "后端", null, null);
     }
 }
