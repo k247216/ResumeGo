@@ -6,7 +6,7 @@ Controller: Core Controller
 
 Integration branch: `codex/v2-career-os`
 
-Dispatch baseline: `42435cb3e75e539d14fa365b56f349c00710598f`
+Dispatch baseline: `b58115e25d37f9b2a032c11d3ea15d7e27e74fa0`
 
 本文件是 V2 外部 Agent 的唯一任务状态入口。只有位于 `docs/tasks/v2/ready/` 且状态为 `READY` 的任务可以开始。执行者领取任务时，将对应任务卡全文交给该 Agent；不得只转述标题。
 
@@ -31,7 +31,7 @@ Dispatch baseline: `42435cb3e75e539d14fa365b56f349c00710598f`
 | V2-F1-FE-01 | Pipeline 类型与 API client | `INTEGRATED` | `f4b8aee`、`fc98ad0` | `codex/v2-f1-fe-01-pipeline-api` | 新建 Pipeline 类型、API client 及其测试 | 无 | 已集成 |
 | V2-F1-FE-02 | Pipeline Pinia store | `INTEGRATED` | `00a81a9`、`8d9a640` | `codex/v2-f1-fe-02-pipeline-store` | 仅新建 store 及其测试 | V2-F1-FE-01 已集成 | 已集成 |
 | V2-F1-BE-02 | Pipeline 身份与材料更新 | `INTEGRATED` | `d33433f`、`42435cb` | `codex/v2-f1-be-02-pipeline-update` | Pipeline 三层、新 update DTO 与测试 | V2-F1-BE-01 已集成 | 已集成 |
-| V2-F1-FE-02B | Pipeline update/history 前端契约补齐 | `READY` | `42435cb3e75e539d14fa365b56f349c00710598f` | `codex/v2-f1-fe-02b-pipeline-contract-completion` | Pipeline types/API/store 及现有对应测试 | BE-01、BE-02、FE-01、FE-02 已集成 | 2B |
+| V2-F1-FE-02B | Pipeline update/history 前端契约补齐 | `INTEGRATED` | `b58115e` | `codex/v2-f1-fe-02b-pipeline-contract-completion` | Pipeline types/API/store 及现有对应测试 | BE-01、BE-02、FE-01、FE-02 已集成 | 已集成 |
 | V2-F1-UX-01 | Pipeline 交互契约 | `DESIGN_REQUIRED` | 不适用 | 不创建代码分支 | Pipeline 页面设计规范与验收场景 | F1 数据契约稳定 | FE-03 前 |
 | V2-F1-FE-03 | V2 Pipeline 页面 | `QUEUED` | FE-02B、UX-01 集成后填写 | `codex/v2-f1-fe-03-pipeline-page` | 路由、Pipeline view/components/tests | V2-F1-FE-02B、UX-01 | 3 |
 | V2-F1-QA-01 | Pipeline 纵向验收 | `QUEUED` | FE-03 集成后填写 | `codex/v2-f1-qa-01-pipeline-acceptance` | 集成/E2E/桌面验收资产 | MIG-03、FE-03 | 4 |
@@ -47,8 +47,8 @@ Dispatch baseline: `42435cb3e75e539d14fa365b56f349c00710598f`
 
 ## 并行与所有权规则
 
-1. 当前仅 `V2-F1-FE-02B` 可分发，用于补齐已落地后端契约；不得提前创建 UI。
-2. FE-02B 执行期间由 Core Controller 冻结 `V2-F1-UX-01`；两者均完成后才能提升 `V2-F1-FE-03`。
+1. 当前没有可分发代码卡；`V2-F1-FE-02B` 已完成并集成。
+2. 下一步由 Core Controller 冻结 `V2-F1-UX-01`，随后立即提升 `V2-F1-FE-03`。
 3. `V2-F1-FE-03` 不得提前修改全局 DesktopShell、V1 页面或 FE-02B 拥有的 API/types/store。
 4. 迁移和 Pipeline 页面不因“实现容易”而提前；它们的状态只能由 Core Controller 修改。
 5. 外部 Agent 只提交功能分支和 `docs/templates/v2-agent-delivery-report.md` 对应的交付内容，不得合并。
