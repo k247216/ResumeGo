@@ -43,8 +43,10 @@ Dispatch baseline: `15e078e9a53158057300d677df92a4d3455bfbba`
 | V2-F2-BE-03 | 重试与派生数据清理 | `INTEGRATED` | `2d1fa2a`、`60221fe`、`b5cc6a4` | `codex/v2-f2-be-03-recovery-delete` | job retry/delete service/API/tests | V2-F2-BE-02 | 已集成 |
 | V2-F2-FE-01 | 分类搜索可用前端切片 | `INTEGRATED` | `8ff5829`、`8eb2b33` | `codex/v2-f2-fe-01-knowledge-client-store` | types/API/store、现有 Knowledge 页面与测试 | V2-F2-BE-02 | 已集成 |
 | V2-F2-IO-02 | 安全打开与定位受管原文 | `READY` | `15e078e9a53158057300d677df92a4d3455bfbba` | `codex/v2-f2-io-02-managed-source-open` | Knowledge 内部端点、Electron IPC/path guard、renderer adapter/tests | V2-F2-BE-03 | 5，可与 UX-01 设计并行 |
-| V2-F2-UX-01 | Knowledge Library 交互契约 | `DESIGN_REQUIRED` | 不适用 | 不创建代码分支 | Knowledge 页面设计规范与验收场景 | ARCH-01 | FE-02 前 |
-| V2-F2-FE-02 | Knowledge Library 页面 | `QUEUED` | BE-03、FE-01、UX-01 集成后填写 | `codex/v2-f2-fe-02-library-ui` | 路由、view/components/tests | V2-F2-BE-03、FE-01、UX-01 | 5 |
+| V2-F2-UX-01 | Knowledge Library 交互契约 | `INTEGRATED` | `docs/superpowers/specs/2026-08-22-v2-knowledge-library-interaction-design.md` | 不创建代码分支 | Knowledge 多栏页面、层级树、收起行为、检查器与响应式规范 | ARCH-01 | 已批准 |
+| V2-F2-BE-04 | 层级资料库分类树 | `QUEUED` | IO-02 集成后填写 | `codex/v2-f2-be-04-hierarchical-library` | V10/V30、Knowledge category tree API/service/repository/tests | V2-F2-IO-02 | 6 |
+| V2-F2-BE-05 | 本地笔记正文保存 | `QUEUED` | BE-04 集成后填写 | `codex/v2-f2-be-05-note-content` | Knowledge NOTE content API/service/repository/tests | V2-F2-BE-04 | 7 |
+| V2-F2-FE-02 | Knowledge Library 页面 | `QUEUED` | IO-02、BE-04、BE-05 集成后填写 | `codex/v2-f2-fe-02-library-ui` | Knowledge view/components/store/API/tests | V2-F2-IO-02、BE-04、BE-05、FE-01、UX-01 | 8 |
 | V2-F2-QA-01 | Knowledge F2 纵向验收 | `QUEUED` | FE-02 集成后填写 | `codex/v2-f2-qa-01-library-acceptance` | 集成/E2E/桌面验收资产 | V2-F2-FE-02 | 6 |
 
 ## 并行与所有权规则
@@ -53,7 +55,8 @@ Dispatch baseline: `15e078e9a53158057300d677df92a4d3455bfbba`
 2. `V2-F1-QA-01` 仍等待 MIG-03，不得提前将迁移场景伪装为已验收。
 3. BE-02 只实现分类、标签与关键词搜索；安全打开受管原文拆为后续 Electron capability，删除仍由 BE-03 负责。
 4. 迁移和 Pipeline 页面不因“实现容易”而提前；它们的状态只能由 Core Controller 修改。
-5. 外部 Agent 只提交功能分支和 `docs/templates/v2-agent-delivery-report.md` 对应的交付内容，不得合并。
+5. UX-01 已批准；视觉稿中的层级树、NOTE 正文和文件动作必须等待真实契约，不允许 FE-02 写死。
+6. 外部 Agent 只提交功能分支和 `docs/templates/v2-agent-delivery-report.md` 对应的交付内容，不得合并。
 
 ## 用户分发步骤
 

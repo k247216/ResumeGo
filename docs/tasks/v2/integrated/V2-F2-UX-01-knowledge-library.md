@@ -2,9 +2,10 @@
 
 ## Identity
 
-- Status: `DESIGN_REQUIRED`
+- Status: `INTEGRATED`
 - Owner: Core Controller with user approval
-- Code branch: none
+- Approved spec: `docs/superpowers/specs/2026-08-22-v2-knowledge-library-interaction-design.md`
+- Approved visual: `docs/design/v2-knowledge-library-target.png`
 - Depends on: approved F2-ARCH-01
 
 ## Product question
@@ -29,5 +30,4 @@
 
 ## Exit gate
 
-用户批准布局和主要状态后，冻结组件边界、route、data-test、copy 和响应式规格，才能提升 F2-FE-02。
-
+已通过：用户批准多栏布局、层级资料库、可收起资料列表、纯正文阅读区和可关闭来源检查器。FE-02 仍需等待真实数据依赖，禁止用静态树或虚构关系替代。
