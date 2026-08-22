@@ -649,7 +649,7 @@ onBeforeUnmount(() => {
 .categorize-warning{margin:0 24px 8px;padding:8px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:12px}
 .library-body{position:relative;flex:1;min-height:0;display:flex;background:var(--surface-solid);overflow:hidden}
 .reading-column{flex:1;min-width:0;display:flex;flex-direction:column}
-.inspector-wrap{position:relative;flex:none}
+.inspector-wrap{position:relative;flex:none;align-self:stretch}
 .inspector-wrap.is-overlay{position:absolute;top:0;right:0;bottom:0;z-index:20;background:var(--surface-solid);box-shadow:-8px 0 24px rgba(0,0,0,.08)}
 .metadata-warning{margin:0 28px 10px;padding:7px 11px;border:1px solid var(--border-default);border-radius:9px;background:var(--danger-soft);color:var(--danger);font-size:12px}
 </style>

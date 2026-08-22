@@ -53,8 +53,10 @@
             </span>
             <span class="row-location">{{ locationOf(item.document) }}</span>
             <span v-if="item.snippet" class="row-snippet">{{ item.snippet }}</span>
-            <span class="row-status" :class="statusTone(item.document.processingStatus)">{{ statusLabel(item.document.processingStatus) }}</span>
-            <span v-if="item.document.processingStatus === 'FAILED'" class="row-action" data-test="doc-row-retry" @click.stop="$emit('retry-doc', item.document.id)">重试</span>
+            <span class="row-side">
+              <span class="row-status" :class="statusTone(item.document.processingStatus)">{{ statusLabel(item.document.processingStatus) }}</span>
+              <span v-if="item.document.processingStatus === 'FAILED'" class="row-action" data-test="doc-row-retry" @click.stop="$emit('retry-doc', item.document.id)">重试</span>
+            </span>
           </button>
           </li>
         </ul>
@@ -172,7 +174,11 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 .list-sort:hover{color:var(--brand)}
 .list-collapse{border:0;background:transparent;color:var(--copy);cursor:pointer;font-size:14px;padding:0 4px}
 .list-rows{list-style:none;margin:0;padding:0;overflow-y:auto;display:flex;flex-direction:column}
-.row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:start;gap:9px;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;cursor:pointer}
+.row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:2px;width:100%;text-align:left;padding:9px 14px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;cursor:pointer}
+.file-visual{grid-column:1;grid-row:1/3;align-self:start;margin-top:2px}
+.row-main{grid-column:2;grid-row:1}
+.row-location,.row-snippet{grid-column:2;grid-row:2;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-side{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .row:hover{background:var(--bg-hover)}
 .row.selected{background:var(--bg-selected);box-shadow:inset 2px 0 0 var(--brand)}
 .file-visual{position:relative;display:grid;width:28px;height:30px;place-items:start center;color:var(--type-color,var(--copy))}
@@ -188,13 +194,13 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 .row-main{flex:1;min-width:0;display:grid;gap:2px}
 .row-main strong{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-meta{font-size:11px;color:var(--copy)}
-.row-location,.row-snippet{grid-column:2/-1;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row-status{flex:none;font-size:10px;padding:1px 7px;border-radius:999px;margin-top:2px}
+
+.row-status{flex:none;font-size:10px;padding:1px 7px;border-radius:999px;line-height:1.5}
 .tone-ok{color:var(--brand);background:var(--brand-soft)}
 .tone-busy{color:var(--copy);background:var(--bg-subtle)}
 .tone-danger{color:var(--danger);background:var(--danger-soft)}
 .tone-idle{color:var(--muted);background:var(--bg-subtle)}
-.row-action{flex:none;font-size:11px;color:var(--brand);background:transparent;border:0;cursor:pointer;margin-top:1px}
+.row-action{flex:none;font-size:11px;color:var(--brand);background:transparent;border:0;cursor:pointer;padding:0}
 .list-state{display:grid;gap:8px;justify-items:start;padding:18px 14px;color:var(--muted);font-size:13px}
 .list-state.error strong,.list-state.error{color:var(--danger)}
 .list-state.empty{color:var(--muted)}
