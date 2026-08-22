@@ -115,13 +115,18 @@ jobs:
         run: |
           echo "EXE=$(find . -name '*.exe' | head -1 | xargs -I{} basename {})" >> $GITHUB_ENV
           ls -la
+      - name: Read tag message for release notes
+        shell: bash
+        run: |
+          git fetch --depth=1 origin tag ${{ github.ref_name }}
+          git tag -l --format='%(contents)' ${{ github.ref_name }} > release-notes.md
+          echo "notes bytes: $(wc -c < release-notes.md)"
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ResumeGo ${{ github.ref_name }}
-          body: |
-            ResumeGo 正式发布版本（${{ github.ref_name }}）
+          body_path: release-notes.md
           files: |
             ./*.exe
           draft: false
