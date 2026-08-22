@@ -22,15 +22,20 @@ class H2FileWorkspaceMigrationTest {
         String jdbcUrl = "jdbc:h2:file:" + databasePath
                 + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH";
 
-        Flyway.configure()
+        Flyway flyway = Flyway.configure()
                 .dataSource(jdbcUrl, "sa", "")
                 .locations("classpath:db/migration-h2")
-                .load()
-                .migrate();
+                .load();
+        flyway.migrate();
+
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
 
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");
              var statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO resumes (user_id, title) VALUES (1, '本地简历')");
+            assertThat(tableExists(connection, "career_pipelines")).isTrue();
+            assertThat(tableExists(connection, "pipeline_stages")).isTrue();
+            assertThat(tableExists(connection, "pipeline_stage_transitions")).isTrue();
         }
 
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");
@@ -47,6 +52,11 @@ class H2FileWorkspaceMigrationTest {
                 .load()
                 .migrate();
         assertThat(secondMigration.migrationsExecuted).isZero();
+        assertThat(Flyway.configure()
+                .dataSource(jdbcUrl, "sa", "")
+                .locations("classpath:db/migration-h2")
+                .load()
+                .info().current().getVersion().getVersion()).isEqualTo("4");
     }
 
     @Test
@@ -82,6 +92,12 @@ class H2FileWorkspaceMigrationTest {
              var result = statement.executeQuery("SELECT title FROM resumes")) {
             assertThat(result.next()).isTrue();
             assertThat(result.getString(1)).isEqualTo("备份前简历");
+        }
+    }
+
+    private boolean tableExists(java.sql.Connection connection, String tableName) throws Exception {
+        try (var result = connection.getMetaData().getTables(null, null, tableName, new String[]{"TABLE"})) {
+            return result.next();
         }
     }
 }
