@@ -82,29 +82,36 @@ public class KnowledgeManagedContentService {
             throw new IllegalStateException("HASH_CONFLICT: 相同内容的文件已存在于资料库");
         }
         // 读取旧受管文件（校验普通文件/符号链接/越界；备份到内存用于回滚）
-        byte[] oldBytes = fileStore.readManagedForReplace(userId(), source.storedRelativePath());
-        Path managed = fileStore.resolveStored(source.storedRelativePath());
-        // 准备替换：staging 临时文件
+        fileStore.readManagedForReplace(userId(), source.storedRelativePath());
+        String oldRelativePath = source.storedRelativePath();
+        // 目标改为新 hash 对应的 owner 受管路径，维持 hash 命名不变量
+        String newRelativePath = "knowledge/sources/" + userId() + "/" + newSha + "." + extension;
+        Path newManaged = fileStore.resolveStored(newRelativePath);
+        // 准备替换：staging 临时文件 → 新 hash 路径
         Path staged = fileStore.stageReplacement(bytes);
-        boolean committed = false;
+        boolean movedToNewPath = false;
         try {
-            fileStore.commitReplacement(managed, staged);
-            committed = true;
-            // DB 同步：提取正文 + size/sha + 状态；失败恢复旧文件
+            fileStore.commitReplacement(newManaged, staged);
+            movedToNewPath = true;
+            // DB 同步：stored_relative_path + size + sha + 提取正文；失败回滚新路径文件（旧路径文件未动）
             try {
                 transactionTemplate.executeWithoutResult(status -> {
                     repository.saveNoteContent(documentId, userId(), content);
-                    repository.updateSourceFileAfterEdit(source.id(), bytes.length, newSha);
+                    repository.updateSourceFileAfterEdit(source.id(), newRelativePath, bytes.length, newSha);
                 });
             } catch (RuntimeException exception) {
-                fileStore.restoreManaged(managed, oldBytes);
+                fileStore.deleteQuietly(newManaged);
                 throw exception;
             }
         } catch (RuntimeException exception) {
-            if (!committed) {
+            if (!movedToNewPath) {
                 fileStore.deleteQuietly(staged);
             }
             throw exception;
+        }
+        // 成功后释放旧 hash 路径文件（受约束删除），不遗留旧文件
+        if (!oldRelativePath.equals(newRelativePath)) {
+            fileStore.deleteManaged(userId(), oldRelativePath);
         }
         return new KnowledgeContentResponse(documentId, content);
     }

@@ -276,23 +276,25 @@ public class KnowledgeRepository {
         return documentId;
     }
 
-    /** 受管文件替换成功后同步 size/sha/updated_at。 */
-    public void updateSourceFileAfterEdit(long sourceFileId, long sizeBytes, String sha256) {
+    /** 受管文件替换成功后同步 stored_relative_path/size/sha/updated_at（hash 命名不变量）。 */
+    public void updateSourceFileAfterEdit(long sourceFileId, String storedRelativePath, long sizeBytes, String sha256) {
         jdbcTemplate.update("""
                 UPDATE knowledge_source_files
-                SET size_bytes = ?, sha256 = ?, availability = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP
+                SET stored_relative_path = ?, size_bytes = ?, sha256 = ?, availability = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-                """, sizeBytes, sha256, sourceFileId);
+                """, storedRelativePath, sizeBytes, sha256, sourceFileId);
     }
 
-    /** 批量取文档 source extension（真实 source record）。 */
-    public Map<Long, String> listSourceExtensions(long userId, java.util.Collection<Long> documentIds) {
-        Map<Long, String> result = new java.util.HashMap<>();
+    /** 批量取文档 source metadata（真实 source record，用于列表 sourceFile/sourceExtension 一致）。 */
+    public Map<Long, KnowledgeSourceFile> listSourceMetadataByDocuments(long userId, java.util.Collection<Long> documentIds) {
+        Map<Long, KnowledgeSourceFile> result = new java.util.HashMap<>();
         if (documentIds == null || documentIds.isEmpty()) {
             return result;
         }
         StringBuilder sql = new StringBuilder("""
-                SELECT document_id, extension FROM knowledge_source_files
+                SELECT id, document_id, user_id, original_name, stored_relative_path, mime_type,
+                       extension, size_bytes, sha256, availability, staging_relative_path, created_at, updated_at
+                FROM knowledge_source_files
                 WHERE user_id = ? AND document_id IN (
                 """);
         java.util.List<Object> params = new java.util.ArrayList<>();
@@ -300,10 +302,8 @@ public class KnowledgeRepository {
         for (int i = 0; i < documentIds.size(); i++) sql.append(i == 0 ? "?" : ", ?");
         sql.append(")");
         params.addAll(documentIds);
-        jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
-            result.put(rs.getLong("document_id"), rs.getString("extension"));
-            return null;
-        }, params.toArray());
+        jdbcTemplate.query(sql.toString(), sourceMapper, params.toArray())
+                .forEach(source -> result.put(source.documentId(), source));
         return result;
     }
 

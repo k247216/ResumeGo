@@ -43,7 +43,7 @@ class KnowledgeControllerTest {
                         .content("{\"title\":\"  TensorFlow  笔记 \",\"sourceType\":\"NOTE\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.sourceType").value("NOTE"))
-                .andExpect(jsonPath("$.data.processingStatus").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.sourceFile").value((Object) null));
 
         mockMvc.perform(get("/api/v2/knowledge/documents"))
@@ -65,7 +65,7 @@ class KnowledgeControllerTest {
     }
 
     private KnowledgeDocumentResponse sample(long id) {
-        return new KnowledgeDocumentResponse(id, "TensorFlow 笔记", "NOTE", "NOT_STARTED",
+        return new KnowledgeDocumentResponse(id, "TensorFlow 笔记", "NOTE", "COMPLETED",
                 null, null, LocalDateTime.now().toString(), LocalDateTime.now().toString());
     }
 

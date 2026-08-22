@@ -31,6 +31,15 @@ class KnowledgeManagedContentServiceTest {
         service = new KnowledgeManagedContentService(repository, fileStore, txManager);
     }
 
+    private String sha256Of(String content) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private KnowledgeDocument note(long id) {
         return new KnowledgeDocument(id, 1L, "笔记", "NOTE", "COMPLETED", LocalDateTime.now(), LocalDateTime.now());
     }
@@ -65,8 +74,13 @@ class KnowledgeManagedContentServiceTest {
         assertThat(response.content()).isEqualTo("# 新内容");
         verify(fileStore).commitReplacement(any(), eq(Path.of("/tmp/staged.part")));
         verify(repository).saveNoteContent(eq(2L), eq(1L), eq("# 新内容"));
+        // 目标改为新 hash 对应路径（hash 命名不变量）
+        String expectedSha = sha256Of("# 新内容");
         verify(repository).updateSourceFileAfterEdit(eq(9L),
+                eq("knowledge/sources/1/" + expectedSha + ".md"),
                 eq((long) "# 新内容".getBytes(java.nio.charset.StandardCharsets.UTF_8).length), any());
+        // 成功后释放旧路径文件
+        verify(fileStore).deleteManaged(1L, "knowledge/sources/1/old-sha.md");
     }
 
     @Test
@@ -100,17 +114,20 @@ class KnowledgeManagedContentServiceTest {
     }
 
     @Test
-    void databaseFailureRestoresOldManagedFile() {
+    void databaseFailureRemovesNewHashFileAndKeepsOldPath() {
         when(repository.findById(1L, 2L)).thenReturn(Optional.of(fileDoc(2L)));
         when(repository.findSourceFileByDocument(1L, 2L)).thenReturn(Optional.of(mdSource(9L, 2L, "old", "AVAILABLE")));
         when(repository.findSourceFileBySha(eq(1L), any())).thenReturn(Optional.empty());
         when(fileStore.readManagedForReplace(1L, "knowledge/sources/1/old.md")).thenReturn(new byte[]{9, 9});
+        when(fileStore.resolveStored(any())).thenReturn(Path.of("/tmp/new.md"));
         when(fileStore.stageReplacement(any())).thenReturn(Path.of("/tmp/s.part"));
         doThrow(new RuntimeException("db down")).when(repository).saveNoteContent(2L, 1L, "# 新");
 
         assertThatThrownBy(() -> service.saveContent(2L, "# 新"))
                 .isInstanceOf(RuntimeException.class).hasMessageContaining("db down");
-        verify(fileStore).restoreManaged(any(), eq(new byte[]{9, 9}));
+        // DB 失败：新 hash 路径文件被删除，旧路径文件未动
+        verify(fileStore).deleteQuietly(any());
+        verify(fileStore, never()).restoreManaged(any(), any());
     }
 
     @Test

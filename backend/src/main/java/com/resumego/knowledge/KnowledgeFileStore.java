@@ -122,15 +122,29 @@ public class KnowledgeFileStore {
         }
     }
 
-    /** 数据库失败回滚：用备份字节恢复受管文件。 */
+    /** 数据库失败回滚：用备份字节恢复受管文件；提供 REPLACE_EXISTING fallback 并尽力清理 rollback 临时文件。 */
     public void restoreManaged(Path managed, byte[] oldBytes) {
+        Path tmp = null;
         try {
             Files.createDirectories(managed.getParent());
-            Path tmp = managed.resolveSibling(UUID.randomUUID() + ".rollback");
+            tmp = managed.resolveSibling(UUID.randomUUID() + ".rollback");
             Files.write(tmp, oldBytes);
-            Files.move(tmp, managed, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            try {
+                Files.move(tmp, managed, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+                Files.move(tmp, managed, StandardCopyOption.REPLACE_EXISTING);
+            }
+            tmp = null;
         } catch (IOException exception) {
             throw new KnowledgeImportException(KnowledgeErrorCodes.EXTRACTION_FAILED, "受管文件恢复失败");
+        } finally {
+            if (tmp != null) {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException ignored) {
+                    // 尽力清理
+                }
+            }
         }
     }
 

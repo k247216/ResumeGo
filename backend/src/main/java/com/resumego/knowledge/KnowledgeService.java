@@ -82,22 +82,17 @@ public class KnowledgeService {
                     .orElseThrow(() -> new NoSuchElementException("标签不存在"));
         }
         List<KnowledgeDocument> documents = repository.listByUserFiltered(userId(), categoryIds, tagId);
-        Map<Long, String> extensions = repository.listSourceExtensions(userId(),
+        Map<Long, KnowledgeSourceFile> sources = repository.listSourceMetadataByDocuments(userId(),
                 documents.stream().map(KnowledgeDocument::id).toList());
-        return documents.stream().map(doc -> toResponseWithExtension(doc,
-                extensionFor(doc, extensions))).toList();
+        return documents.stream().map(doc -> toResponseWithSource(doc, sources.get(doc.id()))).toList();
     }
 
-    private String extensionFor(KnowledgeDocument doc, Map<Long, String> extensions) {
-        if (!"FILE".equals(doc.sourceType())) {
-            return null;
-        }
-        return KnowledgeManagedContentService.normalizeExtension(extensions.get(doc.id()));
-    }
-
-    private KnowledgeDocumentResponse toResponseWithExtension(KnowledgeDocument doc, String extension) {
+    private KnowledgeDocumentResponse toResponseWithSource(KnowledgeDocument doc, KnowledgeSourceFile source) {
+        boolean file = "FILE".equals(doc.sourceType()) && source != null;
         return new KnowledgeDocumentResponse(
-                doc.id(), doc.title(), doc.sourceType(), doc.processingStatus(), null, extension,
+                doc.id(), doc.title(), doc.sourceType(), doc.processingStatus(),
+                file ? source.originalName() : null,
+                file ? KnowledgeManagedContentService.normalizeExtension(source.extension()) : null,
                 doc.createdAt().toString(), doc.updatedAt().toString());
     }
 

@@ -97,14 +97,23 @@ class KnowledgeManagedContentIntegrationTest {
     }
 
     @Test
-    void sourceExtensionReflectsRealTypeInListAndDetail() {
+    void sourceExtensionAndSourceFileReflectRealTypeInListAndDetail() {
         List<KnowledgeDocumentResponse> all = service.list();
         assertThat(all).filteredOn(d -> d.id() == noteDocId).first()
-                .satisfies(d -> assertThat(d.sourceExtension()).isNull());
+                .satisfies(d -> {
+                    assertThat(d.sourceExtension()).isNull();
+                    assertThat(d.sourceFile()).isNull();
+                });
         assertThat(all).filteredOn(d -> d.id() == mdDocId).first()
-                .satisfies(d -> assertThat(d.sourceExtension()).isEqualTo("md"));
+                .satisfies(d -> {
+                    assertThat(d.sourceExtension()).isEqualTo("md");
+                    assertThat(d.sourceFile()).isEqualTo("a.md");
+                });
         assertThat(all).filteredOn(d -> d.id() == txtDocId).first()
-                .satisfies(d -> assertThat(d.sourceExtension()).isEqualTo("txt"));
+                .satisfies(d -> {
+                    assertThat(d.sourceExtension()).isEqualTo("txt");
+                    assertThat(d.sourceFile()).isEqualTo("a.txt");
+                });
     }
 
     @Test
@@ -112,16 +121,22 @@ class KnowledgeManagedContentIntegrationTest {
         String newContent = "# 新标题\n\n- 更新后的项目经历";
         managedContent.saveContent(mdDocId, newContent);
 
-        // 受管文件字节更新
-        Path target = StoreConfig.dataDir.resolve("knowledge/sources/1/old-sha.md");
-        assertThat(Files.readString(target)).isEqualTo(newContent);
-        // 正文与元数据同步
+        // 受管文件字节更新：目标为 newHash 对应路径（hash 命名不变量）
+        String newSha = sha256Of(newContent);
+        Path newTarget = StoreConfig.dataDir.resolve("knowledge/sources/1/" + newSha + ".md");
+        assertThat(Files.readString(newTarget)).isEqualTo(newContent);
+        // 旧 hash 路径文件已释放
+        assertThat(StoreConfig.dataDir.resolve("knowledge/sources/1/old-sha.md")).doesNotExist();
+        // 正文与元数据同步（stored path 指向新 hash）
         assertThat(service.getContent(mdDocId).content()).isEqualTo(newContent);
         KnowledgeSourceFile source = repository.findSourceFileByDocument(1L, mdDocId).orElseThrow();
+        assertThat(source.storedRelativePath()).isEqualTo("knowledge/sources/1/" + newSha + ".md");
         assertThat(source.sizeBytes()).isEqualTo(newContent.getBytes(StandardCharsets.UTF_8).length);
         // 搜索立即命中
         List<KnowledgeSearchItemResponse> results = classification.search("更新后的项目经历", null, null, false);
         assertThat(results).anyMatch(r -> r.document().id() == mdDocId && "CONTENT".equals(r.matchedField()));
+        // 旧内容可再次导入（旧 hash 路径已释放，唯一约束不冲突）
+        createFileDocument("md", sha256Of("# 旧标题"), "# 旧标题", "再次导入的旧文档");
     }
 
     @Test
