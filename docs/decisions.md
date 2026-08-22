@@ -283,6 +283,7 @@ Career OS V2 采用中央总控、隔离功能分支与统一集成的协作模�
 
 **影响**
 
-- V2 功能分支和 worktree 归 Feature Agent 所有，但 `main`、V1 维护线和 `codex/v2-career-os` 集成 worktree 由 Core Controller 保护；功能 Agent 不得自行合并、变基或覆盖其他分支。
+- V1 是本 V2 工作流的只读基线：任何 V2 任务、Feature Agent 与 Core Controller 集成操作都不得修改 V1 代码、数据、构建、维护线或发布物，也不得以 V1 作为任务目标、集成目标或迁移捷径。独立 V1 维护在本治理流程之外，必须取得单独授权。
+- V2 功能分支和 worktree 归 Feature Agent 所有，但 `main` 与 `codex/v2-career-os` 集成 worktree 由 Core Controller 保护；功能 Agent 不得自行合并、变基或覆盖其他分支。
 - 数据库迁移、公共 DTO/API/Port、领域规则、Electron 身份与升级协议、全局构建配置及产品/架构/隐私/决策文档属于受保护的公共契约，除非任务卡明确授权，否则不得修改。
 - 功能交付必须包含 RED/GREEN、局部与模块回归及风险证据；Core Controller 必须在统一集成后执行全量测试、桌面构建和发布前验证，才能决定接收或退回。

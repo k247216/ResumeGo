@@ -22,7 +22,9 @@ Feature Agent 完成后只交付提交哈希和标准交付报告，不自行合
 
 V2 集成分支为 `codex/v2-career-os`。功能分支命名为 `codex/v2-<任务编号>-<功能简称>`，每个 Feature Agent 必须使用独立 worktree。
 
-Feature Agent 不得直接修改 `main`、V1 维护线或 V2 集成 worktree。Core Controller 在核验基础提交、文件范围和交付证据后，决定是否以及如何集成；公共契约冲突由其重新分派或调整任务顺序。
+在本 V2 治理工作流中，V1 是只读基线：任何 V2 任务、Feature Agent 以及 Core Controller 的集成操作都不得修改 V1 代码、数据、构建、维护线或发布物，也不得把 V1 作为任务目标、集成目标或迁移捷径。独立的 V1 维护不属于本规范，必须使用单独授权的维护流程。
+
+Feature Agent 不得直接修改 `main`、V1 维护线或 V2 集成 worktree。Core Controller 在核验基础提交、文件范围和交付证据后，只能向 V2 集成分支决定是否以及如何集成；公共契约冲突由其重新分派或调整任务顺序。
 
 ## Protected artifacts
 
