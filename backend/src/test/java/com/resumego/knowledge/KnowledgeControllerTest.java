@@ -16,8 +16,10 @@ import java.util.NoSuchElementException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,6 +29,7 @@ class KnowledgeControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockBean KnowledgeService service;
+    @MockBean KnowledgeClassificationService classification;
 
     @Test
     void createsAndListsNoteDocuments() throws Exception {
@@ -87,5 +90,31 @@ class KnowledgeControllerTest {
         mockMvc.perform(get("/api/v2/knowledge/documents/404/content"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("知识文档不存在"));
+    }
+
+    @Test
+    void managesDocumentCategoryAndTagsRelationships() throws Exception {
+        mockMvc.perform(put("/api/v2/knowledge/documents/7/category/3"))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v2/knowledge/documents/7/category/3"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v2/knowledge/documents/7/tags/5"))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete("/api/v2/knowledge/documents/7/tags/5"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void foreignRelationMapsToNotFound() throws Exception {
+        org.mockito.Mockito.doThrow(new NoSuchElementException("知识文档不存在"))
+                .when(classification).setDocumentCategory(404L, 1L);
+        mockMvc.perform(put("/api/v2/knowledge/documents/404/category/1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("知识文档不存在"));
+
+        org.mockito.Mockito.doThrow(new NoSuchElementException("标签不存在"))
+                .when(classification).addDocumentTag(7L, 99L);
+        mockMvc.perform(put("/api/v2/knowledge/documents/7/tags/99"))
+                .andExpect(status().isNotFound());
     }
 }

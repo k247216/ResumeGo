@@ -148,4 +148,78 @@ class KnowledgeRepositoryTest {
         assertThat(String.valueOf(done.get("job_status"))).isEqualTo("COMPLETED");
         assertThat(done.get("finished_at")).isNotNull();
     }
+
+    @Test
+    void categoriesAreUserScopedAndNormalizedNameUniquePerUser() {
+        long c1 = repository.insertCategory(1L, "求职", "求职");
+        assertThat(c1).isPositive();
+        assertThat(repository.findCategoryByNormalizedName(1L, "求职")).isPresent();
+        // 用户隔离：user2 查不到 user1 的分类
+        assertThat(repository.findCategoryByNormalizedName(2L, "求职")).isEmpty();
+        assertThat(repository.findCategoryById(1L, c1)).isPresent();
+        assertThat(repository.findCategoryById(2L, c1)).isEmpty();
+
+        assertThatThrownBy(() -> repository.insertCategory(1L, "求职笔记", "求职"))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        // 相同 normalized 不同用户允许
+        repository.insertCategory(2L, "求职", "求职");
+        assertThat(repository.listCategories(1L)).extracting(KnowledgeCategory::normalizedName).contains("求职");
+    }
+
+    @Test
+    void tagsAreUserScopedAndUniquePerUser() {
+        long t1 = repository.insertTag(1L, "机器学习", "机器学习");
+        assertThat(repository.findTagByNormalizedName(1L, "机器学习")).isPresent();
+        assertThat(repository.findTagByNormalizedName(2L, "机器学习")).isEmpty();
+        assertThatThrownBy(() -> repository.insertTag(1L, "机器学习新", "机器学习"))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        assertThat(repository.findTagById(1L, t1)).isPresent();
+        assertThat(repository.findTagById(2L, t1)).isEmpty();
+    }
+
+    @Test
+    void documentCategoryIsSinglePerDocumentAndReplaced() {
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        long cat1 = repository.insertCategory(1L, "求职", "求职");
+        long cat2 = repository.insertCategory(1L, "技能", "技能");
+
+        repository.setDocumentCategory(1L, docId, cat1);
+        Long current = jdbcTemplate.queryForObject(
+                "SELECT category_id FROM knowledge_document_categories WHERE document_id = ?", Long.class, docId);
+        assertThat(current).isEqualTo(cat1);
+
+        // 重新设置替换旧分类：每文档最多一个
+        repository.setDocumentCategory(1L, docId, cat2);
+        Long after = jdbcTemplate.queryForObject(
+                "SELECT category_id FROM knowledge_document_categories WHERE document_id = ?", Long.class, docId);
+        assertThat(after).isEqualTo(cat2);
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document_categories WHERE document_id = ?", Integer.class, docId);
+        assertThat(count).isEqualTo(1);
+
+        repository.removeDocumentCategory(1L, docId, cat2);
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document_categories WHERE document_id = ?", Integer.class, docId);
+        assertThat(remaining).isZero();
+    }
+
+    @Test
+    void documentTagAssociationsAreIdempotent() {
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        long tag1 = repository.insertTag(1L, "机器学习", "机器学习");
+        long tag2 = repository.insertTag(1L, "面试", "面试");
+
+        repository.addDocumentTag(1L, docId, tag1);
+        repository.addDocumentTag(1L, docId, tag1); // 重复关联幂等
+        repository.addDocumentTag(1L, docId, tag2);
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document_tags WHERE document_id = ?", Integer.class, docId);
+        assertThat(count).isEqualTo(2);
+
+        repository.removeDocumentTag(1L, docId, tag1);
+        Integer after = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document_tags WHERE document_id = ?", Integer.class, docId);
+        assertThat(after).isEqualTo(1);
+    }
 }

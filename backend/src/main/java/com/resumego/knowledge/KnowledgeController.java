@@ -17,9 +17,11 @@ import java.util.NoSuchElementException;
 public class KnowledgeController {
 
     private final KnowledgeService service;
+    private final KnowledgeClassificationService classification;
 
-    public KnowledgeController(KnowledgeService service) {
+    public KnowledgeController(KnowledgeService service, KnowledgeClassificationService classification) {
         this.service = service;
+        this.classification = classification;
     }
 
     @PostMapping
@@ -41,6 +43,30 @@ public class KnowledgeController {
     @GetMapping("/{id}/content")
     public ApiResponse<KnowledgeContentResponse> content(@PathVariable long id) {
         return ApiResponse.ok(service.getContent(id));
+    }
+
+    @PutMapping("/{documentId}/category/{categoryId}")
+    public ApiResponse<Void> setCategory(@PathVariable long documentId, @PathVariable long categoryId) {
+        classification.setDocumentCategory(documentId, categoryId);
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/{documentId}/category/{categoryId}")
+    public ApiResponse<Void> removeCategory(@PathVariable long documentId, @PathVariable long categoryId) {
+        classification.removeDocumentCategory(documentId, categoryId);
+        return ApiResponse.ok(null);
+    }
+
+    @PutMapping("/{documentId}/tags/{tagId}")
+    public ApiResponse<Void> addTag(@PathVariable long documentId, @PathVariable long tagId) {
+        classification.addDocumentTag(documentId, tagId);
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/{documentId}/tags/{tagId}")
+    public ApiResponse<Void> removeTag(@PathVariable long documentId, @PathVariable long tagId) {
+        classification.removeDocumentTag(documentId, tagId);
+        return ApiResponse.ok(null);
     }
 
     @ExceptionHandler(NoSuchElementException.class)

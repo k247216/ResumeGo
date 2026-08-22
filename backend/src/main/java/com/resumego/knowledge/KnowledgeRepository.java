@@ -1,5 +1,6 @@
 package com.resumego.knowledge;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -232,6 +233,203 @@ public class KnowledgeRepository {
                 SET processing_status = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """, processingStatus, documentId);
+    }
+
+
+    private final RowMapper<KnowledgeCategory> categoryMapper = (rs, rowNum) -> new KnowledgeCategory(
+            rs.getLong("id"),
+            rs.getLong("user_id"),
+            rs.getString("name"),
+            rs.getString("normalized_name"),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
+    );
+
+    private final RowMapper<KnowledgeTag> tagMapper = (rs, rowNum) -> new KnowledgeTag(
+            rs.getLong("id"),
+            rs.getLong("user_id"),
+            rs.getString("name"),
+            rs.getString("normalized_name"),
+            rs.getTimestamp("created_at").toLocalDateTime(),
+            rs.getTimestamp("updated_at").toLocalDateTime()
+    );
+
+    private final RowMapper<KnowledgeSearchRow> searchMapper = (rs, rowNum) -> new KnowledgeSearchRow(
+            rs.getLong("id"),
+            rs.getString("title"),
+            rs.getString("source_type"),
+            rs.getString("processing_status"),
+            rs.getTimestamp("created_at").toLocalDateTime().toString(),
+            rs.getTimestamp("updated_at").toLocalDateTime().toString(),
+            rs.getString("matched_field"),
+            rs.getString("content")
+    );
+
+    // ---- categories ----
+
+    public Optional<KnowledgeCategory> findCategoryByNormalizedName(long userId, String normalizedName) {
+        return jdbcTemplate.query("""
+                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                FROM knowledge_categories
+                WHERE user_id = ? AND normalized_name = ?
+                """, categoryMapper, userId, normalizedName).stream().findFirst();
+    }
+
+    public Optional<KnowledgeCategory> findCategoryById(long userId, long categoryId) {
+        return jdbcTemplate.query("""
+                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                FROM knowledge_categories
+                WHERE id = ? AND user_id = ?
+                """, categoryMapper, categoryId, userId).stream().findFirst();
+    }
+
+    public List<KnowledgeCategory> listCategories(long userId) {
+        return jdbcTemplate.query("""
+                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                FROM knowledge_categories
+                WHERE user_id = ?
+                ORDER BY updated_at DESC, id DESC
+                """, categoryMapper, userId);
+    }
+
+    public long insertCategory(long userId, String name, String normalizedName) {
+        KeyHolder keys = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO knowledge_categories (user_id, name, normalized_name)
+                    VALUES (?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, userId);
+            statement.setString(2, name);
+            statement.setString(3, normalizedName);
+            return statement;
+        }, keys);
+        return requiredKey(keys, "创建分类失败：未返回主键");
+    }
+
+    // ---- tags ----
+
+    public Optional<KnowledgeTag> findTagByNormalizedName(long userId, String normalizedName) {
+        return jdbcTemplate.query("""
+                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                FROM knowledge_tags
+                WHERE user_id = ? AND normalized_name = ?
+                """, tagMapper, userId, normalizedName).stream().findFirst();
+    }
+
+    public Optional<KnowledgeTag> findTagById(long userId, long tagId) {
+        return jdbcTemplate.query("""
+                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                FROM knowledge_tags
+                WHERE id = ? AND user_id = ?
+                """, tagMapper, tagId, userId).stream().findFirst();
+    }
+
+    public List<KnowledgeTag> listTags(long userId) {
+        return jdbcTemplate.query("""
+                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                FROM knowledge_tags
+                WHERE user_id = ?
+                ORDER BY updated_at DESC, id DESC
+                """, tagMapper, userId);
+    }
+
+    public long insertTag(long userId, String name, String normalizedName) {
+        KeyHolder keys = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO knowledge_tags (user_id, name, normalized_name)
+                    VALUES (?, ?, ?)
+                    """, new String[]{"id"});
+            statement.setLong(1, userId);
+            statement.setString(2, name);
+            statement.setString(3, normalizedName);
+            return statement;
+        }, keys);
+        return requiredKey(keys, "创建标签失败：未返回主键");
+    }
+
+    // ---- document relations ----
+
+    /** 每文档最多一个分类：先清后插，同一事务；重复关联结果一致（幂等）。 */
+    @Transactional
+    public void setDocumentCategory(long userId, long documentId, long categoryId) {
+        jdbcTemplate.update("""
+                DELETE FROM knowledge_document_categories
+                WHERE document_id = ? AND user_id = ?
+                """, documentId, userId);
+        jdbcTemplate.update("""
+                INSERT INTO knowledge_document_categories (document_id, category_id, user_id)
+                VALUES (?, ?, ?)
+                """, documentId, categoryId, userId);
+    }
+
+    @Transactional
+    public void removeDocumentCategory(long userId, long documentId, long categoryId) {
+        jdbcTemplate.update("""
+                DELETE FROM knowledge_document_categories
+                WHERE document_id = ? AND category_id = ? AND user_id = ?
+                """, documentId, categoryId, userId);
+    }
+
+    /** 多对多，重复关联幂等（唯一约束兜底）。 */
+    @Transactional
+    public void addDocumentTag(long userId, long documentId, long tagId) {
+        try {
+            jdbcTemplate.update("""
+                    INSERT INTO knowledge_document_tags (document_id, tag_id, user_id)
+                    VALUES (?, ?, ?)
+                    """, documentId, tagId, userId);
+        } catch (DuplicateKeyException ignored) {
+            // 重复关联幂等
+        }
+    }
+
+    @Transactional
+    public void removeDocumentTag(long userId, long documentId, long tagId) {
+        jdbcTemplate.update("""
+                DELETE FROM knowledge_document_tags
+                WHERE document_id = ? AND tag_id = ? AND user_id = ?
+                """, documentId, tagId, userId);
+    }
+
+    // ---- keyword search ----
+
+    /**
+     * 标题对所有文档命中；正文仅当 processing_status=COMPLETED 才参与匹配（LEFT JOIN 已限定）。
+     * pattern 为 %...% 且已转义 wildcard；LOWER() 实现中英文大小写不敏感。
+     * 可选 filter 必须属于当前用户（EXISTS 内带 user_id）。
+     */
+    public List<KnowledgeSearchRow> search(long userId, String pattern, Long categoryId, Long tagId) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT d.id, d.title, d.source_type, d.processing_status,
+                       d.created_at, d.updated_at,
+                       CASE WHEN LOWER(d.title) LIKE LOWER(?) ESCAPE '\\' THEN 'TITLE' ELSE 'CONTENT' END AS matched_field,
+                       c.content
+                FROM knowledge_documents d
+                LEFT JOIN knowledge_extracted_contents c
+                       ON c.document_id = d.id AND c.user_id = d.user_id
+                      AND d.processing_status = 'COMPLETED'
+                WHERE d.user_id = ?
+                  AND (LOWER(d.title) LIKE LOWER(?) ESCAPE '\\'
+                       OR (d.processing_status = 'COMPLETED' AND c.content IS NOT NULL
+                           AND LOWER(c.content) LIKE LOWER(?) ESCAPE '\\'))
+                """);
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        params.add(pattern);
+        params.add(userId);
+        params.add(pattern);
+        params.add(pattern);
+        if (categoryId != null) {
+            sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_categories dc WHERE dc.document_id = d.id AND dc.user_id = d.user_id AND dc.category_id = ?)");
+            params.add(categoryId);
+        }
+        if (tagId != null) {
+            sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_tags dt WHERE dt.document_id = d.id AND dt.user_id = d.user_id AND dt.tag_id = ?)");
+            params.add(tagId);
+        }
+        sql.append("ORDER BY d.updated_at DESC, d.id DESC\nLIMIT 100");
+        return jdbcTemplate.query(sql.toString(), searchMapper, params.toArray());
     }
 
     private long requiredKey(KeyHolder keys, String message) {
