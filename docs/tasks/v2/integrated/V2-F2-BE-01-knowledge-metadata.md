@@ -2,7 +2,7 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-be-01-knowledge-metadata`
 - Base commit: `5ea03a73274ccc534e44e6acaeb721fb631f5782`
 - Depends on: frozen F2-ARCH-01 contract
@@ -54,5 +54,7 @@ backend/src/test/java/com/resumego/knowledge/**
 ## Delivery
 
 Commit: `feat(knowledge): add local metadata foundation`
+
+Integrated commits: `4946c0c`, `65c25c0`.
 
 通过 DSH 返回最终 commit、端点行为、迁移版本、测试结果和已知未完成项；不得自行合并。
