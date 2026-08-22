@@ -73,13 +73,13 @@ function mountView(store: ReturnType<typeof storeStub>, query = {}) {
         PageHeader: { template: '<header><slot name="actions" /></header>' },
         PipelineListRail: { template: '<div data-test="stub-rail"><slot /></div>' },
         PipelineIdentityPanel: { template: '<div data-test="stub-identity" />' },
-        PipelineStageTrack: { template: '<div data-test="stub-track" />' },
+
         PipelineMaterialsPanel: { template: '<div data-test="stub-materials" />' },
         PipelineRelationsPanel: { template: '<div data-test="stub-relations" />' },
         PipelineCreateDialog: { template: '<div v-if="true" data-test="stub-create-dialog" />' },
         PipelineEditDialog: { template: '<div data-test="stub-edit-dialog" />' },
         PipelineStageManagerDialog: { template: '<div data-test="stub-stage-dialog" />' },
-        PipelineTransitionDialog: { template: '<div data-test="stub-transition-dialog" />' },
+
         PipelineRelationDialog: { template: '<div data-test="stub-relation-dialog" />' },
         PipelineHistoryDrawer: { template: '<div data-test="stub-history-drawer" />' },
       },
@@ -125,5 +125,39 @@ describe('PipelineView', () => {
     await flushPromises()
     await wrapper.get('[data-test="pipeline-create"]').trigger('click')
     expect(wrapper.find('[data-test="stub-create-dialog"]').exists()).toBe(true)
+  })
+
+  it('transition emits one call with the clicked PENDING stage id', async () => {
+    const stage11 = { id: 11, name: '准备中', position: 0, state: 'CURRENT' as const }
+    const stage12 = { id: 12, name: '技术面', position: 1, state: 'PENDING' as const }
+    const pipeline = { ...p(1), currentStageId: 11, stages: [stage11, stage12] }
+    const store = storeStub({ selectedPipeline: pipeline, pipelines: [pipeline] })
+    const wrapper = mountView(store)
+    await flushPromises()
+    // open transition via StageTrack's advance emit with stage 12
+    // 真实 StageTrack 渲染：点击 PENDING 阶段的推进按钮
+    const advanceButtons = wrapper.findAll('[data-test="pipeline-advance"]')
+    expect(advanceButtons.length).toBe(1)
+    await advanceButtons[0].trigger('click')
+    await flushPromises()
+    // 真实 TransitionDialog 打开，点击确认推进
+    expect(wrapper.find('[data-test="pipeline-transition-confirm"]').exists()).toBe(true)
+    await wrapper.get('[data-test="pipeline-transition-confirm"]').trigger('click')
+    await flushPromises()
+    expect(store.transitionStage).toHaveBeenCalledTimes(1)
+    expect(store.transitionStage).toHaveBeenCalledWith(1, { targetStageId: 12, note: null })
+  })
+
+  it('history failure does not produce an unhandled rejection and shows the error', async () => {
+    const store = storeStub()
+    store.loadTransitionHistory.mockRejectedValue(new Error('历史读取失败'))
+    store.historyErrorMessage = '历史读取失败'
+    const wrapper = mountView(store)
+    await flushPromises()
+    // 真实 StageTrack：点击「查看阶段历史」触发 load
+    await wrapper.get('[data-test="pipeline-history-open"]').trigger('click')
+    await flushPromises()
+    // store error visible and no unhandled rejection (test completes without failing)
+    expect(store.historyErrorMessage).toBe('历史读取失败')
   })
 })

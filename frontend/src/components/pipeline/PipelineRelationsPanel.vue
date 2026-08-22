@@ -28,8 +28,8 @@ const props = defineProps<{
 }>()
 defineEmits<{ (e: 'manage'): void; (e: 'go-schedule'): void; (e: 'go-interview'): void }>()
 
-const scheduleCount = computed(() => props.scheduleEvents.filter((e) => props.pipeline.scheduleEventIds.includes(e.id)).length)
-const interviewCount = computed(() => props.interviewPlans.filter((p) => props.pipeline.interviewPlanIds.includes(p.id)).length)
+const scheduleCount = computed(() => props.pipeline.scheduleEventIds.length)
+const interviewCount = computed(() => props.pipeline.interviewPlanIds.length)
 </script>
 
 <style scoped>

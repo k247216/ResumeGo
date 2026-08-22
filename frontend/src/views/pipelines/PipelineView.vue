@@ -78,7 +78,7 @@
     <PipelineCreateDialog v-if="createOpen" :resumes="resumes" :jobs="jobs" :versions-by-resume="versionsByResume" :submitting="creating" :error="store.errorMessage" @close="createOpen = false" @create="handleCreate" />
     <PipelineEditDialog v-if="editOpen && store.selectedPipeline" :pipeline="store.selectedPipeline" :resumes="resumes" :jobs="jobs" :versions-by-resume="versionsByResume" :submitting="saving" :error="store.errorMessage" @close="editOpen = false" @save="handleUpdate" />
     <PipelineStageManagerDialog v-if="stageManagerOpen && store.selectedPipeline" :pipeline="store.selectedPipeline" :busy="mutationBusy" :error="store.errorMessage" @close="stageManagerOpen = false" @add="handleAddStage" @rename="handleRenameStage" @move="handleMoveStage" />
-    <PipelineTransitionDialog v-if="transitionOpen && store.selectedPipeline" :pipeline="store.selectedPipeline" :busy="mutationBusy" :error="store.errorMessage" @close="transitionOpen = false" @confirm="handleTransition" />
+    <PipelineTransitionDialog v-if="transitionOpen && store.selectedPipeline" :pipeline="store.selectedPipeline" :target-stage-id="transitionTargetId" :busy="mutationBusy" :error="store.errorMessage" @close="transitionOpen = false" @confirm="handleTransition" />
     <PipelineRelationDialog v-if="relationOpen && store.selectedPipeline" :pipeline="store.selectedPipeline" :schedule-events="scheduleEvents" :interview-plans="interviewPlans" :busy="mutationBusy" :error="store.errorMessage" @close="relationOpen = false" @toggle-schedule="handleToggleSchedule" @toggle-interview="handleToggleInterview" />
     <PipelineHistoryDrawer v-if="historyOpen && store.selectedPipeline" :pipeline="store.selectedPipeline" :history="store.transitionHistoryByPipelineId[store.selectedPipeline.id] ?? []" :loading="store.historyLoadingPipelineId === store.selectedPipeline.id" :error="store.historyErrorMessage" @close="historyOpen = false" @load="loadHistory" />
   </section>
@@ -118,6 +118,7 @@ const stageManagerOpen = ref(false)
 const transitionOpen = ref(false)
 const relationOpen = ref(false)
 const historyOpen = ref(false)
+const transitionTargetId = ref<number | null>(null)
 const creating = ref(false)
 const saving = ref(false)
 const mutationBusy = ref(false)
@@ -195,20 +196,19 @@ async function restoreCurrent() {
   try { await store.restore(id) } finally { mutationBusy.value = false }
 }
 
-function openTransition() { transitionOpen.value = true }
+function openTransition(stageId?: number) {
+  transitionTargetId.value = stageId ?? null
+  transitionOpen.value = true
+}
 
 async function handleTransition(note: string | null) {
   const id = store.selectedPipelineId
-  if (!id) return
+  const targetId = transitionTargetId.value
+  if (!id || !targetId) return
   mutationBusy.value = true
   try {
-    await store.transitionStage(id, { targetStageId: store.selectedPipeline!.currentStageId! , note })
-    // find next pending stage for the target
-    const stages = store.selectedPipeline!.stages
-    const current = stages.find((s) => s.state === 'CURRENT')
-    const next = stages.find((s) => s.state === 'PENDING')
-    const targetId = next?.id ?? current?.id
-    if (targetId) await store.transitionStage(id, { targetStageId: targetId, note })
+    // 只调用一次：目标就是点击的 PENDING 阶段
+    await store.transitionStage(id, { targetStageId: targetId, note })
     transitionOpen.value = false
   } finally { mutationBusy.value = false }
 }
@@ -263,7 +263,9 @@ async function handleToggleInterview(planId: number, linked: boolean) {
 
 function loadHistory() {
   const id = store.selectedPipelineId
-  if (id) void store.loadTransitionHistory(id)
+  if (!id) return
+  // store 已写入 historyErrorMessage；调用层吞掉 reject 避免未处理 Promise
+  void store.loadTransitionHistory(id).catch(() => undefined)
 }
 
 onMounted(async () => {

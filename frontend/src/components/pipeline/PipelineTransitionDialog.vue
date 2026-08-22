@@ -18,12 +18,12 @@
 import { computed, ref } from 'vue'
 import type { CareerPipeline } from '../../types/pipeline'
 
-const props = defineProps<{ pipeline: CareerPipeline; busy: boolean; error: string }>()
+const props = defineProps<{ pipeline: CareerPipeline; targetStageId: number | null; busy: boolean; error: string }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'confirm', note: string | null): void }>()
 
 const note = ref('')
 const current = computed(() => props.pipeline.stages.find((s) => s.state === 'CURRENT') ?? null)
-const next = computed(() => props.pipeline.stages.find((s) => s.state === 'PENDING') ?? null)
+const next = computed(() => props.pipeline.stages.find((s) => s.id === props.targetStageId) ?? props.pipeline.stages.find((s) => s.state === 'PENDING') ?? null)
 function confirm() { emit('confirm', note.value.trim() ? note.value.trim() : null) }
 </script>
 

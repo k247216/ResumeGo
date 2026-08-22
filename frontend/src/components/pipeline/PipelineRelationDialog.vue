@@ -5,18 +5,26 @@
       <h2>管理关联</h2>
       <p class="desc">为这条求职管线关联或解除日程事项与模拟面试计划。</p>
       <h3 class="group-title">日程事项</h3>
-      <div v-if="!scheduleEvents.length" class="row"><span class="grow muted">暂无日程事项，请先到日程页创建。</span></div>
+      <div v-if="!scheduleEvents.length && !missingScheduleIds.length" class="row"><span class="grow muted">暂无日程事项，请先到日程页创建。</span></div>
       <div v-for="e in scheduleEvents" :key="e.id" class="row">
         <span class="grow">{{ e.title }}</span>
         <button v-if="isScheduleLinked(e.id)" type="button" class="btn ghost" data-test="pipeline-relation-unlink-schedule" :disabled="busy" @click="$emit('toggle-schedule', e.id, true)">解除</button>
         <button v-else type="button" class="btn primary" data-test="pipeline-relation-link-schedule" :disabled="busy" @click="$emit('toggle-schedule', e.id, false)">关联</button>
       </div>
+      <div v-for="id in missingScheduleIds" :key="'m' + id" class="row">
+        <span class="grow warn">关联不可用 #{{ id }}</span>
+        <button type="button" class="btn ghost" data-test="pipeline-relation-unlink-schedule-missing" :disabled="busy" @click="$emit('toggle-schedule', id, true)">解除</button>
+      </div>
       <h3 class="group-title">模拟面试计划</h3>
-      <div v-if="!interviewPlans.length" class="row"><span class="grow muted">暂无面试计划，请先到面试页创建。</span></div>
+      <div v-if="!interviewPlans.length && !missingInterviewIds.length" class="row"><span class="grow muted">暂无面试计划，请先到面试页创建。</span></div>
       <div v-for="p in interviewPlans" :key="p.id" class="row">
         <span class="grow">{{ p.jobLabel }}</span>
         <button v-if="isInterviewLinked(p.id)" type="button" class="btn ghost" data-test="pipeline-relation-unlink-interview" :disabled="busy" @click="$emit('toggle-interview', p.id, true)">解除</button>
         <button v-else type="button" class="btn primary" data-test="pipeline-relation-link-interview" :disabled="busy" @click="$emit('toggle-interview', p.id, false)">关联</button>
+      </div>
+      <div v-for="id in missingInterviewIds" :key="'mi' + id" class="row">
+        <span class="grow warn">关联不可用 #{{ id }}</span>
+        <button type="button" class="btn ghost" data-test="pipeline-relation-unlink-interview-missing" :disabled="busy" @click="$emit('toggle-interview', id, true)">解除</button>
       </div>
       <p v-if="error" class="err">{{ error }}</p>
       <div class="actions"><button type="button" class="btn ghost" @click="$emit('close')">完成</button></div>
@@ -40,8 +48,13 @@ defineEmits<{
   (e: 'toggle-interview', planId: number, linked: boolean): void
 }>()
 
+import { computed } from 'vue'
+
 function isScheduleLinked(id: number) { return props.pipeline.scheduleEventIds.includes(id) }
 function isInterviewLinked(id: number) { return props.pipeline.interviewPlanIds.includes(id) }
+
+const missingScheduleIds = computed(() => props.pipeline.scheduleEventIds.filter((id) => !props.scheduleEvents.some((e) => e.id === id)))
+const missingInterviewIds = computed(() => props.pipeline.interviewPlanIds.filter((id) => !props.interviewPlans.some((p) => p.id === id)))
 </script>
 
 <style scoped>

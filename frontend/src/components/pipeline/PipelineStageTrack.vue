@@ -25,7 +25,7 @@
           type="button"
           class="advance-btn"
           data-test="pipeline-advance"
-          @click="$emit('transition')"
+          @click="$emit('transition', stage.id)"
         >推进 →</button>
       </li>
     </ol>
@@ -46,7 +46,7 @@ const props = defineProps<{
   historyLoading: boolean
   historyError: string
 }>()
-defineEmits<{ (e: 'transition'): void; (e: 'manage-stages'): void; (e: 'load-history'): void }>()
+defineEmits<{ (e: 'transition', stageId: number): void; (e: 'manage-stages'): void; (e: 'load-history'): void }>()
 
 const historyOpen = ref(false)
 const editable = computed(() => props.pipeline.lifecycle === 'ACTIVE' || props.pipeline.lifecycle === 'PAUSED')
