@@ -8,6 +8,8 @@ import com.resumego.pipeline.dto.PipelineStageResponse;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
+import com.resumego.pipeline.port.PipelineInterviewPlanAccess;
+import com.resumego.pipeline.port.PipelineScheduleEventAccess;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,16 @@ public class CareerPipelineService {
 
     private final CareerPipelineRepository repository;
     private final PipelineRules rules;
+    private final PipelineScheduleEventAccess scheduleEventAccess;
+    private final PipelineInterviewPlanAccess interviewPlanAccess;
 
-    public CareerPipelineService(CareerPipelineRepository repository, PipelineRules rules) {
+    public CareerPipelineService(CareerPipelineRepository repository, PipelineRules rules,
+                                 PipelineScheduleEventAccess scheduleEventAccess,
+                                 PipelineInterviewPlanAccess interviewPlanAccess) {
         this.repository = repository;
         this.rules = rules;
+        this.scheduleEventAccess = scheduleEventAccess;
+        this.interviewPlanAccess = interviewPlanAccess;
     }
 
     public List<CareerPipelineResponse> list() {
@@ -117,6 +125,40 @@ public class CareerPipelineService {
     }
 
     @Transactional
+    public CareerPipelineResponse linkScheduleEvent(long pipelineId, long eventId) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        if (!scheduleEventAccess.existsForUser(userId(), eventId)) {
+            throw new IllegalArgumentException("所选日程不可用");
+        }
+        repository.replaceScheduleEventLink(pipeline.id(), eventId);
+        return get(pipeline.id());
+    }
+
+    @Transactional
+    public CareerPipelineResponse unlinkScheduleEvent(long pipelineId, long eventId) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        repository.unlinkScheduleEvent(pipeline.id(), eventId);
+        return get(pipeline.id());
+    }
+
+    @Transactional
+    public CareerPipelineResponse linkInterviewPlan(long pipelineId, long planId) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        if (!interviewPlanAccess.existsForUser(userId(), planId)) {
+            throw new IllegalArgumentException("所选模拟面试不可用");
+        }
+        repository.replaceInterviewPlanLink(pipeline.id(), planId);
+        return get(pipeline.id());
+    }
+
+    @Transactional
+    public CareerPipelineResponse unlinkInterviewPlan(long pipelineId, long planId) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        repository.unlinkInterviewPlan(pipeline.id(), planId);
+        return get(pipeline.id());
+    }
+
+    @Transactional
     public CareerPipelineResponse archive(long pipelineId) {
         requirePipeline(pipelineId);
         repository.updateLifecycle(userId(), pipelineId, PipelineLifecycle.ARCHIVED, null);
@@ -197,8 +239,10 @@ public class CareerPipelineService {
         return new CareerPipelineResponse(
                 pipeline.id(), pipeline.name(), pipeline.companyName(), pipeline.roleTitle(),
                 pipeline.jobDescriptionId(), pipeline.resumeVersionId(), pipeline.lifecycle(),
-                pipeline.outcome(), pipeline.currentStageId(), stages, pipeline.archivedAt(),
-                pipeline.createdAt(), pipeline.updatedAt());
+                pipeline.outcome(), pipeline.currentStageId(), stages,
+                repository.findScheduleEventIds(pipeline.id()),
+                repository.findInterviewPlanIds(pipeline.id()),
+                pipeline.archivedAt(), pipeline.createdAt(), pipeline.updatedAt());
     }
 
     private long userId() {

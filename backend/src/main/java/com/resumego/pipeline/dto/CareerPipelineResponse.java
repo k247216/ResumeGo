@@ -17,6 +17,8 @@ public record CareerPipelineResponse(
         PipelineOutcome outcome,
         Long currentStageId,
         List<PipelineStageResponse> stages,
+        List<Long> scheduleEventIds,
+        List<Long> interviewPlanIds,
         LocalDateTime archivedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

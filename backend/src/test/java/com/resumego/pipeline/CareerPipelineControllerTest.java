@@ -78,6 +78,25 @@ class CareerPipelineControllerTest {
     }
 
     @Test
+    void linksAndUnlinksScheduleEventsAndInterviewPlans() throws Exception {
+        when(service.linkScheduleEvent(7L, 100L)).thenReturn(sample(List.of(100L), List.of()));
+        when(service.unlinkScheduleEvent(7L, 100L)).thenReturn(sample());
+        when(service.linkInterviewPlan(7L, 300L)).thenReturn(sample(List.of(), List.of(300L)));
+        when(service.unlinkInterviewPlan(7L, 300L)).thenReturn(sample());
+
+        mockMvc.perform(put("/api/v2/pipelines/7/schedule-events/100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.scheduleEventIds[0]").value(100));
+        mockMvc.perform(delete("/api/v2/pipelines/7/schedule-events/100"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v2/pipelines/7/interview-plans/300"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.interviewPlanIds[0]").value(300));
+        mockMvc.perform(delete("/api/v2/pipelines/7/interview-plans/300"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void rejectsInvalidInputAndMapsDomainErrors() throws Exception {
         mockMvc.perform(post("/api/v2/pipelines").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\" \" ,\"companyName\":\"腾讯\",\"roleTitle\":\"Java\"}"))
@@ -94,10 +113,15 @@ class CareerPipelineControllerTest {
     }
 
     private CareerPipelineResponse sample() {
+        return sample(List.of(), List.of());
+    }
+
+    private CareerPipelineResponse sample(List<Long> scheduleEventIds, List<Long> interviewPlanIds) {
         LocalDateTime now = LocalDateTime.now();
         return new CareerPipelineResponse(7L, "腾讯 Java", "腾讯", "Java 后端",
                 null, null, PipelineLifecycle.ACTIVE, null, 11L,
                 List.of(new PipelineStageResponse(11L, "准备中", 0, PipelineStageState.CURRENT)),
+                scheduleEventIds, interviewPlanIds,
                 null, now, now);
     }
 }

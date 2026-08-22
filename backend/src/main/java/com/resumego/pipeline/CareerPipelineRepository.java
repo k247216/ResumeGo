@@ -131,6 +131,56 @@ public class CareerPipelineRepository {
         }
     }
 
+    public List<Long> findScheduleEventIds(long pipelineId) {
+        return jdbcTemplate.queryForList("""
+                SELECT link.schedule_event_id
+                FROM pipeline_schedule_events link
+                INNER JOIN schedule_events event ON event.id = link.schedule_event_id
+                WHERE link.pipeline_id = ? AND event.deleted_at IS NULL
+                ORDER BY link.linked_at, link.schedule_event_id
+                """, Long.class, pipelineId);
+    }
+
+    public List<Long> findInterviewPlanIds(long pipelineId) {
+        return jdbcTemplate.queryForList("""
+                SELECT link.interview_plan_id
+                FROM pipeline_interview_plans link
+                INNER JOIN interview_plans plan ON plan.id = link.interview_plan_id
+                WHERE link.pipeline_id = ? AND plan.deleted_at IS NULL
+                ORDER BY link.linked_at, link.interview_plan_id
+                """, Long.class, pipelineId);
+    }
+
+    public void replaceScheduleEventLink(long pipelineId, long eventId) {
+        jdbcTemplate.update("DELETE FROM pipeline_schedule_events WHERE schedule_event_id = ?", eventId);
+        jdbcTemplate.update("""
+                INSERT INTO pipeline_schedule_events (pipeline_id, schedule_event_id)
+                VALUES (?, ?)
+                """, pipelineId, eventId);
+    }
+
+    public void replaceInterviewPlanLink(long pipelineId, long planId) {
+        jdbcTemplate.update("DELETE FROM pipeline_interview_plans WHERE interview_plan_id = ?", planId);
+        jdbcTemplate.update("""
+                INSERT INTO pipeline_interview_plans (pipeline_id, interview_plan_id)
+                VALUES (?, ?)
+                """, pipelineId, planId);
+    }
+
+    public int unlinkScheduleEvent(long pipelineId, long eventId) {
+        return jdbcTemplate.update("""
+                DELETE FROM pipeline_schedule_events
+                WHERE pipeline_id = ? AND schedule_event_id = ?
+                """, pipelineId, eventId);
+    }
+
+    public int unlinkInterviewPlan(long pipelineId, long planId) {
+        return jdbcTemplate.update("""
+                DELETE FROM pipeline_interview_plans
+                WHERE pipeline_id = ? AND interview_plan_id = ?
+                """, pipelineId, planId);
+    }
+
     public int setCurrentStage(long userId, long pipelineId, long stageId) {
         return jdbcTemplate.update("""
                 UPDATE career_pipelines

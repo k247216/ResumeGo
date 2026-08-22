@@ -80,4 +80,37 @@ class CareerPipelineRepositoryTest {
         assertThat(repository.ownsResumeVersion(1L, 31L)).isTrue();
         assertThat(repository.ownsResumeVersion(1L, 41L)).isFalse();
     }
+
+    @Test
+    void rebindsAndUnlinksScheduleAndInterviewAssets() {
+        long first = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        long second = repository.createPipeline(1L, "字节后端", "字节", "后端开发", null, null);
+
+        repository.replaceScheduleEventLink(first, 100L);
+        repository.replaceInterviewPlanLink(first, 300L);
+        repository.replaceScheduleEventLink(second, 100L);
+        repository.replaceInterviewPlanLink(second, 300L);
+
+        assertThat(repository.findScheduleEventIds(first)).isEmpty();
+        assertThat(repository.findInterviewPlanIds(first)).isEmpty();
+        assertThat(repository.findScheduleEventIds(second)).containsExactly(100L);
+        assertThat(repository.findInterviewPlanIds(second)).containsExactly(300L);
+
+        assertThat(repository.unlinkScheduleEvent(first, 100L)).isZero();
+        assertThat(repository.unlinkInterviewPlan(first, 300L)).isZero();
+        assertThat(repository.unlinkScheduleEvent(second, 100L)).isOne();
+        assertThat(repository.unlinkInterviewPlan(second, 300L)).isOne();
+    }
+
+    @Test
+    void omitsSoftDeletedAssetsFromPipelineReads() {
+        long pipelineId = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        repository.replaceScheduleEventLink(pipelineId, 100L);
+        repository.replaceInterviewPlanLink(pipelineId, 300L);
+        jdbcTemplate.update("UPDATE schedule_events SET deleted_at = CURRENT_TIMESTAMP WHERE id = 100");
+        jdbcTemplate.update("UPDATE interview_plans SET deleted_at = CURRENT_TIMESTAMP WHERE id = 300");
+
+        assertThat(repository.findScheduleEventIds(pipelineId)).isEmpty();
+        assertThat(repository.findInterviewPlanIds(pipelineId)).isEmpty();
+    }
 }

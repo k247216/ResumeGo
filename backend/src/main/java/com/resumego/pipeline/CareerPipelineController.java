@@ -70,6 +70,30 @@ public class CareerPipelineController {
         return ApiResponse.ok(service.reorderStages(id, request));
     }
 
+    @PutMapping("/{id}/schedule-events/{eventId}")
+    public ApiResponse<CareerPipelineResponse> linkScheduleEvent(
+            @PathVariable long id, @PathVariable long eventId) {
+        return ApiResponse.ok(service.linkScheduleEvent(id, eventId));
+    }
+
+    @DeleteMapping("/{id}/schedule-events/{eventId}")
+    public ApiResponse<CareerPipelineResponse> unlinkScheduleEvent(
+            @PathVariable long id, @PathVariable long eventId) {
+        return ApiResponse.ok(service.unlinkScheduleEvent(id, eventId));
+    }
+
+    @PutMapping("/{id}/interview-plans/{planId}")
+    public ApiResponse<CareerPipelineResponse> linkInterviewPlan(
+            @PathVariable long id, @PathVariable long planId) {
+        return ApiResponse.ok(service.linkInterviewPlan(id, planId));
+    }
+
+    @DeleteMapping("/{id}/interview-plans/{planId}")
+    public ApiResponse<CareerPipelineResponse> unlinkInterviewPlan(
+            @PathVariable long id, @PathVariable long planId) {
+        return ApiResponse.ok(service.unlinkInterviewPlan(id, planId));
+    }
+
     @PostMapping("/{id}/archive")
     public ApiResponse<CareerPipelineResponse> archive(@PathVariable long id) {
         return ApiResponse.ok(service.archive(id));

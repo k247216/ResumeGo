@@ -5,6 +5,8 @@ import com.resumego.pipeline.dto.AddPipelineStageRequest;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
+import com.resumego.pipeline.port.PipelineInterviewPlanAccess;
+import com.resumego.pipeline.port.PipelineScheduleEventAccess;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +25,8 @@ class CareerPipelineServiceTest {
     @BeforeEach
     void setUp() {
         repository = mock(CareerPipelineRepository.class);
-        service = new CareerPipelineService(repository, new PipelineRules());
+        service = new CareerPipelineService(repository, new PipelineRules(),
+                mock(PipelineScheduleEventAccess.class), mock(PipelineInterviewPlanAccess.class));
     }
 
     @Test

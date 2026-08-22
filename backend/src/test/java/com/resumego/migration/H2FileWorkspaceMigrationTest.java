@@ -28,7 +28,7 @@ class H2FileWorkspaceMigrationTest {
                 .load();
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
 
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");
              var statement = connection.createStatement()) {
@@ -36,6 +36,8 @@ class H2FileWorkspaceMigrationTest {
             assertThat(tableExists(connection, "career_pipelines")).isTrue();
             assertThat(tableExists(connection, "pipeline_stages")).isTrue();
             assertThat(tableExists(connection, "pipeline_stage_transitions")).isTrue();
+            assertThat(tableExists(connection, "pipeline_schedule_events")).isTrue();
+            assertThat(tableExists(connection, "pipeline_interview_plans")).isTrue();
         }
 
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");
@@ -56,7 +58,7 @@ class H2FileWorkspaceMigrationTest {
                 .dataSource(jdbcUrl, "sa", "")
                 .locations("classpath:db/migration-h2")
                 .load()
-                .info().current().getVersion().getVersion()).isEqualTo("4");
+                .info().current().getVersion().getVersion()).isEqualTo("5");
     }
 
     @Test
