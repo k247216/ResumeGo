@@ -292,7 +292,7 @@ class KnowledgeRepositoryTest {
     @Test
     void cleanupJobsInsertFindClaimAndDeleteDocumentById() {
         long docId = repository.insertDocument(1L, "待删笔记", "NOTE", "NOT_STARTED");
-        long jobId = repository.insertCleanupJob(1L, docId, "待删笔记", "knowledge/sources/1/a.md", "PENDING");
+        long jobId = repository.insertCleanupJob(1L, docId, "knowledge/sources/1/a.md", "PENDING");
         assertThat(repository.findCleanupJobById(1L, jobId)).isPresent();
         assertThat(repository.findCleanupJobById(2L, jobId)).isEmpty();
         assertThat(repository.listCleanupJobsByStatus(1L, "PENDING")).hasSize(1);

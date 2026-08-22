@@ -473,7 +473,6 @@ public class KnowledgeRepository {
             rs.getLong("id"),
             rs.getLong("user_id"),
             rs.getLong("document_id"),
-            rs.getString("document_title"),
             rs.getString("source_relative_path"),
             rs.getString("job_status"),
             rs.getString("error_code"),
@@ -560,20 +559,18 @@ public class KnowledgeRepository {
                 """, confirmationId);
     }
 
-    public long insertCleanupJob(long userId, long documentId, String documentTitle,
-                                 String sourceRelativePath, String jobStatus) {
+    public long insertCleanupJob(long userId, long documentId, String sourceRelativePath, String jobStatus) {
         KeyHolder keys = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO knowledge_cleanup_jobs
-                        (user_id, document_id, document_title, source_relative_path, job_status)
-                    VALUES (?, ?, ?, ?, ?)
+                        (user_id, document_id, source_relative_path, job_status)
+                    VALUES (?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, userId);
             statement.setLong(2, documentId);
-            statement.setString(3, documentTitle);
-            statement.setString(4, sourceRelativePath);
-            statement.setString(5, jobStatus);
+            statement.setString(3, sourceRelativePath);
+            statement.setString(4, jobStatus);
             return statement;
         }, keys);
         return requiredKey(keys, "创建清理任务失败：未返回主键");
@@ -581,7 +578,7 @@ public class KnowledgeRepository {
 
     public Optional<KnowledgeCleanupJob> findCleanupJobById(long userId, long cleanupJobId) {
         return jdbcTemplate.query("""
-                SELECT id, user_id, document_id, document_title, source_relative_path,
+                SELECT id, user_id, document_id, source_relative_path,
                        job_status, error_code, created_at, started_at, finished_at
                 FROM knowledge_cleanup_jobs
                 WHERE id = ? AND user_id = ?
@@ -590,7 +587,7 @@ public class KnowledgeRepository {
 
     public List<KnowledgeCleanupJob> listCleanupJobsByStatus(long userId, String jobStatus) {
         return jdbcTemplate.query("""
-                SELECT id, user_id, document_id, document_title, source_relative_path,
+                SELECT id, user_id, document_id, source_relative_path,
                        job_status, error_code, created_at, started_at, finished_at
                 FROM knowledge_cleanup_jobs
                 WHERE user_id = ? AND job_status = ?
@@ -619,6 +616,41 @@ public class KnowledgeRepository {
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """, jobStatus, errorCode, jobStatus, jobStatus, cleanupJobId);
+    }
+
+    /** COMPLETED 时清空受管路径：彻底清理不保留个人路径。 */
+    public void completeCleanupJob(long cleanupJobId) {
+        jdbcTemplate.update("""
+                UPDATE knowledge_cleanup_jobs
+                SET job_status = 'COMPLETED',
+                    error_code = NULL,
+                    source_relative_path = NULL,
+                    finished_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """, cleanupJobId);
+    }
+
+    /** 启动恢复：document 仍 FAILED 的 RUNNING import job（进程崩溃残留）。 */
+    public List<KnowledgeImportJob> listStuckRunningImportJobs(long userId) {
+        return jdbcTemplate.query("""
+                SELECT ij.id, ij.document_id, ij.user_id, ij.source_file_id, ij.job_status, ij.error_code,
+                       ij.started_at, ij.finished_at, ij.created_at, ij.updated_at
+                FROM knowledge_import_jobs ij
+                WHERE ij.user_id = ? AND ij.job_status = 'RUNNING'
+                  AND EXISTS (SELECT 1 FROM knowledge_documents d
+                              WHERE d.id = ij.document_id AND d.processing_status = 'FAILED')
+                """, jobMapper, userId);
+    }
+
+    /** 把残留 RUNNING import job 重置回 FAILED，保留原 errorCode；并发安全（条件更新）。 */
+    public boolean resetImportJobToFailed(long importJobId) {
+        int updated = jdbcTemplate.update("""
+                UPDATE knowledge_import_jobs
+                SET job_status = 'FAILED', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND job_status = 'RUNNING'
+                """, importJobId);
+        return updated > 0;
     }
 
     /** 删除文档：FK cascade 清理 content/import job/category/tag relation/source metadata。 */

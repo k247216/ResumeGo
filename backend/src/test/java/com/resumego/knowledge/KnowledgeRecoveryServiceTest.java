@@ -175,7 +175,7 @@ class KnowledgeRecoveryServiceTest {
         assertThatThrownBy(() -> service.retryCleanupJob(404L))
                 .isInstanceOf(java.util.NoSuchElementException.class);
 
-        KnowledgeCleanupJob done = new KnowledgeCleanupJob(1L, 1L, 5L, "标题", null,
+        KnowledgeCleanupJob done = new KnowledgeCleanupJob(1L, 1L, 5L, null,
                 "COMPLETED", null, LocalDateTime.now(), null, null);
         when(repository.findCleanupJobById(1L, 1L)).thenReturn(Optional.of(done));
         assertThatThrownBy(() -> service.retryCleanupJob(1L))

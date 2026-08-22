@@ -21,7 +21,6 @@ CREATE TABLE knowledge_cleanup_jobs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,
     document_id BIGINT UNSIGNED NOT NULL,
-    document_title VARCHAR(120) NOT NULL,
     source_relative_path VARCHAR(512) NULL,
     job_status VARCHAR(16) NOT NULL,
     error_code VARCHAR(32) NULL,

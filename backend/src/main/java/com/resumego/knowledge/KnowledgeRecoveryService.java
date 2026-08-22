@@ -70,11 +70,16 @@ public class KnowledgeRecoveryService {
         KnowledgeImportJob job = repository.findImportJobByDocument(userId(), documentId)
                 .orElseThrow(() -> new NoSuchElementException("导入任务不存在"));
         String errorCode = job.errorCode();
+        boolean copyNeedsMove = false;
         if (CODE_COPY_FAILED.equals(errorCode)) {
             String stagingPath = source.stagingRelativePath();
-            if (stagingPath == null || !Files.exists(fileStore.resolveStored(stagingPath))) {
+            boolean stagingExists = stagingPath != null && Files.exists(fileStore.resolveStored(stagingPath));
+            boolean storedTargetExists = Files.exists(fileStore.resolveStored(source.storedRelativePath()));
+            if (!stagingExists && !storedTargetExists) {
                 throw conflict("STAGING_MISSING", "staging 副本缺失，无法重试");
             }
+            // 移动后崩溃窗口：staging 已消失但确定性的 stored target 已存在 → 按文件已落位继续提取
+            copyNeedsMove = stagingExists && !storedTargetExists;
         } else if (CODE_EXTRACTION_FAILED.equals(errorCode)) {
             if (!AVAIL_AVAILABLE.equals(source.availability())) {
                 throw conflict("SOURCE_UNAVAILABLE", "受管副本不可用，无法重试");
@@ -86,7 +91,7 @@ public class KnowledgeRecoveryService {
             throw conflict("ALREADY_RUNNING", "已有重试进行中");
         }
         try {
-            if (CODE_COPY_FAILED.equals(errorCode)) {
+            if (copyNeedsMove) {
                 Path staged = fileStore.resolveStored(source.stagingRelativePath());
                 fileStore.moveToSources(userId(), source.sha256(), source.extension(), staged);
                 repository.updateSourceStagingPath(source.id(), null);
@@ -147,32 +152,47 @@ public class KnowledgeRecoveryService {
             throw conflict("TOKEN_INVALID", "确认令牌无效");
         }
         KnowledgeSourceFile source = repository.findSourceFileByDocument(userId(), documentId).orElse(null);
-        String sourceRelativePath = source != null && AVAIL_AVAILABLE.equals(source.availability())
-                ? source.storedRelativePath() : null;
-        long cleanupJobId = 0;
+        // 为每个真实受管路径创建 cleanup job：AVAILABLE 的 stored path 与非空 staging 路径分别清理，
+        // 不能用 null 路径伪造完成（COPY_FAILED 的 staging 副本也必须删除）。
+        List<String> managedPaths = new java.util.ArrayList<>();
+        if (source != null) {
+            if (AVAIL_AVAILABLE.equals(source.availability()) && source.storedRelativePath() != null) {
+                managedPaths.add(source.storedRelativePath());
+            }
+            if (source.stagingRelativePath() != null) {
+                managedPaths.add(source.stagingRelativePath());
+            }
+        }
+        List<Long> cleanupJobIds = new java.util.ArrayList<>();
         if (SOURCE_FILE.equals(doc.sourceType())) {
-            cleanupJobId = repository.insertCleanupJob(userId(), documentId, doc.title(), sourceRelativePath, STATUS_PENDING);
+            if (managedPaths.isEmpty()) {
+                cleanupJobIds.add(repository.insertCleanupJob(userId(), documentId, null, STATUS_PENDING));
+            } else {
+                for (String path : managedPaths) {
+                    cleanupJobIds.add(repository.insertCleanupJob(userId(), documentId, path, STATUS_PENDING));
+                }
+            }
         }
         repository.consumeDeletionConfirmation(confirmation.id());
         repository.deleteDocumentById(userId(), documentId);
 
-        final long jobId = cleanupJobId;
-        final String relPath = sourceRelativePath;
+        final List<Long> jobIds = List.copyOf(cleanupJobIds);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                if (jobId == 0) {
-                    return;
-                }
-                if (relPath == null) {
-                    repository.updateCleanupJobStatus(jobId, STATUS_COMPLETED, null);
-                    return;
-                }
-                try {
-                    fileStore.deleteManaged(userId(), relPath);
-                    repository.updateCleanupJobStatus(jobId, STATUS_COMPLETED, null);
-                } catch (Exception exception) {
-                    repository.updateCleanupJobStatus(jobId, STATUS_FAILED, FILE_DELETE_FAILED);
+                for (long jobId : jobIds) {
+                    KnowledgeCleanupJob job = repository.findCleanupJobById(userId(), jobId).orElse(null);
+                    if (job == null) {
+                        continue;
+                    }
+                    try {
+                        if (job.sourceRelativePath() != null) {
+                            fileStore.deleteManaged(userId(), job.sourceRelativePath());
+                        }
+                        repository.completeCleanupJob(jobId);
+                    } catch (Exception exception) {
+                        repository.updateCleanupJobStatus(jobId, STATUS_FAILED, FILE_DELETE_FAILED);
+                    }
                 }
             }
         });
@@ -197,6 +217,14 @@ public class KnowledgeRecoveryService {
         executeCleanup(job, cleanupJobId);
     }
 
+    /** 启动恢复 import job：进程崩溃残留的 RUNNING job（document 仍 FAILED）重置回 FAILED，保留原 errorCode。 */
+    public void recoverStuckImportJobs() {
+        List<KnowledgeImportJob> stuck = repository.listStuckRunningImportJobs(userId());
+        for (KnowledgeImportJob job : stuck) {
+            repository.resetImportJobToFailed(job.id());
+        }
+    }
+
     /** 启动恢复：只处理 PENDING，避免无限重试 FAILED。 */
     public void recoverPendingCleanupJobs() {
         List<KnowledgeCleanupJob> pending = repository.listCleanupJobsByStatus(userId(), STATUS_PENDING);
@@ -209,14 +237,11 @@ public class KnowledgeRecoveryService {
     }
 
     private void executeCleanup(KnowledgeCleanupJob job, long cleanupJobId) {
-        String relPath = job.sourceRelativePath();
-        if (relPath == null) {
-            repository.updateCleanupJobStatus(cleanupJobId, STATUS_COMPLETED, null);
-            return;
-        }
         try {
-            fileStore.deleteManaged(userId(), relPath);
-            repository.updateCleanupJobStatus(cleanupJobId, STATUS_COMPLETED, null);
+            if (job.sourceRelativePath() != null) {
+                fileStore.deleteManaged(userId(), job.sourceRelativePath());
+            }
+            repository.completeCleanupJob(cleanupJobId);
         } catch (Exception exception) {
             repository.updateCleanupJobStatus(cleanupJobId, STATUS_FAILED, FILE_DELETE_FAILED);
         }

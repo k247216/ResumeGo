@@ -18,6 +18,7 @@ public class KnowledgeCleanupStartupRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
+            recoveryService.recoverStuckImportJobs();
             recoveryService.recoverPendingCleanupJobs();
         } catch (DataAccessException ignored) {
             // schema.sql 测试环境无 knowledge 表时静默跳过

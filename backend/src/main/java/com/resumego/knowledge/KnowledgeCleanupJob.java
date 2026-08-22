@@ -6,7 +6,6 @@ public record KnowledgeCleanupJob(
         Long id,
         Long userId,
         Long documentId,
-        String documentTitle,
         String sourceRelativePath,
         String jobStatus,
         String errorCode,
