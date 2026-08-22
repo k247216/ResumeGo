@@ -6,6 +6,7 @@ import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
 import com.resumego.pipeline.dto.AddPipelineStageRequest;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
+import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -33,6 +34,11 @@ public class CareerPipelineController {
     @GetMapping("/{id}")
     public ApiResponse<CareerPipelineResponse> get(@PathVariable long id) {
         return ApiResponse.ok(service.get(id));
+    }
+
+    @GetMapping("/{id}/transitions")
+    public ApiResponse<List<PipelineStageTransitionResponse>> transitions(@PathVariable long id) {
+        return ApiResponse.ok(service.findTransitionHistory(id));
     }
 
     @PostMapping

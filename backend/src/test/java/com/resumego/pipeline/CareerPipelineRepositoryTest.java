@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @JdbcTest
@@ -112,5 +114,35 @@ class CareerPipelineRepositoryTest {
 
         assertThat(repository.findScheduleEventIds(pipelineId)).isEmpty();
         assertThat(repository.findInterviewPlanIds(pipelineId)).isEmpty();
+    }
+
+    @Test
+    void findTransitionsReturnsUserScopedHistoryInStableOrder() {
+        long first = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        long second = repository.createPipeline(2L, "字节后端", "字节跳动", "后端开发", null, null);
+        long prepare = repository.createStage(first, "准备中", 0, PipelineStageState.CURRENT);
+        long interview = repository.createStage(first, "技术面", 1, PipelineStageState.PENDING);
+        repository.appendTransition(first, null, prepare, "USER", "创建管线");
+        repository.appendTransition(first, prepare, interview, "USER", "进入技术面");
+        // 其他用户的管线不进入当前用户历史
+        repository.appendTransition(second, null, prepare, "USER", "另一用户");
+
+        List<PipelineStageTransition> history = repository.findTransitions(1L, first);
+
+        assertThat(history).hasSize(2);
+        assertThat(history.get(0).fromStageId()).isNull();
+        assertThat(history.get(0).note()).isEqualTo("创建管线");
+        assertThat(history.get(1).fromStageId()).isEqualTo(prepare);
+        assertThat(history.get(1).toStageId()).isEqualTo(interview);
+        // 顺序稳定：occurredAt ASC, id ASC
+        assertThat(history.get(0).id()).isLessThan(history.get(1).id());
+    }
+
+    @Test
+    void findTransitionsReturnsEmptyForPipelineWithoutHistory() {
+        long pipelineId = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        repository.createStage(pipelineId, "准备中", 0, PipelineStageState.CURRENT);
+
+        assertThat(repository.findTransitions(1L, pipelineId)).isEmpty();
     }
 }

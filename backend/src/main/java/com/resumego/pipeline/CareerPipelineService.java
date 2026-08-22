@@ -5,6 +5,7 @@ import com.resumego.pipeline.dto.CareerPipelineResponse;
 import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
 import com.resumego.pipeline.dto.AddPipelineStageRequest;
 import com.resumego.pipeline.dto.PipelineStageResponse;
+import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.NoSuchElementException;
 
 @Service
@@ -43,6 +45,20 @@ public class CareerPipelineService {
 
     public CareerPipelineResponse get(long pipelineId) {
         return toResponse(requirePipeline(pipelineId));
+    }
+
+    public List<PipelineStageTransitionResponse> findTransitionHistory(long pipelineId) {
+        requirePipeline(pipelineId);
+        return repository.findTransitions(userId(), pipelineId).stream()
+                .map(transition -> new PipelineStageTransitionResponse(
+                        transition.id(),
+                        transition.pipelineId(),
+                        transition.fromStageId(),
+                        transition.toStageId(),
+                        transition.actor(),
+                        transition.note(),
+                        transition.occurredAt()))
+                .toList();
     }
 
     @Transactional

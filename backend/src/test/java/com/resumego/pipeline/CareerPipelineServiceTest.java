@@ -4,6 +4,7 @@ import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
 import com.resumego.pipeline.dto.AddPipelineStageRequest;
 import com.resumego.pipeline.dto.RenamePipelineStageRequest;
 import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
+import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
 import com.resumego.pipeline.port.PipelineInterviewPlanAccess;
 import com.resumego.pipeline.port.PipelineScheduleEventAccess;
@@ -12,8 +13,10 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -145,5 +148,41 @@ class CareerPipelineServiceTest {
     private PipelineStage stage(long id, PipelineStageState state) {
         return new PipelineStage(id, 7L, "技术面", 1, state,
                 LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    @Test
+    void returnsOrderedTransitionHistoryForOwnedPipeline() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.findTransitions(1L, 7L)).thenReturn(List.of(
+                new PipelineStageTransition(1L, 7L, null, 11L, "USER", null, LocalDateTime.of(2026, 8, 22, 14, 30)),
+                new PipelineStageTransition(2L, 7L, 11L, 12L, "USER", "进入技术面", LocalDateTime.of(2026, 8, 22, 15, 0))
+        ));
+
+        List<PipelineStageTransitionResponse> result = service.findTransitionHistory(7L);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).id()).isEqualTo(1L);
+        assertThat(result.get(0).fromStageId()).isNull();
+        assertThat(result.get(0).note()).isNull();
+        assertThat(result.get(1).toStageId()).isEqualTo(12L);
+        assertThat(result.get(1).note()).isEqualTo("进入技术面");
+    }
+
+    @Test
+    void returnsEmptyHistoryForOwnedPipelineWithoutTransitions() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.findTransitions(1L, 7L)).thenReturn(List.of());
+
+        List<PipelineStageTransitionResponse> result = service.findTransitionHistory(7L);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void rejectsHistoryForMissingPipeline() {
+        when(repository.findById(1L, 404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findTransitionHistory(404L))
+                .isInstanceOf(NoSuchElementException.class);
     }
 }

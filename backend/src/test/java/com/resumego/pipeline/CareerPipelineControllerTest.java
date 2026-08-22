@@ -2,6 +2,7 @@ package com.resumego.pipeline;
 
 import com.resumego.pipeline.dto.CareerPipelineResponse;
 import com.resumego.pipeline.dto.PipelineStageResponse;
+import com.resumego.pipeline.dto.PipelineStageTransitionResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -18,6 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -110,6 +112,29 @@ class CareerPipelineControllerTest {
         mockMvc.perform(post("/api/v2/pipelines/7/transitions").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"targetStageId\":12}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void exposesFrozenTransitionHistoryEndpoint() throws Exception {
+        when(service.findTransitionHistory(7L)).thenReturn(List.of(
+                new PipelineStageTransitionResponse(12L, 7L, null, 11L, "USER", null, LocalDateTime.of(2026, 8, 22, 14, 30)),
+                new PipelineStageTransitionResponse(13L, 7L, 11L, 12L, "USER", "进入技术面", LocalDateTime.of(2026, 8, 22, 15, 0))
+        ));
+        mockMvc.perform(get("/api/v2/pipelines/7/transitions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(12))
+                .andExpect(jsonPath("$.data[0].fromStageId").value(nullValue()))
+                .andExpect(jsonPath("$.data[0].note").value(nullValue()))
+                .andExpect(jsonPath("$.data[1].toStageId").value(12))
+                .andExpect(jsonPath("$.data[1].note").value("进入技术面"));
+    }
+
+    @Test
+    void mapsMissingPipelineToNotFoundOnTransitions() throws Exception {
+        when(service.findTransitionHistory(404L)).thenThrow(new NoSuchElementException("求职管线不存在"));
+        mockMvc.perform(get("/api/v2/pipelines/404/transitions"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("求职管线不存在"));
     }
 
     private CareerPipelineResponse sample() {
