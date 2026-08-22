@@ -58,6 +58,26 @@ class CareerPipelineControllerTest {
     }
 
     @Test
+    void addsRenamesAndReordersPipelineStages() throws Exception {
+        when(service.addStage(anyLong(), any())).thenReturn(sample());
+        when(service.renameStage(anyLong(), anyLong(), any())).thenReturn(sample());
+        when(service.reorderStages(anyLong(), any())).thenReturn(sample());
+
+        mockMvc.perform(post("/api/v2/pipelines/7/stages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"技术二面\"}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(patch("/api/v2/pipelines/7/stages/13")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"主管面\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v2/pipelines/7/stages/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"stageIds\":[13,11,12]}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void rejectsInvalidInputAndMapsDomainErrors() throws Exception {
         mockMvc.perform(post("/api/v2/pipelines").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\" \" ,\"companyName\":\"腾讯\",\"roleTitle\":\"Java\"}"))

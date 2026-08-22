@@ -96,6 +96,41 @@ public class CareerPipelineRepository {
                 """, stageMapper(), stageId, pipelineId, userId).stream().findFirst();
     }
 
+    public int nextStagePosition(long userId, long pipelineId) {
+        Integer value = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(s.position_index), -1) + 1
+                FROM pipeline_stages s
+                INNER JOIN career_pipelines p ON p.id = s.pipeline_id
+                WHERE s.pipeline_id = ? AND p.user_id = ?
+                """, Integer.class, pipelineId, userId);
+        return value == null ? 0 : value;
+    }
+
+    public int renameStage(long pipelineId, long stageId, String name) {
+        return jdbcTemplate.update("""
+                UPDATE pipeline_stages
+                SET name = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND pipeline_id = ?
+                """, name, stageId, pipelineId);
+    }
+
+    public void reorderStages(long pipelineId, List<Long> stageIds) {
+        for (int index = 0; index < stageIds.size(); index++) {
+            jdbcTemplate.update("""
+                    UPDATE pipeline_stages
+                    SET position_index = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND pipeline_id = ?
+                    """, 1_000_000 + index, stageIds.get(index), pipelineId);
+        }
+        for (int index = 0; index < stageIds.size(); index++) {
+            jdbcTemplate.update("""
+                    UPDATE pipeline_stages
+                    SET position_index = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND pipeline_id = ?
+                    """, index, stageIds.get(index), pipelineId);
+        }
+    }
+
     public int setCurrentStage(long userId, long pipelineId, long stageId) {
         return jdbcTemplate.update("""
                 UPDATE career_pipelines

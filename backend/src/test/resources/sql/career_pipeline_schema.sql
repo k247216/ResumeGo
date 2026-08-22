@@ -35,7 +35,8 @@ CREATE TABLE pipeline_stages (
     position_index INT NOT NULL,
     state VARCHAR(20) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_pipeline_stages_position UNIQUE (pipeline_id, position_index)
 );
 
 CREATE TABLE pipeline_stage_transitions (

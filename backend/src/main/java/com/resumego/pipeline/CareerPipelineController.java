@@ -3,6 +3,9 @@ package com.resumego.pipeline;
 import com.resumego.common.ApiResponse;
 import com.resumego.pipeline.dto.CareerPipelineResponse;
 import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
+import com.resumego.pipeline.dto.AddPipelineStageRequest;
+import com.resumego.pipeline.dto.RenamePipelineStageRequest;
+import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -43,6 +46,28 @@ public class CareerPipelineController {
             @PathVariable long id,
             @Valid @RequestBody TransitionPipelineStageRequest request) {
         return ApiResponse.ok(service.transition(id, request));
+    }
+
+    @PostMapping("/{id}/stages")
+    public ResponseEntity<ApiResponse<CareerPipelineResponse>> addStage(
+            @PathVariable long id,
+            @Valid @RequestBody AddPipelineStageRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(service.addStage(id, request)));
+    }
+
+    @PatchMapping("/{id}/stages/{stageId}")
+    public ApiResponse<CareerPipelineResponse> renameStage(
+            @PathVariable long id,
+            @PathVariable long stageId,
+            @Valid @RequestBody RenamePipelineStageRequest request) {
+        return ApiResponse.ok(service.renameStage(id, stageId, request));
+    }
+
+    @PutMapping("/{id}/stages/order")
+    public ApiResponse<CareerPipelineResponse> reorderStages(
+            @PathVariable long id,
+            @Valid @RequestBody ReorderPipelineStagesRequest request) {
+        return ApiResponse.ok(service.reorderStages(id, request));
     }
 
     @PostMapping("/{id}/archive")

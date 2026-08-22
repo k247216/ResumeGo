@@ -57,6 +57,23 @@ class CareerPipelineRepositoryTest {
     }
 
     @Test
+    void addsRenamesAndReordersStagesWithoutPositionCollisions() {
+        long pipelineId = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        long prepare = repository.createStage(pipelineId, "准备中", 0, PipelineStageState.CURRENT);
+        long interview = repository.createStage(pipelineId, "技术面", 1, PipelineStageState.PENDING);
+
+        assertThat(repository.nextStagePosition(1L, pipelineId)).isEqualTo(2);
+        repository.renameStage(pipelineId, interview, "技术一面");
+        repository.reorderStages(pipelineId, java.util.List.of(interview, prepare));
+
+        assertThat(repository.findStages(1L, pipelineId))
+                .extracting(PipelineStage::id, PipelineStage::name, PipelineStage::position)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(interview, "技术一面", 0),
+                        org.assertj.core.groups.Tuple.tuple(prepare, "准备中", 1));
+    }
+
+    @Test
     void validatesLinkedAssetOwnership() {
         assertThat(repository.ownsJobDescription(1L, 10L)).isTrue();
         assertThat(repository.ownsJobDescription(1L, 20L)).isFalse();

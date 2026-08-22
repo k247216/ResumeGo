@@ -3,7 +3,10 @@ package com.resumego.pipeline;
 import com.resumego.common.CurrentUser;
 import com.resumego.pipeline.dto.CareerPipelineResponse;
 import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
+import com.resumego.pipeline.dto.AddPipelineStageRequest;
 import com.resumego.pipeline.dto.PipelineStageResponse;
+import com.resumego.pipeline.dto.RenamePipelineStageRequest;
+import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +79,44 @@ public class CareerPipelineService {
     }
 
     @Transactional
+    public CareerPipelineResponse addStage(long pipelineId, AddPipelineStageRequest request) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        String name = normalize(request.name(), "阶段名称", 80);
+        rejectDuplicateStageName(repository.findStages(userId(), pipeline.id()), name, null);
+        int position = repository.nextStagePosition(userId(), pipeline.id());
+        repository.createStage(pipeline.id(), name, position, PipelineStageState.PENDING);
+        return get(pipeline.id());
+    }
+
+    @Transactional
+    public CareerPipelineResponse renameStage(long pipelineId, long stageId,
+                                               RenamePipelineStageRequest request) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        repository.findStage(userId(), pipeline.id(), stageId)
+                .orElseThrow(() -> new NoSuchElementException("管线阶段不存在"));
+        String name = normalize(request.name(), "阶段名称", 80);
+        rejectDuplicateStageName(repository.findStages(userId(), pipeline.id()), name, stageId);
+        repository.renameStage(pipeline.id(), stageId, name);
+        return get(pipeline.id());
+    }
+
+    @Transactional
+    public CareerPipelineResponse reorderStages(long pipelineId, ReorderPipelineStagesRequest request) {
+        CareerPipeline pipeline = requireEditablePipeline(pipelineId);
+        List<PipelineStage> stages = repository.findStages(userId(), pipeline.id());
+        List<Long> requestedIds = request.stageIds();
+        if (requestedIds == null
+                || requestedIds.size() != stages.size()
+                || new HashSet<>(requestedIds).size() != requestedIds.size()
+                || !new HashSet<>(requestedIds).equals(
+                        stages.stream().map(PipelineStage::id).collect(java.util.stream.Collectors.toSet()))) {
+            throw new IllegalArgumentException("排序必须包含管线的全部阶段且不能重复");
+        }
+        repository.reorderStages(pipeline.id(), requestedIds);
+        return get(pipeline.id());
+    }
+
+    @Transactional
     public CareerPipelineResponse archive(long pipelineId) {
         requirePipeline(pipelineId);
         repository.updateLifecycle(userId(), pipelineId, PipelineLifecycle.ARCHIVED, null);
@@ -92,6 +133,23 @@ public class CareerPipelineService {
     private CareerPipeline requirePipeline(long pipelineId) {
         return repository.findById(userId(), pipelineId)
                 .orElseThrow(() -> new NoSuchElementException("求职管线不存在"));
+    }
+
+    private CareerPipeline requireEditablePipeline(long pipelineId) {
+        CareerPipeline pipeline = requirePipeline(pipelineId);
+        if (pipeline.lifecycle() == PipelineLifecycle.ARCHIVED) {
+            throw new IllegalStateException("已归档的求职管线不能修改阶段");
+        }
+        if (pipeline.lifecycle() == PipelineLifecycle.CLOSED) {
+            throw new IllegalStateException("已结束的求职管线不能修改阶段");
+        }
+        return pipeline;
+    }
+
+    private void rejectDuplicateStageName(List<PipelineStage> stages, String name, Long ignoredStageId) {
+        boolean duplicate = stages.stream().anyMatch(stage -> stage.name().equals(name)
+                && (ignoredStageId == null || stage.id() != ignoredStageId));
+        if (duplicate) throw new IllegalArgumentException("阶段名称不能重复");
     }
 
     private void validateLinks(Long jobDescriptionId, Long resumeVersionId) {

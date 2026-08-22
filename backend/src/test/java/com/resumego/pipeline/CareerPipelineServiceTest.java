@@ -1,6 +1,9 @@
 package com.resumego.pipeline;
 
 import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
+import com.resumego.pipeline.dto.AddPipelineStageRequest;
+import com.resumego.pipeline.dto.RenamePipelineStageRequest;
+import com.resumego.pipeline.dto.ReorderPipelineStagesRequest;
 import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +84,49 @@ class CareerPipelineServiceTest {
                         LocalDateTime.now(), LocalDateTime.now())));
         assertThatThrownBy(() -> service.transition(8L, new TransitionPipelineStageRequest(22L, null)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("待进入");
+    }
+
+    @Test
+    void addsRenamesAndReordersStagesWithinOwnedPipeline() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.nextStagePosition(1L, 7L)).thenReturn(2);
+        when(repository.createStage(7L, "二面", 2, PipelineStageState.PENDING)).thenReturn(13L);
+        when(repository.findStage(1L, 7L, 13L)).thenReturn(Optional.of(stage(13L, PipelineStageState.PENDING)));
+        List<PipelineStage> before = List.of(
+                new PipelineStage(11L, 7L, "准备中", 0, PipelineStageState.CURRENT,
+                        LocalDateTime.now(), LocalDateTime.now()),
+                new PipelineStage(12L, 7L, "技术面", 1, PipelineStageState.PENDING,
+                        LocalDateTime.now(), LocalDateTime.now()));
+        List<PipelineStage> after = List.of(
+                before.get(0), before.get(1),
+                new PipelineStage(13L, 7L, "二面", 2, PipelineStageState.PENDING,
+                        LocalDateTime.now(), LocalDateTime.now()));
+        when(repository.findStages(1L, 7L)).thenReturn(before, after, after, after, after, after);
+
+        service.addStage(7L, new AddPipelineStageRequest(" 二面 "));
+        service.renameStage(7L, 13L, new RenamePipelineStageRequest(" 技术二面 "));
+        service.reorderStages(7L, new ReorderPipelineStagesRequest(List.of(13L, 11L, 12L)));
+
+        verify(repository).createStage(7L, "二面", 2, PipelineStageState.PENDING);
+        verify(repository).renameStage(7L, 13L, "技术二面");
+        verify(repository).reorderStages(7L, List.of(13L, 11L, 12L));
+    }
+
+    @Test
+    void rejectsIncompleteOrForeignStageOrder() {
+        stubPipeline(7L, 11L, PipelineLifecycle.ACTIVE);
+        when(repository.findStages(1L, 7L)).thenReturn(List.of(
+                new PipelineStage(11L, 7L, "准备中", 0, PipelineStageState.CURRENT,
+                        LocalDateTime.now(), LocalDateTime.now()),
+                new PipelineStage(12L, 7L, "技术面", 1, PipelineStageState.PENDING,
+                        LocalDateTime.now(), LocalDateTime.now())));
+
+        assertThatThrownBy(() -> service.reorderStages(
+                7L, new ReorderPipelineStagesRequest(List.of(11L))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("全部阶段");
+        assertThatThrownBy(() -> service.reorderStages(
+                7L, new ReorderPipelineStagesRequest(List.of(11L, 99L))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("全部阶段");
     }
 
     private void stubPipeline(long id, long currentStageId, PipelineLifecycle lifecycle) {
