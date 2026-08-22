@@ -7,7 +7,6 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,18 +35,16 @@ public class KnowledgeRepository {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO knowledge_documents (user_id, title, source_type, processing_status)
                     VALUES (?, ?, ?, ?)
-                    """, Statement.RETURN_GENERATED_KEYS);
+                    """, new String[]{"id"});
             statement.setLong(1, userId);
             statement.setString(2, title);
             statement.setString(3, sourceType);
             statement.setString(4, processingStatus);
             return statement;
         }, keys);
-        List<Number> keysList = keys.getKeyList().isEmpty()
-                ? List.of()
-                : keys.getKeyList().stream().map(row -> (Number) row.get("ID")).toList();
-        if (keysList.isEmpty()) throw new IllegalStateException("创建知识文档失败");
-        return keysList.get(0).longValue();
+        Number key = keys.getKey();
+        if (key == null) throw new IllegalStateException("创建知识文档失败：未返回主键");
+        return key.longValue();
     }
 
     public List<KnowledgeDocument> listByUser(long userId) {
