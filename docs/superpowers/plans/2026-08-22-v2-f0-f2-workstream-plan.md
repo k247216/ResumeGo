@@ -25,10 +25,10 @@
 
 ## Wave A — Complete current independent Pipeline tasks
 
-- [ ] `V2-F1-BE-01`: expose append-only stage history.
-- [ ] `V2-F1-FE-01`: create Pipeline types and API client.
-- [ ] Review and integrate both independently.
-- [ ] Promote `V2-F1-FE-02` with the real FE-01 integration commit.
+- [x] `V2-F1-BE-01`: expose append-only stage history.
+- [x] `V2-F1-FE-01`: create Pipeline types and API client.
+- [x] Review and integrate both independently.
+- [x] Promote `V2-F1-FE-02` and `V2-F1-BE-02` from the shared post-integration baseline.
 
 Wave exit: Pipeline history is readable and the frontend has one typed state-management foundation without UI replacement.
 

@@ -6,10 +6,11 @@
 | --- | --- |
 | Owner role | Frontend Feature Agent |
 | Milestone | V2 F1 Career Pipeline |
-| Status | `READY` |
+| Status | `INTEGRATED` |
 | Base commit | `1f83b1ac02e62793813d174a2f451a42fc5c3e57` |
 | Branch | `codex/v2-f1-fe-01-pipeline-api` |
 | Integration target | `codex/v2-career-os`，仅由 Core Controller 集成 |
+| Integration commits | `f4b8aee`、`fc98ad0` |
 
 执行前必须阅读 `docs/architecture/agent-collaboration.md`。如果当前仓库不包含精确 `Base commit`，或授权文件已有非本任务改动，立即停止并报告。
 
