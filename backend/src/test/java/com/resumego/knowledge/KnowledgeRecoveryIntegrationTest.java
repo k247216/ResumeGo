@@ -117,7 +117,7 @@ class KnowledgeRecoveryIntegrationTest {
         KnowledgeDeletionImpactResponse impact = recovery.deletionImpact(deleteDocId);
         recovery.deleteDocument(deleteDocId, impact.confirmationToken());
 
-        List<KnowledgeSearchItemResponse> results = classification.search("失败文件", null, null);
+        List<KnowledgeSearchItemResponse> results = classification.search("失败文件", null, null, false);
         assertThat(results).noneMatch(r -> r.document().id() == deleteDocId);
         assertThat(results).anyMatch(r -> r.document().id() == keepDocId);
     }

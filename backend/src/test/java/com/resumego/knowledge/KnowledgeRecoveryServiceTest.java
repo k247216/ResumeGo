@@ -97,7 +97,7 @@ class KnowledgeRecoveryServiceTest {
         when(repository.findExtractedContentByDocument(1L, 5L)).thenReturn(Optional.of(
                 new KnowledgeExtractedContent(1L, 5L, 1L, "正文", LocalDateTime.now(), LocalDateTime.now())));
         when(repository.findDocumentCategory(1L, 5L)).thenReturn(Optional.of(
-                new KnowledgeCategory(1L, 1L, "求职", "求职", LocalDateTime.now(), LocalDateTime.now())));
+                new KnowledgeCategory(1L, 1L, "求职", "求职", null, LocalDateTime.now(), LocalDateTime.now())));
         when(repository.listDocumentTags(1L, 5L)).thenReturn(List.of(
                 new KnowledgeTag(1L, 1L, "标签", "标签", LocalDateTime.now(), LocalDateTime.now())));
 

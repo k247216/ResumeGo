@@ -40,7 +40,7 @@ class KnowledgeSearchControllerTest {
 
     @Test
     void searchesWithQueryAndReturnsMatches() throws Exception {
-        when(classification.search(eq("TensorFlow"), isNull(), isNull())).thenReturn(List.of(titleHit()));
+        when(classification.search(eq("TensorFlow"), isNull(), isNull(), eq(false))).thenReturn(List.of(titleHit()));
         mockMvc.perform(get("/api/v2/knowledge/search").param("q", "TensorFlow"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].matchedField").value("TITLE"))
@@ -49,7 +49,7 @@ class KnowledgeSearchControllerTest {
 
     @Test
     void invalidQueryMapsToBadRequest() throws Exception {
-        when(classification.search(eq("   "), isNull(), isNull()))
+        when(classification.search(eq("   "), isNull(), isNull(), eq(false)))
                 .thenThrow(new IllegalArgumentException("搜索词长度需为 1-100 个字符"));
         mockMvc.perform(get("/api/v2/knowledge/search").param("q", "   "))
                 .andExpect(status().isBadRequest());
@@ -57,7 +57,7 @@ class KnowledgeSearchControllerTest {
 
     @Test
     void foreignFilterMapsToNotFound() throws Exception {
-        when(classification.search(eq("笔记"), eq(99L), isNull()))
+        when(classification.search(eq("笔记"), eq(99L), isNull(), eq(false)))
                 .thenThrow(new NoSuchElementException("分类不存在"));
         mockMvc.perform(get("/api/v2/knowledge/search").param("q", "笔记").param("categoryId", "99"))
                 .andExpect(status().isNotFound())
@@ -66,10 +66,18 @@ class KnowledgeSearchControllerTest {
 
     @Test
     void emptyResultReturnsEmptyArray() throws Exception {
-        when(classification.search(eq("无"), isNull(), isNull())).thenReturn(List.of());
+        when(classification.search(eq("无"), isNull(), isNull(), eq(false))).thenReturn(List.of());
         mockMvc.perform(get("/api/v2/knowledge/search").param("q", "无"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void includeDescendantsFlagIsForwarded() throws Exception {
+        when(classification.search(eq("笔记"), eq(3L), isNull(), eq(true))).thenReturn(List.of());
+        mockMvc.perform(get("/api/v2/knowledge/search").param("q", "笔记")
+                        .param("categoryId", "3").param("includeDescendants", "true"))
+                .andExpect(status().isOk());
     }
 }

@@ -1,9 +1,12 @@
 package com.resumego.knowledge;
 
 import com.resumego.common.CurrentUser;
+import com.resumego.knowledge.dto.CreateKnowledgeCategoryRequest;
 import com.resumego.knowledge.dto.CreateKnowledgeNameRequest;
-import com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse;
+import com.resumego.knowledge.dto.KnowledgeCategoryNodeResponse;
 import com.resumego.knowledge.dto.KnowledgeCategoryResponse;
+import com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse;
+import com.resumego.knowledge.dto.UpdateKnowledgeCategoryRequest;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
 import com.resumego.knowledge.dto.KnowledgeSearchItemResponse;
 import com.resumego.knowledge.dto.KnowledgeTagResponse;
@@ -12,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.NoSuchElementException;
 
@@ -28,6 +32,8 @@ public class KnowledgeClassificationService {
     private static final int SNIPPET_LIMIT = 240;
     private static final int SNIPPET_BEFORE = 100;
     private static final int SNIPPET_AFTER = 140;
+    /** 最大层级五级：根 depth=0，最多 depth 4。 */
+    private static final int MAX_TREE_DEPTH = 4;
 
     private final KnowledgeRepository repository;
 
@@ -53,14 +59,227 @@ public class KnowledgeClassificationService {
         return displayName.toLowerCase(Locale.ROOT);
     }
 
-    // ---- categories ----
+    // ---- categories (hierarchical library folders) ----
 
-    public List<KnowledgeCategoryResponse> listCategories() {
-        return repository.listCategories(userId()).stream().map(this::toCategoryResponse).toList();
+    /** 扁平节点列表：depth/count 由真实关联在内存计算；前端构树。 */
+    public List<KnowledgeCategoryNodeResponse> listCategoryTree() {
+        List<KnowledgeCategory> all = repository.listCategories(userId());
+        Map<Long, Integer> directCounts = repository.listCategoryDocumentCounts(userId());
+        Map<Long, List<Long>> children = childrenMap(all);
+        Map<Long, Integer> depths = computeDepths(all, children);
+        Map<Long, Integer> descendantCounts = computeDescendantCounts(all, children, directCounts, depths);
+        return all.stream().map(category -> new KnowledgeCategoryNodeResponse(
+                category.id(),
+                category.name(),
+                category.normalizedName(),
+                category.parentId(),
+                depths.getOrDefault(category.id(), 0),
+                directCounts.getOrDefault(category.id(), 0),
+                descendantCounts.getOrDefault(category.id(), 0),
+                category.createdAt().toString(),
+                category.updatedAt().toString())).toList();
     }
 
-    public KnowledgeNameCreateResult<KnowledgeCategoryResponse> createCategory(CreateKnowledgeNameRequest request) {
-        return createName(request, true);
+    /** 创建分类（文件夹）：parentId 可为 null（根）；跨用户 parent 404；层级不超过五级。 */
+    public KnowledgeNameCreateResult<KnowledgeCategoryResponse> createCategory(CreateKnowledgeCategoryRequest request) {
+        if (request == null || request.name() == null) {
+            throw new IllegalArgumentException("请求不能为空");
+        }
+        String display = normalizeDisplayName(request.name());
+        String key = normalizeKey(display);
+        Long parentId = request.parentId();
+        if (parentId != null) {
+            requireCategory(parentId);
+            if (depthOf(parentId) + 1 > MAX_TREE_DEPTH) {
+                throw new IllegalArgumentException("分类层级不能超过五级");
+            }
+        }
+        KnowledgeCategory existing = repository.findCategoryByNormalizedName(userId(), key).orElse(null);
+        if (existing != null) {
+            return new KnowledgeNameCreateResult<>(toCategoryResponse(existing), false);
+        }
+        try {
+            long id = repository.insertCategoryWithParent(userId(), display, key, parentId);
+            KnowledgeCategory created = repository.findCategoryById(userId(), id).orElseThrow();
+            return new KnowledgeNameCreateResult<>(toCategoryResponse(created), true);
+        } catch (DuplicateKeyException exception) {
+            KnowledgeCategory raced = repository.findCategoryByNormalizedName(userId(), key).orElseThrow();
+            return new KnowledgeNameCreateResult<>(toCategoryResponse(raced), false);
+        }
+    }
+
+    /** 更新名称与父节点（移动）：parentId 显式提供，可为 null（移到根）；拒绝自身/后代循环与超五级。 */
+    @Transactional
+    public KnowledgeCategoryResponse updateCategory(long categoryId, UpdateKnowledgeCategoryRequest request) {
+        if (request == null || request.name() == null) {
+            throw new IllegalArgumentException("请求不能为空");
+        }
+        KnowledgeCategory current = repository.findCategoryById(userId(), categoryId)
+                .orElseThrow(() -> new NoSuchElementException("分类不存在"));
+        String display = normalizeDisplayName(request.name());
+        String key = normalizeKey(display);
+        Long newParentId = request.parentId();
+        if (newParentId != null) {
+            requireCategory(newParentId);
+            if (newParentId == categoryId) {
+                throw new IllegalArgumentException("分类不能作为自身的父级");
+            }
+            if (isAncestor(categoryId, newParentId)) {
+                throw new IllegalArgumentException("不能移动到自身的后代分类下");
+            }
+            int parentDepth = depthOf(newParentId);
+            int subtreeHeight = subtreeHeight(categoryId);
+            if (parentDepth + 1 + subtreeHeight > MAX_TREE_DEPTH) {
+                throw new IllegalArgumentException("移动后分类层级不能超过五级");
+            }
+        }
+        try {
+            repository.updateCategory(userId(), categoryId, display, key, newParentId);
+        } catch (DuplicateKeyException exception) {
+            throw new IllegalArgumentException("同名称分类已存在");
+        }
+        return toCategoryResponse(repository.findCategoryById(userId(), categoryId).orElseThrow());
+    }
+
+    /** 仅删除空叶节点：无子分类且无直属文档，否则 CATEGORY_NOT_EMPTY（409）；不得 cascade。 */
+    @Transactional
+    public void deleteCategory(long categoryId) {
+        KnowledgeCategory category = repository.findCategoryById(userId(), categoryId)
+                .orElseThrow(() -> new NoSuchElementException("分类不存在"));
+        List<KnowledgeCategory> all = repository.listCategories(userId());
+        boolean hasChildren = all.stream().anyMatch(c -> c.parentId() != null && c.parentId() == categoryId);
+        int directDocuments = repository.listCategoryDocumentCounts(userId()).getOrDefault(categoryId, 0);
+        if (hasChildren || directDocuments > 0) {
+            throw new IllegalStateException("CATEGORY_NOT_EMPTY: 分类下仍有子分类或资料，不能删除");
+        }
+        repository.deleteCategoryById(userId(), categoryId);
+    }
+
+    // ---- tree helpers ----
+
+    private Map<Long, List<Long>> childrenMap(List<KnowledgeCategory> all) {
+        Map<Long, List<Long>> children = new java.util.HashMap<>();
+        for (KnowledgeCategory category : all) {
+            if (category.parentId() != null) {
+                children.computeIfAbsent(category.parentId(), k -> new java.util.ArrayList<>()).add(category.id());
+            }
+        }
+        return children;
+    }
+
+    private Map<Long, Integer> computeDepths(List<KnowledgeCategory> all, Map<Long, List<Long>> children) {
+        Map<Long, Integer> depths = new java.util.HashMap<>();
+        java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>();
+        for (KnowledgeCategory category : all) {
+            if (category.parentId() == null) {
+                depths.put(category.id(), 0);
+                queue.add(category.id());
+            }
+        }
+        while (!queue.isEmpty()) {
+            long id = queue.poll();
+            int depth = depths.get(id);
+            for (long child : children.getOrDefault(id, List.of())) {
+                depths.putIfAbsent(child, depth + 1);
+                queue.add(child);
+            }
+        }
+        // 防御（BFS 之后）：parent 缺失的孤儿按根处理
+        for (KnowledgeCategory category : all) {
+            if (!depths.containsKey(category.id())) {
+                depths.put(category.id(), 0);
+            }
+        }
+        return depths;
+    }
+
+    private Map<Long, Integer> computeDescendantCounts(List<KnowledgeCategory> all, Map<Long, List<Long>> children,
+                                                       Map<Long, Integer> directCounts, Map<Long, Integer> depths) {
+        Map<Long, Integer> counts = new java.util.HashMap<>();
+        java.util.function.Function<Long, Integer> compute = new java.util.function.Function<>() {
+            @Override
+            public Integer apply(Long id) {
+                Integer cached = counts.get(id);
+                if (cached != null) return cached;
+                int total = directCounts.getOrDefault(id, 0);
+                for (long child : children.getOrDefault(id, List.of())) {
+                    if (depths.getOrDefault(child, 0) > depths.getOrDefault(id, 0)) {
+                        total += apply(child);
+                    }
+                }
+                counts.put(id, total);
+                return total;
+            }
+        };
+        for (KnowledgeCategory category : all) {
+            compute.apply(category.id());
+        }
+        return counts;
+    }
+
+    /** 分类所在深度（根=0），逐级上查。 */
+    private int depthOf(long categoryId) {
+        Map<Long, Long> parentById = new java.util.HashMap<>();
+        for (KnowledgeCategory category : repository.listCategories(userId())) {
+            if (category.parentId() != null) {
+                parentById.put(category.id(), category.parentId());
+            }
+        }
+        int depth = 0;
+        Long cursor = parentById.get(categoryId);
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        while (cursor != null && seen.add(cursor)) {
+            depth++;
+            cursor = parentById.get(cursor);
+        }
+        return depth;
+    }
+
+    /** 以 categoryId 为根的子树相对高度（自身=0）。 */
+    private int subtreeHeight(long categoryId) {
+        Map<Long, Integer> depths = computeDepths(repository.listCategories(userId()), childrenMap(repository.listCategories(userId())));
+        int rootDepth = depths.getOrDefault(categoryId, 0);
+        int maxDepth = rootDepth;
+        for (Map.Entry<Long, Integer> entry : depths.entrySet()) {
+            if (isAncestor(categoryId, entry.getKey())) {
+                maxDepth = Math.max(maxDepth, entry.getValue());
+            }
+        }
+        return maxDepth - rootDepth;
+    }
+
+    /** nodeId 是否位于 ancestorId 的子树（沿 parent 链上溯检查）。 */
+    private boolean isAncestor(long ancestorId, long nodeId) {
+        Map<Long, Long> parentById = new java.util.HashMap<>();
+        for (KnowledgeCategory category : repository.listCategories(userId())) {
+            if (category.parentId() != null) {
+                parentById.put(category.id(), category.parentId());
+            }
+        }
+        Long cursor = nodeId;
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        while (cursor != null && seen.add(cursor)) {
+            if (cursor == ancestorId) {
+                return true;
+            }
+            cursor = parentById.get(cursor);
+        }
+        return false;
+    }
+
+    /** 子树（含自身）分类 id 集合，供 includeDescendants 搜索。 */
+    private java.util.Set<Long> descendantIds(long categoryId) {
+        List<KnowledgeCategory> all = repository.listCategories(userId());
+        Map<Long, List<Long>> children = childrenMap(all);
+        java.util.Set<Long> result = new java.util.LinkedHashSet<>();
+        java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>();
+        queue.add(categoryId);
+        while (!queue.isEmpty()) {
+            long id = queue.poll();
+            if (!result.add(id)) continue;
+            queue.addAll(children.getOrDefault(id, List.of()));
+        }
+        return result;
     }
 
     // ---- tags ----
@@ -176,19 +395,22 @@ public class KnowledgeClassificationService {
      * q trim 后 1..100；字面子串匹配（wildcard 已转义）；标题所有文档可命中，
      * 正文仅 COMPLETED；可选 filter 必须属于当前用户；updated_at DESC, id DESC，最多 100。
      */
-    public List<KnowledgeSearchItemResponse> search(String q, Long categoryId, Long tagId) {
+    /** includeDescendants 仅在 categoryId 非空时生效：true 返回该分类及其全部后代分类的直属文档。 */
+    public List<KnowledgeSearchItemResponse> search(String q, Long categoryId, Long tagId, boolean includeDescendants) {
         String query = q == null ? "" : q.trim();
         if (query.isEmpty() || query.length() > MAX_QUERY_LENGTH) {
             throw new IllegalArgumentException("搜索词长度需为 1-" + MAX_QUERY_LENGTH + " 个字符");
         }
+        java.util.Collection<Long> categoryIds = null;
         if (categoryId != null) {
             requireCategory(categoryId);
+            categoryIds = includeDescendants ? descendantIds(categoryId) : List.of(categoryId);
         }
         if (tagId != null) {
             requireTag(tagId);
         }
         String pattern = "%" + escapeLike(query) + "%";
-        List<KnowledgeSearchRow> rows = repository.search(userId(), pattern, categoryId, tagId);
+        List<KnowledgeSearchRow> rows = repository.search(userId(), pattern, categoryIds, tagId);
         return rows.stream()
                 .limit(MAX_RESULTS)
                 .map(row -> toSearchItem(row, query))
@@ -258,7 +480,7 @@ public class KnowledgeClassificationService {
 
     private KnowledgeCategoryResponse toCategoryResponse(KnowledgeCategory category) {
         return new KnowledgeCategoryResponse(category.id(), category.name(), category.normalizedName(),
-                category.createdAt().toString(), category.updatedAt().toString());
+                category.parentId(), category.createdAt().toString(), category.updatedAt().toString());
     }
 
     private KnowledgeTagResponse toTagResponse(KnowledgeTag tag) {

@@ -1,5 +1,6 @@
 package com.resumego.knowledge;
 
+import com.resumego.knowledge.dto.KnowledgeCategoryNodeResponse;
 import com.resumego.knowledge.dto.KnowledgeCategoryResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,16 +36,22 @@ class KnowledgeCategoryControllerTest {
     KnowledgeService knowledgeService;
 
     private KnowledgeCategoryResponse sample(long id) {
-        return new KnowledgeCategoryResponse(id, "求职", "求职",
+        return new KnowledgeCategoryResponse(id, "求职", "求职", null,
                 LocalDateTime.now().toString(), LocalDateTime.now().toString());
     }
 
     @Test
-    void listsOwnedCategories() throws Exception {
-        when(classification.listCategories()).thenReturn(List.of(sample(1L)));
+    void listsOwnedCategoryTreeNodes() throws Exception {
+        KnowledgeCategoryNodeResponse node = new KnowledgeCategoryNodeResponse(
+                1L, "求职", "求职", null, 0, 2, 5,
+                LocalDateTime.now().toString(), LocalDateTime.now().toString());
+        when(classification.listCategoryTree()).thenReturn(List.of(node));
         mockMvc.perform(get("/api/v2/knowledge/categories"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].name").value("求职"));
+                .andExpect(jsonPath("$.data[0].name").value("求职"))
+                .andExpect(jsonPath("$.data[0].depth").value(0))
+                .andExpect(jsonPath("$.data[0].directDocumentCount").value(2))
+                .andExpect(jsonPath("$.data[0].descendantDocumentCount").value(5));
     }
 
     @Test
@@ -80,7 +87,7 @@ class KnowledgeCategoryControllerTest {
 
     @Test
     void foreignCategoryMapsToNotFound() throws Exception {
-        when(classification.listCategories()).thenThrow(new NoSuchElementException("分类不存在"));
+        when(classification.listCategoryTree()).thenThrow(new NoSuchElementException("分类不存在"));
         mockMvc.perform(get("/api/v2/knowledge/categories"))
                 .andExpect(status().isNotFound());
     }

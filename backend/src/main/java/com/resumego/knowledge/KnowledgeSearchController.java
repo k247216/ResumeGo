@@ -22,8 +22,9 @@ public class KnowledgeSearchController {
     public ApiResponse<List<KnowledgeSearchItemResponse>> search(
             @RequestParam("q") String q,
             @RequestParam(value = "categoryId", required = false) Long categoryId,
-            @RequestParam(value = "tagId", required = false) Long tagId) {
-        return ApiResponse.ok(service.search(q, categoryId, tagId));
+            @RequestParam(value = "tagId", required = false) Long tagId,
+            @RequestParam(value = "includeDescendants", defaultValue = "false") boolean includeDescendants) {
+        return ApiResponse.ok(service.search(q, categoryId, tagId, includeDescendants));
     }
 
     @ExceptionHandler(NoSuchElementException.class)

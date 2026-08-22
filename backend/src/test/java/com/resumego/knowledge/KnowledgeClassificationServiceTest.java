@@ -1,5 +1,6 @@
 package com.resumego.knowledge;
 
+import com.resumego.knowledge.dto.CreateKnowledgeCategoryRequest;
 import com.resumego.knowledge.dto.CreateKnowledgeNameRequest;
 import com.resumego.knowledge.dto.KnowledgeCategoryResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse;
@@ -33,7 +34,7 @@ class KnowledgeClassificationServiceTest {
     }
 
     private KnowledgeCategory category(long id, String name, String normalized) {
-        return new KnowledgeCategory(id, 1L, name, normalized, LocalDateTime.now(), LocalDateTime.now());
+        return new KnowledgeCategory(id, 1L, name, normalized, null, LocalDateTime.now(), LocalDateTime.now());
     }
 
     private KnowledgeTag tag(long id, String name, String normalized) {
@@ -48,11 +49,11 @@ class KnowledgeClassificationServiceTest {
     @Test
     void normalizesNameCollapsingInternalWhitespace() {
         when(repository.findCategoryByNormalizedName(1L, "求职 准备")).thenReturn(Optional.empty());
-        when(repository.insertCategory(1L, "求职 准备", "求职 准备")).thenReturn(12L);
+        when(repository.insertCategoryWithParent(1L, "求职 准备", "求职 准备", null)).thenReturn(12L);
         when(repository.findCategoryById(1L, 12L)).thenReturn(Optional.of(category(12L, "求职 准备", "求职 准备")));
 
         KnowledgeNameCreateResult<KnowledgeCategoryResponse> result =
-                service.createCategory(new CreateKnowledgeNameRequest("  求职  准备  "));
+                service.createCategory(new CreateKnowledgeCategoryRequest("  求职  准备  "));
 
         assertThat(result.created()).isTrue();
         assertThat(result.response().name()).isEqualTo("求职 准备");
@@ -61,7 +62,7 @@ class KnowledgeClassificationServiceTest {
 
     @Test
     void rejectsBlankName() {
-        assertThatThrownBy(() -> service.createCategory(new CreateKnowledgeNameRequest("   ")))
+        assertThatThrownBy(() -> service.createCategory(new CreateKnowledgeCategoryRequest("   ")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("名称");
         assertThatThrownBy(() -> service.createTag(new CreateKnowledgeNameRequest(null)))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -70,7 +71,7 @@ class KnowledgeClassificationServiceTest {
 
     @Test
     void rejectsNameLongerThan40() {
-        assertThatThrownBy(() -> service.createCategory(new CreateKnowledgeNameRequest("a".repeat(41))))
+        assertThatThrownBy(() -> service.createCategory(new CreateKnowledgeCategoryRequest("a".repeat(41))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("40");
     }
 
@@ -79,7 +80,7 @@ class KnowledgeClassificationServiceTest {
         when(repository.findCategoryByNormalizedName(1L, "求职")).thenReturn(Optional.of(category(5L, "求职", "求职")));
 
         KnowledgeNameCreateResult<KnowledgeCategoryResponse> result =
-                service.createCategory(new CreateKnowledgeNameRequest("  求职  "));
+                service.createCategory(new CreateKnowledgeCategoryRequest("  求职  "));
 
         assertThat(result.created()).isFalse();
         assertThat(result.response().id()).isEqualTo(5L);
@@ -129,17 +130,17 @@ class KnowledgeClassificationServiceTest {
 
     @Test
     void searchRejectsInvalidQueryAndForeignFilters() {
-        assertThatThrownBy(() -> service.search("   ", null, null))
+        assertThatThrownBy(() -> service.search("   ", null, null, false))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.search("a".repeat(101), null, null))
+        assertThatThrownBy(() -> service.search("a".repeat(101), null, null, false))
                 .isInstanceOf(IllegalArgumentException.class);
 
         when(repository.findCategoryById(1L, 99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.search("笔记", 99L, null))
+        assertThatThrownBy(() -> service.search("笔记", 99L, null, false))
                 .isInstanceOf(NoSuchElementException.class);
 
         when(repository.findTagById(1L, 98L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.search("笔记", null, 98L))
+        assertThatThrownBy(() -> service.search("笔记", null, 98L, false))
                 .isInstanceOf(NoSuchElementException.class);
         verify(repository, never()).search(anyLong(), any(), any(), any());
     }
@@ -150,7 +151,7 @@ class KnowledgeClassificationServiceTest {
         when(repository.search(eq(1L), any(), isNull(), isNull())).thenReturn(List.of(
                 new KnowledgeSearchRow(1L, "标题", "FILE", "COMPLETED", "t", "t", "CONTENT", content)));
 
-        List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null, false);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).matchedField()).isEqualTo("CONTENT");
@@ -164,7 +165,7 @@ class KnowledgeClassificationServiceTest {
         when(repository.search(eq(1L), any(), isNull(), isNull())).thenReturn(List.of(
                 new KnowledgeSearchRow(1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED", "t", "t", "TITLE", null)));
 
-        List<KnowledgeSearchItemResponse> results = service.search("tensorflow", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("tensorflow", null, null, false);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).matchedField()).isEqualTo("TITLE");
@@ -216,7 +217,7 @@ class KnowledgeClassificationServiceTest {
         when(repository.search(eq(1L), any(), isNull(), isNull())).thenReturn(List.of(
                 new KnowledgeSearchRow(1L, "标题", "FILE", "COMPLETED", "t", "t", "CONTENT", longContent)));
 
-        List<KnowledgeSearchItemResponse> results = service.search("关键词", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("关键词", null, null, false);
 
         assertThat(results.get(0).snippet()).contains("关键词");
         assertThat(results.get(0).snippet()).hasSizeLessThanOrEqualTo(240);

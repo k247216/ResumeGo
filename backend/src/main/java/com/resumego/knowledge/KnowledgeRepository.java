@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -243,6 +244,7 @@ public class KnowledgeRepository {
             rs.getLong("user_id"),
             rs.getString("name"),
             rs.getString("normalized_name"),
+            rs.getObject("parent_id") != null ? ((Number) rs.getObject("parent_id")).longValue() : null,
             rs.getTimestamp("created_at").toLocalDateTime(),
             rs.getTimestamp("updated_at").toLocalDateTime()
     );
@@ -271,7 +273,7 @@ public class KnowledgeRepository {
 
     public Optional<KnowledgeCategory> findCategoryByNormalizedName(long userId, String normalizedName) {
         return jdbcTemplate.query("""
-                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                SELECT id, user_id, name, normalized_name, parent_id, created_at, updated_at
                 FROM knowledge_categories
                 WHERE user_id = ? AND normalized_name = ?
                 """, categoryMapper, userId, normalizedName).stream().findFirst();
@@ -279,7 +281,7 @@ public class KnowledgeRepository {
 
     public Optional<KnowledgeCategory> findCategoryById(long userId, long categoryId) {
         return jdbcTemplate.query("""
-                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                SELECT id, user_id, name, normalized_name, parent_id, created_at, updated_at
                 FROM knowledge_categories
                 WHERE id = ? AND user_id = ?
                 """, categoryMapper, categoryId, userId).stream().findFirst();
@@ -287,7 +289,7 @@ public class KnowledgeRepository {
 
     public List<KnowledgeCategory> listCategories(long userId) {
         return jdbcTemplate.query("""
-                SELECT id, user_id, name, normalized_name, created_at, updated_at
+                SELECT id, user_id, name, normalized_name, parent_id, created_at, updated_at
                 FROM knowledge_categories
                 WHERE user_id = ?
                 ORDER BY updated_at DESC, id DESC
@@ -295,18 +297,58 @@ public class KnowledgeRepository {
     }
 
     public long insertCategory(long userId, String name, String normalizedName) {
+        return insertCategoryWithParent(userId, name, normalizedName, null);
+    }
+
+    public long insertCategoryWithParent(long userId, String name, String normalizedName, Long parentId) {
         KeyHolder keys = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO knowledge_categories (user_id, name, normalized_name)
-                    VALUES (?, ?, ?)
+                    INSERT INTO knowledge_categories (user_id, name, normalized_name, parent_id)
+                    VALUES (?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, userId);
             statement.setString(2, name);
             statement.setString(3, normalizedName);
+            if (parentId == null) {
+                statement.setNull(4, java.sql.Types.BIGINT);
+            } else {
+                statement.setLong(4, parentId);
+            }
             return statement;
         }, keys);
         return requiredKey(keys, "创建分类失败：未返回主键");
+    }
+
+    /** 更新名称与父节点（父可为 null 表示移到根）。 */
+    public void updateCategory(long userId, long categoryId, String name, String normalizedName, Long parentId) {
+        jdbcTemplate.update("""
+                UPDATE knowledge_categories
+                SET name = ?, normalized_name = ?, parent_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+                """, name, normalizedName, parentId, categoryId, userId);
+    }
+
+    /** 仅删除空叶节点；业务层先校验无子分类与无直属文档。 */
+    public void deleteCategoryById(long userId, long categoryId) {
+        jdbcTemplate.update("""
+                DELETE FROM knowledge_categories WHERE id = ? AND user_id = ?
+                """, categoryId, userId);
+    }
+
+    /** 直属文档计数（真实关联）。 */
+    public Map<Long, Integer> listCategoryDocumentCounts(long userId) {
+        Map<Long, Integer> counts = new java.util.HashMap<>();
+        jdbcTemplate.query("""
+                SELECT category_id, COUNT(*) AS cnt
+                FROM knowledge_document_categories
+                WHERE user_id = ?
+                GROUP BY category_id
+                """, (rs, rowNum) -> {
+            counts.put(rs.getLong("category_id"), rs.getInt("cnt"));
+            return null;
+        }, userId);
+        return counts;
     }
 
     // ---- tags ----
@@ -401,7 +443,7 @@ public class KnowledgeRepository {
     /** 读取文档当前分类：按 document_id + user_id 隔离。 */
     public Optional<KnowledgeCategory> findDocumentCategory(long userId, long documentId) {
         return jdbcTemplate.query("""
-                SELECT c.id, c.user_id, c.name, c.normalized_name, c.created_at, c.updated_at
+                SELECT c.id, c.user_id, c.name, c.normalized_name, c.parent_id, c.created_at, c.updated_at
                 FROM knowledge_document_categories dc
                 JOIN knowledge_categories c ON c.id = dc.category_id
                 WHERE dc.document_id = ? AND dc.user_id = ?
@@ -426,7 +468,7 @@ public class KnowledgeRepository {
      * pattern 为 %...% 且已转义 wildcard；LOWER() 实现中英文大小写不敏感。
      * 可选 filter 必须属于当前用户（EXISTS 内带 user_id）。
      */
-    public List<KnowledgeSearchRow> search(long userId, String pattern, Long categoryId, Long tagId) {
+    public List<KnowledgeSearchRow> search(long userId, String pattern, java.util.Collection<Long> categoryIds, Long tagId) {
         StringBuilder sql = new StringBuilder("""
                 SELECT d.id, d.title, d.source_type, d.processing_status,
                        d.created_at, d.updated_at,
@@ -446,9 +488,13 @@ public class KnowledgeRepository {
         params.add(userId);
         params.add(pattern);
         params.add(pattern);
-        if (categoryId != null) {
-            sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_categories dc WHERE dc.document_id = d.id AND dc.user_id = d.user_id AND dc.category_id = ?)");
-            params.add(categoryId);
+        if (categoryIds != null && !categoryIds.isEmpty()) {
+            sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_categories dc WHERE dc.document_id = d.id AND dc.user_id = d.user_id AND dc.category_id IN (");
+            for (int i = 0; i < categoryIds.size(); i++) {
+                sql.append(i == 0 ? "?" : ", ?");
+            }
+            sql.append("))");
+            params.addAll(categoryIds);
         }
         if (tagId != null) {
             sql.append(" AND EXISTS (SELECT 1 FROM knowledge_document_tags dt WHERE dt.document_id = d.id AND dt.user_id = d.user_id AND dt.tag_id = ?)");

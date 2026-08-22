@@ -7,6 +7,7 @@ public record KnowledgeCategory(
         Long userId,
         String name,
         String normalizedName,
+        Long parentId,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

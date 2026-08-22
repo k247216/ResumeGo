@@ -50,7 +50,7 @@ class KnowledgeSearchIntegrationTest {
 
     @Test
     void titleMatchesAllDocumentsWithCaseInsensitiveEnglish() {
-        List<KnowledgeSearchItemResponse> results = service.search("tensorflow", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("tensorflow", null, null, false);
         assertThat(results).isNotEmpty();
         assertThat(results).anyMatch(r -> r.document().id() == tensorflowNote && "TITLE".equals(r.matchedField()));
         assertThat(results).anyMatch(r -> r.document().id() == interviewDoc && "CONTENT".equals(r.matchedField()));
@@ -63,7 +63,7 @@ class KnowledgeSearchIntegrationTest {
                 INSERT INTO knowledge_extracted_contents (document_id, user_id, content)
                 VALUES (?, 1, 'Python 脚本 部署 复盘')
                 """, pendingDoc);
-        List<KnowledgeSearchItemResponse> results = service.search("复盘", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("复盘", null, null, false);
         assertThat(results).isNotEmpty();
         assertThat(results).noneMatch(r -> r.document().id() == pendingDoc);
         assertThat(results).anyMatch(r -> r.document().id() == interviewDoc
@@ -77,30 +77,30 @@ class KnowledgeSearchIntegrationTest {
         long bangDoc = repository.insertDocument(1L, "真棒!达成", "NOTE", "NOT_STARTED");
         long backslashDoc = repository.insertDocument(1L, "路径 C:\\Temp", "NOTE", "NOT_STARTED");
 
-        List<KnowledgeSearchItemResponse> results = service.search("100%_成功", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("100%_成功", null, null, false);
         assertThat(results).hasSize(1);
         assertThat(results.get(0).document().id()).isEqualTo(wildcardDoc);
 
         // 单独的 % 只命中确实包含字面 % 的标题
-        List<KnowledgeSearchItemResponse> percent = service.search("%", null, null);
+        List<KnowledgeSearchItemResponse> percent = service.search("%", null, null, false);
         assertThat(percent).isNotEmpty();
         assertThat(percent).allMatch(r -> r.document().title().contains("%"));
 
         // 单独的 _ 只命中字面 _
-        List<KnowledgeSearchItemResponse> underscore = service.search("_", null, null);
+        List<KnowledgeSearchItemResponse> underscore = service.search("_", null, null, false);
         assertThat(underscore).isNotEmpty();
         assertThat(underscore).allMatch(r -> r.document().title().contains("_"));
 
         // 转义符 ! 本身可作字面字符搜索
-        List<KnowledgeSearchItemResponse> bang = service.search("真棒!达成", null, null);
+        List<KnowledgeSearchItemResponse> bang = service.search("真棒!达成", null, null, false);
         assertThat(bang).hasSize(1);
         assertThat(bang.get(0).document().id()).isEqualTo(bangDoc);
-        List<KnowledgeSearchItemResponse> loneBang = service.search("!", null, null);
+        List<KnowledgeSearchItemResponse> loneBang = service.search("!", null, null, false);
         assertThat(loneBang).isNotEmpty();
         assertThat(loneBang).allMatch(r -> r.document().title().contains("!"));
 
         // 反斜杠作为普通字面字符
-        List<KnowledgeSearchItemResponse> backslash = service.search("C:\\Temp", null, null);
+        List<KnowledgeSearchItemResponse> backslash = service.search("C:\\Temp", null, null, false);
         assertThat(backslash).isNotEmpty();
         assertThat(backslash).anyMatch(r -> r.document().id() == backslashDoc);
     }
@@ -133,25 +133,25 @@ class KnowledgeSearchIntegrationTest {
         repository.addDocumentTag(1L, tensorflowNote, tagId);
         repository.addDocumentTag(1L, interviewDoc, otherTag);
 
-        List<KnowledgeSearchItemResponse> both = service.search("TensorFlow", categoryId, tagId);
+        List<KnowledgeSearchItemResponse> both = service.search("TensorFlow", categoryId, tagId, false);
         assertThat(both).hasSize(1);
         assertThat(both.get(0).document().id()).isEqualTo(tensorflowNote);
 
         // 只按标签过滤：interviewDoc 命中但被 otherTag 过滤后仅剩有该标签的文档
-        List<KnowledgeSearchItemResponse> byTag = service.search("TensorFlow", null, otherTag);
+        List<KnowledgeSearchItemResponse> byTag = service.search("TensorFlow", null, otherTag, false);
         assertThat(byTag).hasSize(1);
         assertThat(byTag.get(0).document().id()).isEqualTo(interviewDoc);
     }
 
     @Test
     void emptyResultForMissingKeyword() {
-        assertThat(service.search("不存在的词", null, null)).isEmpty();
+        assertThat(service.search("不存在的词", null, null, false)).isEmpty();
     }
 
     @Test
     void searchIsIsolatedPerUser() {
         repository.insertDocument(2L, "他人的 TensorFlow 笔记", "NOTE", "NOT_STARTED");
-        List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null, false);
         assertThat(results).noneMatch(r -> r.document().title().contains("他人的"));
     }
 
@@ -159,7 +159,7 @@ class KnowledgeSearchIntegrationTest {
     void ordersByUpdatedAtDescThenIdDesc() {
         jdbcTemplate.update("UPDATE knowledge_documents SET updated_at = DATEADD('SECOND', -10, CURRENT_TIMESTAMP) WHERE id = ?",
                 tensorflowNote);
-        List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null);
+        List<KnowledgeSearchItemResponse> results = service.search("TensorFlow", null, null, false);
         assertThat(results).isNotEmpty();
         assertThat(results.get(0).document().id()).isEqualTo(interviewDoc);
         assertThat(results.get(0).document().processingStatus()).isEqualTo("COMPLETED");

@@ -83,10 +83,13 @@ CREATE TABLE knowledge_categories (
     user_id BIGINT NOT NULL,
     name VARCHAR(40) NOT NULL,
     normalized_name VARCHAR(40) NOT NULL,
+    parent_id BIGINT NULL,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_knowledge_category_user_name UNIQUE (user_id, normalized_name),
-    CONSTRAINT fk_knowledge_category_user FOREIGN KEY (user_id) REFERENCES users (id)
+    CONSTRAINT fk_knowledge_category_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_knowledge_category_parent FOREIGN KEY (parent_id)
+        REFERENCES knowledge_categories (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE knowledge_tags (

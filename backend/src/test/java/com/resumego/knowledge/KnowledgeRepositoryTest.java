@@ -306,4 +306,26 @@ class KnowledgeRepositoryTest {
         repository.deleteDocumentById(1L, docId);
         assertThat(repository.findById(1L, docId)).isEmpty();
     }
+
+    @Test
+    void hierarchicalCategoryCrudWithParentAndCounts() {
+        long root = repository.insertCategoryWithParent(1L, "根", "根", null);
+        long child = repository.insertCategoryWithParent(1L, "子", "子", root);
+        assertThat(repository.findCategoryById(1L, child).orElseThrow().parentId()).isEqualTo(root);
+
+        repository.updateCategory(1L, child, "子改", "子改", null);
+        assertThat(repository.findCategoryById(1L, child).orElseThrow().parentId()).isNull();
+        assertThat(repository.findCategoryById(1L, child).orElseThrow().name()).isEqualTo("子改");
+
+        // 计数由真实关联计算
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        repository.setDocumentCategory(1L, docId, root);
+        assertThat(repository.listCategoryDocumentCounts(1L)).containsEntry(root, 1);
+
+        repository.deleteCategoryById(1L, child);
+        assertThat(repository.findCategoryById(1L, child)).isEmpty();
+        assertThat(repository.findCategoryById(1L, root)).isPresent();
+        // 用户隔离
+        assertThat(repository.findCategoryById(2L, root)).isEmpty();
+    }
 }
