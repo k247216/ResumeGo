@@ -136,6 +136,9 @@ class CareerPipelineRepositoryTest {
         assertThat(history.get(1).toStageId()).isEqualTo(interview);
         // 顺序稳定：occurredAt ASC, id ASC
         assertThat(history.get(0).id()).isLessThan(history.get(1).id());
+
+        // 跨用户：user 1 无权读取 user 2 管线的历史（所有权过滤）
+        assertThat(repository.findTransitions(1L, second)).isEmpty();
     }
 
     @Test
@@ -144,5 +147,36 @@ class CareerPipelineRepositoryTest {
         repository.createStage(pipelineId, "准备中", 0, PipelineStageState.CURRENT);
 
         assertThat(repository.findTransitions(1L, pipelineId)).isEmpty();
+    }
+
+    @Test
+    void findTransitionsIsReadOnlyAndDoesNotMutateAnyTable() {
+        long pipelineId = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        long prepare = repository.createStage(pipelineId, "准备中", 0, PipelineStageState.CURRENT);
+        long interview = repository.createStage(pipelineId, "技术面", 1, PipelineStageState.PENDING);
+        repository.appendTransition(pipelineId, null, prepare, "USER", "创建管线");
+        repository.appendTransition(pipelineId, prepare, interview, "USER", "进入技术面");
+
+        // 查询前快照：行数与关键值
+        Integer beforeTransitions = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pipeline_stage_transitions", Integer.class);
+        Integer beforeStages = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pipeline_stages WHERE pipeline_id = ?", Integer.class, pipelineId);
+        Integer beforePipelines = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM career_pipelines WHERE id = ?", Integer.class, pipelineId);
+
+        List<PipelineStageTransition> history = repository.findTransitions(1L, pipelineId);
+        assertThat(history).hasSize(2);
+
+        // 查询后：所有表行数不变（只读证明）
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pipeline_stage_transitions", Integer.class))
+                .isEqualTo(beforeTransitions);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pipeline_stages WHERE pipeline_id = ?", Integer.class, pipelineId))
+                .isEqualTo(beforeStages);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM career_pipelines WHERE id = ?", Integer.class, pipelineId))
+                .isEqualTo(beforePipelines);
     }
 }
