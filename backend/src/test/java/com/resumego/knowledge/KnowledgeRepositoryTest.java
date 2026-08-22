@@ -222,4 +222,29 @@ class KnowledgeRepositoryTest {
                 "SELECT COUNT(*) FROM knowledge_document_tags WHERE document_id = ?", Integer.class, docId);
         assertThat(after).isEqualTo(1);
     }
+
+    @Test
+    void readsDocumentClassificationUserScopedWithStableTagOrder() {
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        long cat = repository.insertCategory(1L, "求职", "求职");
+        long tagB = repository.insertTag(1L, "面试", "面试");
+        long tagA = repository.insertTag(1L, "机器学习", "机器学习");
+        repository.setDocumentCategory(1L, docId, cat);
+        repository.addDocumentTag(1L, docId, tagB);
+        repository.addDocumentTag(1L, docId, tagA);
+
+        assertThat(repository.findDocumentCategory(1L, docId)).isPresent();
+        assertThat(repository.findDocumentCategory(1L, docId).orElseThrow().name()).isEqualTo("求职");
+        // 用户隔离
+        assertThat(repository.findDocumentCategory(2L, docId)).isEmpty();
+        assertThat(repository.listDocumentTags(2L, docId)).isEmpty();
+        // 冻结排序 name ASC, id ASC
+        assertThat(repository.listDocumentTags(1L, docId))
+                .extracting(KnowledgeTag::name).containsExactly("机器学习", "面试");
+
+        // 无关联文档诚实返回空
+        long other = repository.insertDocument(1L, "无关联", "NOTE", "NOT_STARTED");
+        assertThat(repository.findDocumentCategory(1L, other)).isEmpty();
+        assertThat(repository.listDocumentTags(1L, other)).isEmpty();
+    }
 }

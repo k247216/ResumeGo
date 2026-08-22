@@ -1,6 +1,8 @@
 package com.resumego.knowledge;
 
+import com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse;
 import com.resumego.knowledge.dto.KnowledgeSearchItemResponse;
+import com.resumego.knowledge.dto.KnowledgeTagResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,7 +73,10 @@ class KnowledgeSearchIntegrationTest {
     }
 
     @Test
-    void wildcardCharactersMatchLiterally() {
+    void wildcardAndEscapeCharsMatchLiterally() {
+        long bangDoc = repository.insertDocument(1L, "真棒!达成", "NOTE", "NOT_STARTED");
+        long backslashDoc = repository.insertDocument(1L, "路径 C:\\Temp", "NOTE", "NOT_STARTED");
+
         List<KnowledgeSearchItemResponse> results = service.search("100%_成功", null, null);
         assertThat(results).hasSize(1);
         assertThat(results.get(0).document().id()).isEqualTo(wildcardDoc);
@@ -80,6 +85,43 @@ class KnowledgeSearchIntegrationTest {
         List<KnowledgeSearchItemResponse> percent = service.search("%", null, null);
         assertThat(percent).isNotEmpty();
         assertThat(percent).allMatch(r -> r.document().title().contains("%"));
+
+        // 单独的 _ 只命中字面 _
+        List<KnowledgeSearchItemResponse> underscore = service.search("_", null, null);
+        assertThat(underscore).isNotEmpty();
+        assertThat(underscore).allMatch(r -> r.document().title().contains("_"));
+
+        // 转义符 ! 本身可作字面字符搜索
+        List<KnowledgeSearchItemResponse> bang = service.search("真棒!达成", null, null);
+        assertThat(bang).hasSize(1);
+        assertThat(bang.get(0).document().id()).isEqualTo(bangDoc);
+        List<KnowledgeSearchItemResponse> loneBang = service.search("!", null, null);
+        assertThat(loneBang).isNotEmpty();
+        assertThat(loneBang).allMatch(r -> r.document().title().contains("!"));
+
+        // 反斜杠作为普通字面字符
+        List<KnowledgeSearchItemResponse> backslash = service.search("C:\\Temp", null, null);
+        assertThat(backslash).isNotEmpty();
+        assertThat(backslash).anyMatch(r -> r.document().id() == backslashDoc);
+    }
+
+    @Test
+    void readsDocumentClassificationWithOwnedRelations() {
+        long categoryId = repository.insertCategory(1L, "求职", "求职");
+        long tagA = repository.insertTag(1L, "机器学习", "机器学习");
+        long tagB = repository.insertTag(1L, "面试", "面试");
+        repository.setDocumentCategory(1L, tensorflowNote, categoryId);
+        repository.addDocumentTag(1L, tensorflowNote, tagB);
+        repository.addDocumentTag(1L, tensorflowNote, tagA);
+
+        KnowledgeDocumentClassificationResponse result = service.getDocumentClassification(tensorflowNote);
+        assertThat(result.category()).isNotNull();
+        assertThat(result.category().name()).isEqualTo("求职");
+        assertThat(result.tags()).extracting(KnowledgeTagResponse::name).containsExactly("机器学习", "面试");
+
+        KnowledgeDocumentClassificationResponse empty = service.getDocumentClassification(wildcardDoc);
+        assertThat(empty.category()).isNull();
+        assertThat(empty.tags()).isEmpty();
     }
 
     @Test

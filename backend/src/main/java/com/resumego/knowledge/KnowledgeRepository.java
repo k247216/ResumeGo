@@ -393,6 +393,30 @@ public class KnowledgeRepository {
                 """, documentId, tagId, userId);
     }
 
+
+    // ---- document classification read ----
+
+    /** 读取文档当前分类：按 document_id + user_id 隔离。 */
+    public Optional<KnowledgeCategory> findDocumentCategory(long userId, long documentId) {
+        return jdbcTemplate.query("""
+                SELECT c.id, c.user_id, c.name, c.normalized_name, c.created_at, c.updated_at
+                FROM knowledge_document_categories dc
+                JOIN knowledge_categories c ON c.id = dc.category_id
+                WHERE dc.document_id = ? AND dc.user_id = ?
+                """, categoryMapper, documentId, userId).stream().findFirst();
+    }
+
+    /** 读取文档标签：冻结排序 name ASC, id ASC；按 document_id + user_id 隔离。 */
+    public List<KnowledgeTag> listDocumentTags(long userId, long documentId) {
+        return jdbcTemplate.query("""
+                SELECT t.id, t.user_id, t.name, t.normalized_name, t.created_at, t.updated_at
+                FROM knowledge_document_tags dt
+                JOIN knowledge_tags t ON t.id = dt.tag_id
+                WHERE dt.document_id = ? AND dt.user_id = ?
+                ORDER BY t.name ASC, t.id ASC
+                """, tagMapper, documentId, userId);
+    }
+
     // ---- keyword search ----
 
     /**
@@ -404,16 +428,16 @@ public class KnowledgeRepository {
         StringBuilder sql = new StringBuilder("""
                 SELECT d.id, d.title, d.source_type, d.processing_status,
                        d.created_at, d.updated_at,
-                       CASE WHEN LOWER(d.title) LIKE LOWER(?) ESCAPE '\\' THEN 'TITLE' ELSE 'CONTENT' END AS matched_field,
+                       CASE WHEN LOWER(d.title) LIKE LOWER(?) ESCAPE '!' THEN 'TITLE' ELSE 'CONTENT' END AS matched_field,
                        c.content
                 FROM knowledge_documents d
                 LEFT JOIN knowledge_extracted_contents c
                        ON c.document_id = d.id AND c.user_id = d.user_id
                       AND d.processing_status = 'COMPLETED'
                 WHERE d.user_id = ?
-                  AND (LOWER(d.title) LIKE LOWER(?) ESCAPE '\\'
+                  AND (LOWER(d.title) LIKE LOWER(?) ESCAPE '!'
                        OR (d.processing_status = 'COMPLETED' AND c.content IS NOT NULL
-                           AND LOWER(c.content) LIKE LOWER(?) ESCAPE '\\'))
+                           AND LOWER(c.content) LIKE LOWER(?) ESCAPE '!'))
                 """);
         java.util.List<Object> params = new java.util.ArrayList<>();
         params.add(pattern);

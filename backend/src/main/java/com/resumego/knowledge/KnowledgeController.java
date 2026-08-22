@@ -45,6 +45,12 @@ public class KnowledgeController {
         return ApiResponse.ok(service.getContent(id));
     }
 
+    @GetMapping("/{documentId}/classification")
+    public ApiResponse<com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse> classification(
+            @PathVariable long documentId) {
+        return ApiResponse.ok(classification.getDocumentClassification(documentId));
+    }
+
     @PutMapping("/{documentId}/category/{categoryId}")
     public ApiResponse<Void> setCategory(@PathVariable long documentId, @PathVariable long categoryId) {
         classification.setDocumentCategory(documentId, categoryId);

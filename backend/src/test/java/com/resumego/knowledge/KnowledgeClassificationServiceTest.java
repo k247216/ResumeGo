@@ -2,7 +2,9 @@ package com.resumego.knowledge;
 
 import com.resumego.knowledge.dto.CreateKnowledgeNameRequest;
 import com.resumego.knowledge.dto.KnowledgeCategoryResponse;
+import com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse;
 import com.resumego.knowledge.dto.KnowledgeSearchItemResponse;
+import com.resumego.knowledge.dto.KnowledgeTagResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -171,9 +173,41 @@ class KnowledgeClassificationServiceTest {
     }
 
     @Test
-    void escapeLikeEscapesWildcardsLiterally() {
-        assertThat(KnowledgeClassificationService.escapeLike("100%_x\\y"))
-                .isEqualTo("100\\%\\_x\\\\y");
+    void escapeLikeEscapesWithPortableSingleCharEscape() {
+        assertThat(KnowledgeClassificationService.escapeLike("100%_x\\y!"))
+                .isEqualTo("100!%!_x\\y!!");
+    }
+
+
+    @Test
+    void readsDocumentClassificationWithEmptyHonesty() {
+        when(repository.findById(1L, 10L)).thenReturn(Optional.of(doc(10L)));
+        when(repository.findDocumentCategory(1L, 10L)).thenReturn(Optional.empty());
+        when(repository.listDocumentTags(1L, 10L)).thenReturn(List.of());
+
+        KnowledgeDocumentClassificationResponse result = service.getDocumentClassification(10L);
+        assertThat(result.category()).isNull();
+        assertThat(result.tags()).isEmpty();
+    }
+
+    @Test
+    void readsDocumentClassificationWithOwnedCategoryAndTags() {
+        when(repository.findById(1L, 10L)).thenReturn(Optional.of(doc(10L)));
+        when(repository.findDocumentCategory(1L, 10L)).thenReturn(Optional.of(category(3L, "求职", "求职")));
+        when(repository.listDocumentTags(1L, 10L)).thenReturn(
+                List.of(tag(2L, "面试", "面试"), tag(1L, "机器学习", "机器学习")));
+
+        KnowledgeDocumentClassificationResponse result = service.getDocumentClassification(10L);
+        assertThat(result.category().id()).isEqualTo(3L);
+        assertThat(result.tags()).extracting(KnowledgeTagResponse::name).containsExactly("面试", "机器学习");
+    }
+
+    @Test
+    void classificationRequiresOwnedDocument() {
+        when(repository.findById(1L, 404L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.getDocumentClassification(404L))
+                .isInstanceOf(NoSuchElementException.class);
+        verify(repository, never()).findDocumentCategory(anyLong(), anyLong());
     }
 
     @Test

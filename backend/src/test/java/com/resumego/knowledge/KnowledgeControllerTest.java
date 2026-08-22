@@ -117,4 +117,24 @@ class KnowledgeControllerTest {
         mockMvc.perform(put("/api/v2/knowledge/documents/7/tags/99"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void readsDocumentClassificationHonestly() throws Exception {
+        com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse resp =
+                new com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse(null, java.util.List.of());
+        org.mockito.Mockito.when(classification.getDocumentClassification(7L)).thenReturn(resp);
+        mockMvc.perform(get("/api/v2/knowledge/documents/7/classification"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.category").value((Object) null))
+                .andExpect(jsonPath("$.data.tags").isArray())
+                .andExpect(jsonPath("$.data.tags.length()").value(0));
+    }
+
+    @Test
+    void foreignClassificationMapsToNotFound() throws Exception {
+        org.mockito.Mockito.when(classification.getDocumentClassification(404L))
+                .thenThrow(new NoSuchElementException("知识文档不存在"));
+        mockMvc.perform(get("/api/v2/knowledge/documents/404/classification"))
+                .andExpect(status().isNotFound());
+    }
 }

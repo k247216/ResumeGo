@@ -2,6 +2,7 @@ package com.resumego.knowledge;
 
 import com.resumego.common.CurrentUser;
 import com.resumego.knowledge.dto.CreateKnowledgeNameRequest;
+import com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse;
 import com.resumego.knowledge.dto.KnowledgeCategoryResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
 import com.resumego.knowledge.dto.KnowledgeSearchItemResponse;
@@ -157,6 +158,18 @@ public class KnowledgeClassificationService {
                 .orElseThrow(() -> new NoSuchElementException("标签不存在"));
     }
 
+    // ---- document classification read ----
+
+    /** 读取文档现有关联：document 必须属于当前用户，否则 404；空关联诚实返回 null/[]。 */
+    public KnowledgeDocumentClassificationResponse getDocumentClassification(long documentId) {
+        requireDocument(documentId);
+        KnowledgeCategory category = repository.findDocumentCategory(userId(), documentId).orElse(null);
+        List<KnowledgeTag> tags = repository.listDocumentTags(userId(), documentId);
+        return new KnowledgeDocumentClassificationResponse(
+                category == null ? null : toCategoryResponse(category),
+                tags.stream().map(this::toTagResponse).toList());
+    }
+
     // ---- search ----
 
     /**
@@ -182,11 +195,14 @@ public class KnowledgeClassificationService {
                 .toList();
     }
 
-    /** 转义 SQL LIKE wildcard：% _ 与反斜杠。 */
+    /**
+     * 可移植单字符转义（ESCAPE '!'，MySQL 反斜杠字符串语义下安全）：
+     * 先 ! -> !!，再 % -> !%，_ -> !_；反斜杠作为普通字面字符，不充当 escape char。
+     */
     static String escapeLike(String input) {
-        return input.replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
+        return input.replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
     }
 
     private KnowledgeSearchItemResponse toSearchItem(KnowledgeSearchRow row, String query) {
