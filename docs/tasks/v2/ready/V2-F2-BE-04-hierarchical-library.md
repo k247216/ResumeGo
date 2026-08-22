@@ -2,9 +2,9 @@
 
 ## Identity
 
-- Status: `QUEUED`
+- Status: `READY`
 - Branch: `codex/v2-f2-be-04-hierarchical-library`
-- Base commit: integration HEAD after IO-02
+- Base commit: `d701ddc87aafc1a4f3d71043c4108c87fd8814d0`
 - Depends on: integrated F2-IO-02
 
 ## User result

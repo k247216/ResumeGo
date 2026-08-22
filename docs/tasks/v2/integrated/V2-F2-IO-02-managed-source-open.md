@@ -2,9 +2,9 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-io-02-managed-source-open`
-- Base commit: `15e078e9a53158057300d677df92a4d3455bfbba`
+- Integrated commits: `d2204b1`、`d701ddc`
 - Depends on: integrated F2-BE-03
 
 ## User result
