@@ -3,7 +3,7 @@
 
 Version: V2.0
 
-Status: Far-term direction draft (V2, not in current development)
+Status: Approved architecture direction (V2, current development line)
 
 
 # 1. Architecture Overview
@@ -712,4 +712,3 @@ AI能力增强：
 - Calendar Sync
 - Career Agent
 - Smart Application Assistant
-

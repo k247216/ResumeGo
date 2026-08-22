@@ -1,4 +1,7 @@
-# ResumeGo 产品定义
+# ResumeGo V1 产品定义（历史基线）
+
+> 状态：仅用于 V1 维护和 V2 数据迁移参考。V2 当前产品定义以
+> `docs/product/productV2.md` 与 Career OS Foundation 设计文档为准。
 
 ## 定位
 

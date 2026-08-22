@@ -251,3 +251,22 @@ Career Pipeline（管理目标）→ Resume Version（管理表达）→ Knowled
 - 当前产品定义以 `docs/product/product.md` 为准，开发按 V1 → V1.5 → V2 顺序推进；
 - 数据诚实、证据驱动、AI 受约束、本地优先原则不变，三个版本都适用。
 
+## 2026-08-22｜V2.0 进入当前开发，早期与 V1 并行安装
+
+**决定**
+
+职达 Career OS V2.0 从远期草案转为当前开发线。V1 由独立维护流程继续负责 Release、缺陷修复和现有功能优化；V2 不再承接 V1 的界面优化任务，而围绕 Knowledge Base、Career Pipeline、Resume Version、Interview Engine、Growth Feedback 和 Workspace Action 分阶段演进。
+
+V2 早期版本与 V1 并行安装：使用独立应用标识、产品显示名和本地数据目录。V2 只通过显式迁移流程读取 V1 备份或工作区副本，迁移前创建备份，不原地修改 V1 数据。V2 稳定前不支持将已经升级的数据降级回 V1。
+
+**原因**
+
+V1 已经形成可下载、可在 Windows 使用的发行基线，同时 V2 将重构核心业务对象和数据关系。并行安装可以让 V1 持续维护，也允许 V2 在不危及现有用户数据的前提下进行架构级迭代。
+
+**影响**
+
+- `docs/product/productV2.md` 成为当前产品定义，`docs/product/product.md` 降级为 V1 历史与迁移参考；
+- `docs/architecture/architectureV2.md` 成为 V2 目标架构，现有 `docs/architecture/architecture.md` 继续描述当前代码基线；
+- V2 开发使用隔离 worktree 和短期 `codex/` 分支，`main` 仍是唯一长期分支；
+- V2 第一阶段是 Career OS Foundation，不同时全面建设全部系统；
+- V1 数据兼容通过可验证、可重试的迁移层实现，不通过长期保留错误领域模型实现。
