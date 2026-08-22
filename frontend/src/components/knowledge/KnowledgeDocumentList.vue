@@ -37,9 +37,16 @@
             :data-test="'doc-row-' + item.document.id"
             @click="$emit('select', item.document.id)"
           >
-            <el-icon class="row-icon" :data-type="iconType(item.document)">
-              <component :is="iconOf(item.document)" />
-            </el-icon>
+            <span class="file-visual" :class="'type-' + iconType(item.document)">
+              <el-icon class="row-icon" :data-type="iconType(item.document)">
+                <component :is="iconOf(item.document)" />
+              </el-icon>
+              <span
+                class="file-type"
+                :class="'type-' + iconType(item.document)"
+                :data-test="'file-type-' + item.document.id"
+              >{{ shortTypeLabel(item.document) }}</span>
+            </span>
             <span class="row-main">
               <strong>{{ item.document.title }}</strong>
               <span class="row-meta">{{ metaOf(item.document) }}</span>
@@ -116,7 +123,14 @@ function typeLabel(doc: KnowledgeDocument): string {
   const extension = doc.sourceExtension?.toLowerCase()
   if (extension === 'md') return 'Markdown'
   if (extension === 'txt') return 'TXT'
-  return '文件'
+  return extension ? extension.toUpperCase() : '文件'
+}
+
+function shortTypeLabel(doc: KnowledgeDocument): string {
+  if (doc.sourceType === 'NOTE') return 'NOTE'
+  const extension = doc.sourceExtension?.toLowerCase()
+  if (extension === 'md') return 'MD'
+  return extension ? extension.toUpperCase().slice(0, 4) : 'FILE'
 }
 
 function metaOf(doc: KnowledgeDocument): string {
@@ -149,22 +163,28 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 <style scoped>
 .doc-list{width:320px;min-width:0;border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;min-height:0;background:var(--surface-solid)}
 .list-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px}
-.list-head strong{font-size:12px;font-weight:600;color:var(--muted)}
+.list-head strong{font-size:12px;font-weight:650;color:var(--ink)}
 .list-actions{display:inline-flex;align-items:center;gap:8px}
 .list-sort{border:0;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 4px}
 .list-sort:hover{color:var(--brand)}
 .list-collapse{border:0;background:transparent;color:var(--copy);cursor:pointer;font-size:14px;padding:0 4px}
 .list-rows{list-style:none;margin:0;padding:0;overflow-y:auto;display:flex;flex-direction:column}
-.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:8px;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;cursor:pointer}
+.row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:start;gap:9px;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;cursor:pointer}
 .row:hover{background:var(--bg-hover)}
 .row.selected{background:var(--bg-selected);box-shadow:inset 2px 0 0 var(--brand)}
-.row-icon{flex:none;font-size:15px;color:var(--muted)}
-.row-icon[data-type='note']{color:var(--brand)}
-.row-icon[data-type='md']{color:#2f7ed8}
-.row-icon[data-type='txt']{color:#c48220}
+.file-visual{position:relative;display:grid;width:30px;height:34px;place-items:start center;color:var(--type-color,var(--copy))}
+.row-icon{font-size:28px;color:currentColor}
+.file-type{position:absolute;left:50%;bottom:3px;min-width:22px;max-width:32px;transform:translateX(-50%);padding:1px 2px;border-radius:3px;background:var(--type-color,var(--copy));color:#fff;font-size:7px;font-weight:750;line-height:1;text-align:center;letter-spacing:-.02em;box-sizing:border-box}
+.file-visual.type-note{--type-color:var(--brand)}
+.file-visual.type-md{--type-color:#36a853}
+.file-visual.type-txt{--type-color:#c48220}
+.file-visual.type-pdf{--type-color:#e34b45}
+.file-visual.type-doc,.file-visual.type-docx{--type-color:#3978d4}
+.file-visual.type-ppt,.file-visual.type-pptx{--type-color:#e77532}
+.file-visual.type-xls,.file-visual.type-xlsx{--type-color:#23875a}
 .row-main{flex:1;min-width:0;display:grid;gap:2px}
 .row-main strong{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row-meta{font-size:11px;color:var(--muted)}
+.row-meta{font-size:11px;color:var(--copy)}
 .row-location,.row-snippet{grid-column:2/-1;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-status{flex:none;font-size:10px;padding:1px 7px;border-radius:999px;margin-top:2px}
 .tone-ok{color:var(--brand);background:var(--brand-soft)}

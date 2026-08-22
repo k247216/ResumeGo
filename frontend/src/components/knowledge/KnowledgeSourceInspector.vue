@@ -139,13 +139,18 @@ function statusLabel(status: KnowledgeDocument['processingStatus']): string {
 .block{padding:14px 0;border-bottom:1px solid var(--border-subtle)}
 .block h3{margin:0 0 8px;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em}
 .block.danger h3{color:var(--danger)}
-.select{width:100%;padding:7px 10px;border:1px solid var(--border-default);border-radius:9px;background:var(--bg-subtle);color:var(--ink);font-size:13px}
+.select{box-sizing:border-box;width:100%;height:36px;padding:0 32px 0 11px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-solid);color:var(--ink);font-size:13px;font-weight:500;cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease}
+.select:hover{border-color:var(--copy)}
+.select:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.select:disabled{cursor:not-allowed;opacity:.58}
 .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:var(--bg-subtle);color:var(--copy);font-size:12px}
 .tag-remove{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:0 2px}
 .tag-remove:hover{color:var(--danger)}
 .tag-empty{font-size:12px;color:var(--muted)}
-.tag-add{padding:4px 8px;border:1px dashed var(--border-default);border-radius:999px;background:transparent;color:var(--copy);font-size:12px}
+.tag-add{height:30px;padding:0 28px 0 10px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-solid);color:var(--ink);font-size:12px;cursor:pointer}
+.tag-add:hover{border-color:var(--copy)}
+.tag-add:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .source-meta{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0 0 10px;font-size:12px}
 .source-meta dt{color:var(--muted)}
 .source-meta dd{margin:0;color:var(--copy)}

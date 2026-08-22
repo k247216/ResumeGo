@@ -37,7 +37,7 @@
               :class="{ active: tag.id === activeTagId }"
               :data-test="'navigator-tag-' + tag.id"
               @click="$emit('select-tag', tag.id === activeTagId ? null : tag.id)"
-            >{{ tag.name }}</button>
+            ><el-icon class="tag-icon" :data-test="'navigator-tag-icon-' + tag.id" :size="14"><PriceTag /></el-icon><span>{{ tag.name }}</span></button>
           </li>
           <li v-if="!tags.length" class="tag-empty">暂无标签</li>
         </ul>
@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, PriceTag } from '@element-plus/icons-vue'
 import KnowledgeFolderTree from './KnowledgeFolderTree.vue'
 import type { KnowledgeCategoryNode, KnowledgeTag } from '../../types/knowledge'
 
@@ -79,13 +79,15 @@ defineEmits<{
 .nav-section{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
 .nav-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
 .nav-head-actions{display:inline-flex;align-items:center;gap:2px}
-.nav-head strong{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em}
+.nav-head strong{font-size:12px;font-weight:650;color:var(--ink);letter-spacing:.02em}
 .nav-action{border:0;background:transparent;color:var(--copy);font-size:14px;cursor:pointer;padding:0 4px}
 .nav-action:hover{color:var(--brand)}
 .tag-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
-.tag-item{border:0;background:transparent;color:var(--copy);font-size:13px;text-align:left;padding:5px 8px;border-radius:8px;cursor:pointer;width:100%}
+.tag-item{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);font-size:13px;text-align:left;padding:5px 8px;border-radius:8px;cursor:pointer;width:100%}
+.tag-icon{flex:none;color:var(--copy)}
 .tag-item:hover{background:var(--bg-hover)}
 .tag-item.active{background:var(--bg-selected);color:var(--brand)}
+.tag-item.active .tag-icon{color:var(--brand)}
 .tag-empty{color:var(--muted);font-size:12px;padding:4px 8px}
 .nav-error{display:grid;gap:6px;padding:6px 8px;color:var(--danger);font-size:12px}
 .text-btn{border:0;background:transparent;color:var(--brand);font-size:12px;cursor:pointer;padding:0;justify-self:start}

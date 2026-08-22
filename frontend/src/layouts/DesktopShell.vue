@@ -9,6 +9,8 @@
           class="desktop-nav-item"
           :aria-label="item.label"
           :title="item.label"
+          :data-nav="item.routeName"
+          :data-icon="item.iconName"
         >
           <el-icon :size="20"><component :is="item.icon" /></el-icon>
           <span class="nav-tooltip">{{ item.label }}</span>
@@ -45,7 +47,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Aim, Calendar, ChatDotRound, Document, House, Moon, Reading, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
+import { Aim, Calendar, ChatDotRound, Document, House, Moon, Notebook, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const themeStorageKey = 'resumego:theme'
@@ -59,12 +61,12 @@ watch(
   { immediate: true },
 )
 const navItems = [
-  { label: '工作台', icon: House, routeName: 'workbench' },
-  { label: '求职目标', icon: Aim, routeName: 'targets' },
-  { label: '简历', icon: Document, routeName: 'resumes' },
-  { label: '知识库', icon: Reading, routeName: 'knowledge' },
-  { label: '模拟面试', icon: ChatDotRound, routeName: 'interview' },
-  { label: '日程', icon: Calendar, routeName: 'schedule' },
+  { label: '工作台', icon: House, iconName: 'House', routeName: 'workbench' },
+  { label: '求职目标', icon: Aim, iconName: 'Aim', routeName: 'targets' },
+  { label: '简历', icon: Document, iconName: 'Document', routeName: 'resumes' },
+  { label: '知识库', icon: Notebook, iconName: 'Notebook', routeName: 'knowledge' },
+  { label: '模拟面试', icon: ChatDotRound, iconName: 'ChatDotRound', routeName: 'interview' },
+  { label: '日程', icon: Calendar, iconName: 'Calendar', routeName: 'schedule' },
 ]
 </script>
 

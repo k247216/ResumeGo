@@ -49,6 +49,19 @@ describe('KnowledgeDocumentList', () => {
     expect(wrapper.get('[data-test="doc-row-3"]').text()).toContain('笔记')
   })
 
+  it('shows the real imported file extension instead of a generic file label', () => {
+    const pdf = { ...doc(1, 'COMPLETED', 'PDF 资料'), sourceExtension: 'PDF' }
+    const docx = { ...doc(2, 'COMPLETED', 'Word 资料'), sourceExtension: 'docx' }
+    const unknown = { ...doc(3, 'COMPLETED', '未知资料'), sourceExtension: 'epub' }
+    const wrapper = mountList({ documents: [pdf, docx, unknown] })
+
+    expect(wrapper.get('[data-test="doc-row-1"]').text()).toContain('PDF')
+    expect(wrapper.get('[data-test="doc-row-2"]').text()).toContain('DOCX')
+    expect(wrapper.get('[data-test="doc-row-3"]').text()).toContain('EPUB')
+    expect(wrapper.get('[data-test="file-type-1"]').text()).toBe('PDF')
+    expect(wrapper.get('[data-test="file-type-1"]').classes()).toContain('type-pdf')
+  })
+
   it('selects a row', async () => {
     const wrapper = mountList({ documents: [doc(1, 'COMPLETED')] })
     await wrapper.get('[data-test="doc-row-1"]').trigger('click')

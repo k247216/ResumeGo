@@ -47,6 +47,7 @@ describe('DesktopShell', () => {
     expect(wrapper.text()).not.toContain('岗位探索')
     expect(wrapper.find('[aria-label="通知"]').exists()).toBe(false)
     expect(wrapper.find('[aria-label="资源中心"]').exists()).toBe(false)
+    expect(wrapper.get('[data-nav="knowledge"]').attributes('data-icon')).toBe('Notebook')
   })
 
   it('switches the application canvas between light and dark themes', async () => {
