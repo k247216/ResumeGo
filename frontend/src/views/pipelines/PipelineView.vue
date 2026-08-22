@@ -264,7 +264,8 @@ async function handleToggleInterview(planId: number, linked: boolean) {
 function loadHistory() {
   const id = store.selectedPipelineId
   if (!id) return
-  // store 已写入 historyErrorMessage；调用层吞掉 reject 避免未处理 Promise
+  // 先打开抽屉（即使失败也保持打开展示错误），再按需加载
+  historyOpen.value = true
   void store.loadTransitionHistory(id).catch(() => undefined)
 }
 

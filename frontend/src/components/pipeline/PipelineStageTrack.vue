@@ -3,7 +3,7 @@
     <div class="section-head">
       <h3 class="section-title">阶段</h3>
       <div class="head-actions">
-        <button type="button" class="soft-btn" data-test="pipeline-history-open" @click="$emit('load-history'); historyOpen = true">查看阶段历史</button>
+        <button type="button" class="soft-btn" data-test="pipeline-history-open" @click="$emit('load-history')">查看阶段历史</button>
         <button v-if="editable" type="button" class="soft-btn" data-test="pipeline-manage-stages" @click="$emit('manage-stages')">管理阶段</button>
       </div>
     </div>
@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { CareerPipeline, PipelineStageTransition } from '../../types/pipeline'
 
 const props = defineProps<{
@@ -47,8 +47,6 @@ const props = defineProps<{
   historyError: string
 }>()
 defineEmits<{ (e: 'transition', stageId: number): void; (e: 'manage-stages'): void; (e: 'load-history'): void }>()
-
-const historyOpen = ref(false)
 const editable = computed(() => props.pipeline.lifecycle === 'ACTIVE' || props.pipeline.lifecycle === 'PAUSED')
 
 function stateLabel(s: string) {

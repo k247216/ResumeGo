@@ -81,7 +81,7 @@ function mountView(store: ReturnType<typeof storeStub>, query = {}) {
         PipelineStageManagerDialog: { template: '<div data-test="stub-stage-dialog" />' },
 
         PipelineRelationDialog: { template: '<div data-test="stub-relation-dialog" />' },
-        PipelineHistoryDrawer: { template: '<div data-test="stub-history-drawer" />' },
+
       },
       mocks: { $route: { query }, $router: { push: vi.fn(), replace: vi.fn() } },
     },
