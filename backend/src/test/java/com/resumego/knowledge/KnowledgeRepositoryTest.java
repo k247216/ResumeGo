@@ -328,4 +328,25 @@ class KnowledgeRepositoryTest {
         // 用户隔离
         assertThat(repository.findCategoryById(2L, root)).isEmpty();
     }
+
+    @Test
+    void saveNoteContentUpsertsAndMarksCompletedWithUpdatedAt() {
+        long docId = repository.insertDocument(1L, "笔记", "NOTE", "NOT_STARTED");
+        java.sql.Timestamp before = jdbcTemplate.queryForObject(
+                "SELECT updated_at FROM knowledge_documents WHERE id = ?", java.sql.Timestamp.class, docId);
+
+        repository.saveNoteContent(docId, 1L, "正文内容");
+        assertThat(repository.findById(1L, docId).orElseThrow().processingStatus()).isEqualTo("COMPLETED");
+        assertThat(repository.findExtractedContentByDocument(1L, docId).orElseThrow().content()).isEqualTo("正文内容");
+
+        // 覆盖保存 upsert
+        repository.saveNoteContent(docId, 1L, "新正文");
+        assertThat(repository.findExtractedContentByDocument(1L, docId).orElseThrow().content()).isEqualTo("新正文");
+        Integer rows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_extracted_contents WHERE document_id = ?", Integer.class, docId);
+        assertThat(rows).isEqualTo(1);
+        java.sql.Timestamp after = jdbcTemplate.queryForObject(
+                "SELECT updated_at FROM knowledge_documents WHERE id = ?", java.sql.Timestamp.class, docId);
+        assertThat(after).isAfterOrEqualTo(before);
+    }
 }

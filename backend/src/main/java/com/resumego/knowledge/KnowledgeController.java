@@ -48,6 +48,13 @@ public class KnowledgeController {
         return ApiResponse.ok(service.getContent(id));
     }
 
+    @PutMapping("/{id}/content")
+    public ApiResponse<KnowledgeContentResponse> saveContent(
+            @PathVariable long id,
+            @Valid @RequestBody com.resumego.knowledge.dto.SaveKnowledgeNoteContentRequest request) {
+        return ApiResponse.ok(service.saveNoteContent(id, request.content()));
+    }
+
     @GetMapping("/{documentId}/classification")
     public ApiResponse<com.resumego.knowledge.dto.KnowledgeDocumentClassificationResponse> classification(
             @PathVariable long documentId) {

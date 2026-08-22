@@ -188,6 +188,16 @@ public class KnowledgeRepository {
                 """, jobStatus, errorCode, jobStatus, jobStatus, importJobId);
     }
 
+    /** 保存 NOTE 正文（upsert）+ 文档 COMPLETED + updatedAt 更新，同一事务；失败不改变旧正文。 */
+    @Transactional
+    public void saveNoteContent(long documentId, long userId, String content) {
+        jdbcTemplate.update("""
+                DELETE FROM knowledge_extracted_contents WHERE document_id = ? AND user_id = ?
+                """, documentId, userId);
+        insertExtractedContent(documentId, userId, content);
+        updateDocumentStatus(documentId, "COMPLETED");
+    }
+
     /** 提取成功：source 落位、保存正文、文档与任务 COMPLETED，同一事务。 */
     @Transactional
     public void completeImport(long documentId, long sourceFileId, long importJobId, long userId, String content) {

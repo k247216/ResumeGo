@@ -176,4 +176,35 @@ class KnowledgeControllerTest {
                 .andExpect(status().isOk());
         org.mockito.Mockito.verify(recovery).deleteDocument(7L, "abc123");
     }
+
+    @Test
+    void savesNoteContentViaPut() throws Exception {
+        org.mockito.Mockito.when(service.saveNoteContent(7L, "笔记正文"))
+                .thenReturn(new KnowledgeContentResponse(7L, "笔记正文"));
+        mockMvc.perform(put("/api/v2/knowledge/documents/7/content")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"笔记正文\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value("笔记正文"));
+    }
+
+    @Test
+    void noteContentFileRejectionMapsToConflict() throws Exception {
+        org.mockito.Mockito.when(service.saveNoteContent(6L, "x"))
+                .thenThrow(new IllegalStateException("仅 NOTE 文档支持保存正文"));
+        mockMvc.perform(put("/api/v2/knowledge/documents/6/content")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"x\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void noteContentTooLargeMapsToBadRequest() throws Exception {
+        org.mockito.Mockito.when(service.saveNoteContent(7L, "a".repeat(1024 * 1024 + 1)))
+                .thenThrow(new IllegalArgumentException("正文不能超过 1 MiB"));
+        mockMvc.perform(put("/api/v2/knowledge/documents/7/content")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"" + "a".repeat(1024 * 1024 + 1) + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

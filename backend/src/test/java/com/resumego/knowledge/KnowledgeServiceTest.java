@@ -13,6 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.*;
 
 class KnowledgeServiceTest {
@@ -101,5 +104,54 @@ class KnowledgeServiceTest {
         when(repository.findById(1L, 404L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getContent(404L))
                 .isInstanceOf(java.util.NoSuchElementException.class).hasMessageContaining("不存在");
+    }
+
+    @Test
+    void savesNoteContentFirstTimeAndOverwrites() {
+        KnowledgeDocument doc = new KnowledgeDocument(5L, 1L, "笔记", "NOTE", "NOT_STARTED",
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 5L)).thenReturn(Optional.of(doc));
+
+        assertThat(service.saveNoteContent(5L, "正文内容").content()).isEqualTo("正文内容");
+        verify(repository).saveNoteContent(5L, 1L, "正文内容");
+
+        // 覆盖保存
+        assertThat(service.saveNoteContent(5L, "新正文").content()).isEqualTo("新正文");
+        verify(repository).saveNoteContent(5L, 1L, "新正文");
+    }
+
+    @Test
+    void noteContentAllowsEmptyString() {
+        KnowledgeDocument doc = new KnowledgeDocument(5L, 1L, "笔记", "NOTE", "COMPLETED",
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 5L)).thenReturn(Optional.of(doc));
+        assertThat(service.saveNoteContent(5L, "").content()).isEqualTo("");
+        verify(repository).saveNoteContent(5L, 1L, "");
+    }
+
+    @Test
+    void noteContentEnforcesOneMibUtf8ByteLimit() {
+        KnowledgeDocument doc = new KnowledgeDocument(5L, 1L, "笔记", "NOTE", "NOT_STARTED",
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 5L)).thenReturn(Optional.of(doc));
+        String max = "a".repeat(1024 * 1024);
+        assertThat(service.saveNoteContent(5L, max).content()).hasSize(1024 * 1024);
+        assertThatThrownBy(() -> service.saveNoteContent(5L, "a".repeat(1024 * 1024 + 1)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("1 MiB");
+        verify(repository, times(1)).saveNoteContent(5L, 1L, max);
+    }
+
+    @Test
+    void noteContentRejectsFileAndMissingDocuments() {
+        KnowledgeDocument file = new KnowledgeDocument(6L, 1L, "文件", "FILE", "COMPLETED",
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 6L)).thenReturn(Optional.of(file));
+        assertThatThrownBy(() -> service.saveNoteContent(6L, "x"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("NOTE");
+
+        when(repository.findById(1L, 404L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.saveNoteContent(404L, "x"))
+                .isInstanceOf(java.util.NoSuchElementException.class).hasMessageContaining("不存在");
+        verify(repository, never()).saveNoteContent(anyLong(), anyLong(), any());
     }
 }

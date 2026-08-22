@@ -16,6 +16,7 @@ public class KnowledgeService {
     private static final String SOURCE_NOTE = "NOTE";
     private static final String STATUS_NOT_STARTED = "NOT_STARTED";
     private static final String STATUS_COMPLETED = "COMPLETED";
+    private static final long MAX_NOTE_CONTENT_BYTES = 1024L * 1024;
 
     private final KnowledgeRepository repository;
 
@@ -48,6 +49,23 @@ public class KnowledgeService {
 
     public KnowledgeDocumentResponse get(long documentId) {
         return findResponse(documentId);
+    }
+
+    /** 保存 NOTE 正文：原样 UTF-8（允许空串，≤1 MiB），同事务置 COMPLETED；FILE/缺失拒绝；不记录正文。 */
+    public KnowledgeContentResponse saveNoteContent(long documentId, String content) {
+        KnowledgeDocument doc = repository.findById(userId(), documentId)
+                .orElseThrow(() -> new NoSuchElementException("知识文档不存在"));
+        if (!SOURCE_NOTE.equals(doc.sourceType())) {
+            throw new IllegalStateException("仅 NOTE 文档支持保存正文");
+        }
+        if (content == null) {
+            throw new IllegalArgumentException("正文不能为空值");
+        }
+        if (content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_NOTE_CONTENT_BYTES) {
+            throw new IllegalArgumentException("正文不能超过 1 MiB");
+        }
+        repository.saveNoteContent(documentId, userId(), content);
+        return new KnowledgeContentResponse(documentId, content);
     }
 
     /** 返回当前用户的提取文本；未完成 409，缺失/他人 404。 */
