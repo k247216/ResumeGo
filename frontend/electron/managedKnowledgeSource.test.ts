@@ -23,6 +23,7 @@ async function tempWorkspace(): Promise<string> {
 const realFs: ManagedSourceFs = {
   realpath: (p: string) => Promise.resolve(p),
   stat: async (p: string) => ({ isFile: () => true }),
+  lstat: async () => ({ isSymbolicLink: () => false }),
 }
 
 describe('managed knowledge source', () => {
@@ -54,7 +55,20 @@ describe('managed knowledge source', () => {
     const base = '/data/workspace'
     const symlinkFs: ManagedSourceFs = {
       stat: async () => ({ isFile: () => true }),
+      lstat: async () => ({ isSymbolicLink: () => false }),
       realpath: async (p: string) => (p.endsWith('x.md') ? '/outside/real.md' : p),
+    }
+    const result = await resolveManagedSourcePath(base, 'knowledge/sources/1/x.md', symlinkFs)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe(MANAGED_SOURCE_CODES.INVALID_PATH)
+  })
+
+  it('rejects a final symlink even when it resolves inside the managed root', async () => {
+    const base = '/data/workspace'
+    const symlinkFs: ManagedSourceFs = {
+      stat: async () => ({ isFile: () => true }),
+      lstat: async () => ({ isSymbolicLink: () => true }),
+      realpath: async (p: string) => p,
     }
     const result = await resolveManagedSourcePath(base, 'knowledge/sources/1/x.md', symlinkFs)
     expect(result.ok).toBe(false)
@@ -80,6 +94,20 @@ describe('managed knowledge source', () => {
     })
     expect(result).toEqual({ ok: false, code: 'SOURCE_MISSING', message: '无法打开受管原文' })
     expect(shell.openPath).not.toHaveBeenCalled()
+  })
+
+  it('does not return an unexpected backend error message to the renderer', async () => {
+    const leakedPath = '/Users/example/private/secret.md'
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ success: false, data: null, message: leakedPath }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    ))
+    const result = await openManagedKnowledgeSource(7, 'open', {
+      backendOrigin: 'http://x', workspaceToken: 'w', internalToken: 'i', dataDir: '/d',
+      shell: { openPath: vi.fn(), showItemInFolder: vi.fn() }, fetchImpl,
+    })
+    expect(result).toEqual({ ok: false, code: 'SOURCE_NOT_FOUND', message: '无法打开受管原文' })
+    expect(JSON.stringify(result)).not.toContain(leakedPath)
   })
 
   it('opens the resolved file via shell.openPath and normalizes system errors', async () => {

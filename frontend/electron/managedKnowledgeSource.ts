@@ -1,4 +1,4 @@
-import { realpath, stat } from 'node:fs/promises'
+import { lstat, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 /** 受管原文操作的稳定失败分类；不得包含本地路径或内部 token。 */
@@ -21,6 +21,7 @@ export type ManagedSourceResult =
 export interface ManagedSourceFs {
   realpath(p: string): Promise<string>
   stat(p: string): Promise<{ isFile(): boolean }>
+  lstat(p: string): Promise<{ isSymbolicLink(): boolean }>
 }
 
 /** 纯校验：只接受正整数 documentId。 */
@@ -39,7 +40,7 @@ function fail(code: string, message: string): { ok: false; code: string; message
 export async function resolveManagedSourcePath(
   dataDir: string,
   relativePath: string,
-  fsImpl: ManagedSourceFs = { realpath, stat },
+  fsImpl: ManagedSourceFs = { lstat, realpath, stat },
 ): Promise<{ ok: true; absolute: string } | { ok: false; code: string; message: string }> {
   if (typeof relativePath !== 'string' || relativePath.trim() === '') {
     return fail(MANAGED_SOURCE_CODES.INVALID_PATH, '受管路径无效')
@@ -51,6 +52,10 @@ export async function resolveManagedSourcePath(
     return fail(MANAGED_SOURCE_CODES.INVALID_PATH, '受管路径越界')
   }
   try {
+    const linkInfo = await fsImpl.lstat(candidate)
+    if (linkInfo.isSymbolicLink()) {
+      return fail(MANAGED_SOURCE_CODES.INVALID_PATH, '受管目标不能是符号链接')
+    }
     const info = await fsImpl.stat(candidate)
     if (!info.isFile()) {
       return fail(MANAGED_SOURCE_CODES.INVALID_PATH, '受管目标不是普通文件')
@@ -113,7 +118,13 @@ export async function openManagedKnowledgeSource(
     return { ok: false, code: MANAGED_SOURCE_CODES.SOURCE_NOT_FOUND, message: '无法取得受管原文' }
   }
   if (!response.ok || !body.success) {
-    const code = typeof body.message === 'string' && body.message.length > 0
+    const allowedBackendCodes = new Set<string>([
+      MANAGED_SOURCE_CODES.SOURCE_NOT_FOUND,
+      MANAGED_SOURCE_CODES.SOURCE_NOT_FILE,
+      MANAGED_SOURCE_CODES.SOURCE_NOT_AVAILABLE,
+      MANAGED_SOURCE_CODES.SOURCE_MISSING,
+    ])
+    const code = typeof body.message === 'string' && allowedBackendCodes.has(body.message)
       ? body.message
       : MANAGED_SOURCE_CODES.SOURCE_NOT_FOUND
     return { ok: false, code, message: '无法打开受管原文' }
