@@ -4,10 +4,12 @@ import com.resumego.common.CurrentUser;
 import com.resumego.knowledge.dto.CreateKnowledgeDocumentRequest;
 import com.resumego.knowledge.dto.KnowledgeContentResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
+import com.resumego.knowledge.dto.UpdateKnowledgeDocumentTitleRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 @Service
@@ -32,6 +34,7 @@ public class KnowledgeService {
         return collapsed;
     }
 
+    /** 创建 NOTE：同一事务持久化空正文并标记 COMPLETED；失败不留半成品。 */
     @Transactional
     public KnowledgeDocumentResponse create(CreateKnowledgeDocumentRequest request) {
         if (request == null) throw new IllegalArgumentException("请求不能为空");
@@ -39,8 +42,22 @@ public class KnowledgeService {
         if (!SOURCE_NOTE.equals(request.sourceType())) {
             throw new IllegalArgumentException("本阶段仅支持创建 NOTE 类型知识文档，不支持 FILE");
         }
-        long id = repository.insertDocument(userId(), title, SOURCE_NOTE, STATUS_NOT_STARTED);
+        long id = repository.createNoteWithEmptyContent(userId(), title);
         return findResponse(id);
+    }
+
+    /** 当前用户重命名：trim 1-120；空白/超长/缺失/跨用户失败保留旧值。 */
+    @Transactional
+    public KnowledgeDocumentResponse updateTitle(long documentId, UpdateKnowledgeDocumentTitleRequest request) {
+        if (request == null || request.title() == null) {
+            throw new IllegalArgumentException("请求不能为空");
+        }
+        String title = normalizeTitle(request.title());
+        boolean updated = repository.updateDocumentTitle(userId(), documentId, title);
+        if (!updated) {
+            throw new NoSuchElementException("知识文档不存在");
+        }
+        return findResponse(documentId);
     }
 
     /** 兼容无过滤调用（全部资料）。 */
@@ -64,7 +81,24 @@ public class KnowledgeService {
             repository.findTagById(userId(), tagId)
                     .orElseThrow(() -> new NoSuchElementException("标签不存在"));
         }
-        return repository.listByUserFiltered(userId(), categoryIds, tagId).stream().map(this::toResponse).toList();
+        List<KnowledgeDocument> documents = repository.listByUserFiltered(userId(), categoryIds, tagId);
+        Map<Long, String> extensions = repository.listSourceExtensions(userId(),
+                documents.stream().map(KnowledgeDocument::id).toList());
+        return documents.stream().map(doc -> toResponseWithExtension(doc,
+                extensionFor(doc, extensions))).toList();
+    }
+
+    private String extensionFor(KnowledgeDocument doc, Map<Long, String> extensions) {
+        if (!"FILE".equals(doc.sourceType())) {
+            return null;
+        }
+        return KnowledgeManagedContentService.normalizeExtension(extensions.get(doc.id()));
+    }
+
+    private KnowledgeDocumentResponse toResponseWithExtension(KnowledgeDocument doc, String extension) {
+        return new KnowledgeDocumentResponse(
+                doc.id(), doc.title(), doc.sourceType(), doc.processingStatus(), null, extension,
+                doc.createdAt().toString(), doc.updatedAt().toString());
     }
 
     /** 子树（含自身）分类 id 集合。 */
@@ -125,19 +159,13 @@ public class KnowledgeService {
     }
 
     private KnowledgeDocumentResponse toResponse(KnowledgeDocument doc) {
-        String sourceFile = SOURCE_NOTE.equals(doc.sourceType()) ? null
-                : repository.findSourceFileByDocument(userId(), doc.id())
-                .map(KnowledgeSourceFile::originalName)
-                .orElse(null);
+        KnowledgeSourceFile source = "FILE".equals(doc.sourceType())
+                ? repository.findSourceFileByDocument(userId(), doc.id()).orElse(null) : null;
         return new KnowledgeDocumentResponse(
-                doc.id(),
-                doc.title(),
-                doc.sourceType(),
-                doc.processingStatus(),
-                sourceFile,
-                doc.createdAt().toString(),
-                doc.updatedAt().toString()
-        );
+                doc.id(), doc.title(), doc.sourceType(), doc.processingStatus(),
+                source == null ? null : source.originalName(),
+                source == null ? null : KnowledgeManagedContentService.normalizeExtension(source.extension()),
+                doc.createdAt().toString(), doc.updatedAt().toString());
     }
 
     private long userId() {

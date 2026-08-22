@@ -258,6 +258,55 @@ public class KnowledgeRepository {
                 """, availability, sourceFileId);
     }
 
+    /** 标题更新必须同时带 id 与 user_id（owner-scoped）；失败不改变旧值。 */
+    public boolean updateDocumentTitle(long userId, long documentId, String title) {
+        int updated = jdbcTemplate.update("""
+                UPDATE knowledge_documents
+                SET title = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+                """, title, documentId, userId);
+        return updated > 0;
+    }
+
+    /** NOTE 创建即持久化空正文并标记 COMPLETED；同一事务，失败不留半成品。 */
+    @Transactional
+    public long createNoteWithEmptyContent(long userId, String title) {
+        long documentId = insertDocument(userId, title, "NOTE", "COMPLETED");
+        insertExtractedContent(documentId, userId, "");
+        return documentId;
+    }
+
+    /** 受管文件替换成功后同步 size/sha/updated_at。 */
+    public void updateSourceFileAfterEdit(long sourceFileId, long sizeBytes, String sha256) {
+        jdbcTemplate.update("""
+                UPDATE knowledge_source_files
+                SET size_bytes = ?, sha256 = ?, availability = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """, sizeBytes, sha256, sourceFileId);
+    }
+
+    /** 批量取文档 source extension（真实 source record）。 */
+    public Map<Long, String> listSourceExtensions(long userId, java.util.Collection<Long> documentIds) {
+        Map<Long, String> result = new java.util.HashMap<>();
+        if (documentIds == null || documentIds.isEmpty()) {
+            return result;
+        }
+        StringBuilder sql = new StringBuilder("""
+                SELECT document_id, extension FROM knowledge_source_files
+                WHERE user_id = ? AND document_id IN (
+                """);
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        params.add(userId);
+        for (int i = 0; i < documentIds.size(); i++) sql.append(i == 0 ? "?" : ", ?");
+        sql.append(")");
+        params.addAll(documentIds);
+        jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            result.put(rs.getLong("document_id"), rs.getString("extension"));
+            return null;
+        }, params.toArray());
+        return result;
+    }
+
     private void updateDocumentStatus(long documentId, String processingStatus) {
         jdbcTemplate.update("""
                 UPDATE knowledge_documents

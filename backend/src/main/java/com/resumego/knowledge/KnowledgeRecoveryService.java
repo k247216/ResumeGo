@@ -285,12 +285,13 @@ public class KnowledgeRecoveryService {
     }
 
     private KnowledgeDocumentResponse toResponse(KnowledgeDocument doc) {
-        String sourceFile = "NOTE".equals(doc.sourceType()) ? null
-                : repository.findSourceFileByDocument(userId(), doc.id())
-                .map(KnowledgeSourceFile::originalName)
-                .orElse(null);
+        KnowledgeSourceFile source = "NOTE".equals(doc.sourceType())
+                ? null : repository.findSourceFileByDocument(userId(), doc.id()).orElse(null);
+        String extension = source == null ? null
+                : KnowledgeManagedContentService.normalizeExtension(source.extension());
         return new KnowledgeDocumentResponse(doc.id(), doc.title(), doc.sourceType(),
-                doc.processingStatus(), sourceFile, doc.createdAt().toString(), doc.updatedAt().toString());
+                doc.processingStatus(), source == null ? null : source.originalName(), extension,
+                doc.createdAt().toString(), doc.updatedAt().toString());
     }
 
     private long userId() {

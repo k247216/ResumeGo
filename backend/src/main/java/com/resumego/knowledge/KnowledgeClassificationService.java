@@ -431,7 +431,7 @@ public class KnowledgeClassificationService {
         String lowerQuery = query.toLowerCase(Locale.ROOT);
         KnowledgeDocumentResponse document = new KnowledgeDocumentResponse(
                 row.documentId(), row.title(), row.sourceType(), row.processingStatus(), row.sourceFile(),
-                row.createdAt(), row.updatedAt());
+                rowExtension(row), row.createdAt(), row.updatedAt());
         if ("CONTENT".equals(row.matchedField()) && row.content() != null) {
             int hit = indexOfIgnoreCase(row.content(), lowerQuery);
             if (hit >= 0) {
@@ -442,6 +442,16 @@ public class KnowledgeClassificationService {
         int hit = indexOfIgnoreCase(row.title(), lowerQuery);
         return new KnowledgeSearchItemResponse(document, "TITLE",
                 buildSnippet(row.title(), Math.max(hit, 0), query.length()), null);
+    }
+
+    private String rowExtension(KnowledgeSearchRow row) {
+        if (!"FILE".equals(row.sourceType())) {
+            return null;
+        }
+        return repository.findSourceFileByDocument(userId(), row.documentId())
+                .map(KnowledgeSourceFile::extension)
+                .map(KnowledgeManagedContentService::normalizeExtension)
+                .orElse(null);
     }
 
     private int indexOfIgnoreCase(String text, String lowerQuery) {
