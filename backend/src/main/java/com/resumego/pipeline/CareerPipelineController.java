@@ -1,0 +1,67 @@
+package com.resumego.pipeline;
+
+import com.resumego.common.ApiResponse;
+import com.resumego.pipeline.dto.CareerPipelineResponse;
+import com.resumego.pipeline.dto.CreateCareerPipelineRequest;
+import com.resumego.pipeline.dto.TransitionPipelineStageRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.NoSuchElementException;
+
+@RestController
+@RequestMapping("/api/v2/pipelines")
+public class CareerPipelineController {
+
+    private final CareerPipelineService service;
+
+    public CareerPipelineController(CareerPipelineService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public ApiResponse<List<CareerPipelineResponse>> list() {
+        return ApiResponse.ok(service.list());
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<CareerPipelineResponse> get(@PathVariable long id) {
+        return ApiResponse.ok(service.get(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<CareerPipelineResponse>> create(
+            @Valid @RequestBody CreateCareerPipelineRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(service.create(request)));
+    }
+
+    @PostMapping("/{id}/transitions")
+    public ApiResponse<CareerPipelineResponse> transition(
+            @PathVariable long id,
+            @Valid @RequestBody TransitionPipelineStageRequest request) {
+        return ApiResponse.ok(service.transition(id, request));
+    }
+
+    @PostMapping("/{id}/archive")
+    public ApiResponse<CareerPipelineResponse> archive(@PathVariable long id) {
+        return ApiResponse.ok(service.archive(id));
+    }
+
+    @PostMapping("/{id}/restore")
+    public ApiResponse<CareerPipelineResponse> restore(@PathVariable long id) {
+        return ApiResponse.ok(service.restore(id));
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<ApiResponse<Void>> notFound(NoSuchElementException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    public ResponseEntity<ApiResponse<Void>> badRequest(RuntimeException exception) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(exception.getMessage()));
+    }
+}
