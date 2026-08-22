@@ -7,9 +7,9 @@ Status: Approved architecture direction (V2, current development line)
 
 ## Current implementation boundary
 
-The first V2 backend boundary is `/api/v2/pipelines`, implemented by the isolated `com.resumego.pipeline` module. It uses additive H2 V4 and MySQL V24 migrations for `career_pipelines`, `pipeline_stages` and append-only `pipeline_stage_transitions`.
+The V2 backend boundary is `/api/v2/pipelines`, implemented by the isolated `com.resumego.pipeline` module. It uses additive H2 V4-V5 and MySQL V24-V25 migrations for `career_pipelines`, `pipeline_stages`, append-only `pipeline_stage_transitions` and explicit Pipeline asset links.
 
-The legacy `/api/v1/projects` API and `job_projects` table remain unchanged and serve only V1 maintenance and future explicit migration. Current V2 API support covers creation, reads, initial custom stages, post-creation stage add/rename/reorder, deterministic stage transitions, archive and restore. Stage reordering is an all-stage atomic operation so persisted positions remain unique. Schedule/interview links, V1 import and the Pipeline UI remain later F1 slices.
+The legacy `/api/v1/projects` API and `job_projects` table remain unchanged and serve only V1 maintenance and future explicit migration. Current V2 API support covers creation, reads, initial custom stages, post-creation stage add/rename/reorder, deterministic stage transitions, archive and restore. Stage reordering is an all-stage atomic operation so persisted positions remain unique. Schedule events and complete interview plans are linked through additive association tables; ownership is checked through module ports rather than cross-module writes, and rebinding is transactional. V1 import and the Pipeline UI remain later F1 slices.
 
 
 # 1. Architecture Overview
