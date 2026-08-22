@@ -34,7 +34,7 @@ class KnowledgeSearchControllerTest {
     private KnowledgeSearchItemResponse titleHit() {
         com.resumego.knowledge.dto.KnowledgeDocumentResponse doc =
                 new com.resumego.knowledge.dto.KnowledgeDocumentResponse(1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED",
-                        null, LocalDateTime.now().toString(), LocalDateTime.now().toString());
+                        null, null, LocalDateTime.now().toString(), LocalDateTime.now().toString());
         return new KnowledgeSearchItemResponse(doc, "TITLE", "TensorFlow 学习笔记", null);
     }
 

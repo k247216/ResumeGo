@@ -66,6 +66,88 @@ public class KnowledgeFileStore {
         }
     }
 
+
+    /**
+     * 读取受管文件准备替换：校验普通文件、非符号链接、realpath 仍在 data root 内；返回字节作为回滚备份。
+     */
+    public byte[] readManagedForReplace(long userId, String relativePath) {
+        Path managed = resolveStored(relativePath);
+        Path ownSourceDir = root.resolve("knowledge/sources").resolve(String.valueOf(userId)).normalize();
+        if (!managed.startsWith(ownSourceDir)) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "受管文件不属于当前用户");
+        }
+        try {
+            if (Files.isSymbolicLink(managed)) {
+                throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "受管文件不能是符号链接");
+            }
+            Path realRoot = root.toRealPath();
+            Path real = managed.toRealPath();
+            if (!real.startsWith(realRoot)) {
+                throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "真实路径越界");
+            }
+            if (!Files.isRegularFile(managed)) {
+                throw new KnowledgeImportException(KnowledgeErrorCodes.INVALID_FILENAME, "受管目标不是普通文件");
+            }
+            return Files.readAllBytes(managed);
+        } catch (IOException exception) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.EXTRACTION_FAILED, "读取受管文件失败");
+        }
+    }
+
+    /** 准备替换：把新字节写入 staging 临时文件，返回其路径。 */
+    public Path stageReplacement(byte[] bytes) {
+        try {
+            Path stagingDir = root.resolve(STAGING_SUBDIR);
+            Files.createDirectories(stagingDir);
+            Path staged = stagingDir.resolve(UUID.randomUUID() + ".part");
+            Files.write(staged, bytes);
+            return staged;
+        } catch (IOException exception) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.STAGING_FAILED, "受管文件写入失败");
+        }
+    }
+
+    /** 原子提交替换：staging 临时文件覆盖受管文件。 */
+    public void commitReplacement(Path managed, Path staged) {
+        try {
+            Files.move(staged, managed, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+            try {
+                Files.move(staged, managed, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e2) {
+                throw new KnowledgeImportException(KnowledgeErrorCodes.COPY_FAILED, "受管文件替换失败");
+            }
+        } catch (IOException exception) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.COPY_FAILED, "受管文件替换失败");
+        }
+    }
+
+    /** 数据库失败回滚：用备份字节恢复受管文件；提供 REPLACE_EXISTING fallback 并尽力清理 rollback 临时文件。 */
+    public void restoreManaged(Path managed, byte[] oldBytes) {
+        Path tmp = null;
+        try {
+            Files.createDirectories(managed.getParent());
+            tmp = managed.resolveSibling(UUID.randomUUID() + ".rollback");
+            Files.write(tmp, oldBytes);
+            try {
+                Files.move(tmp, managed, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+                Files.move(tmp, managed, StandardCopyOption.REPLACE_EXISTING);
+            }
+            tmp = null;
+        } catch (IOException exception) {
+            throw new KnowledgeImportException(KnowledgeErrorCodes.EXTRACTION_FAILED, "受管文件恢复失败");
+        } finally {
+            if (tmp != null) {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException ignored) {
+                    // 尽力清理
+                }
+            }
+        }
+    }
+
     /** 计算 data dir 下的相对路径（用于 staging 记录）。 */
     public String relativePath(Path absolute) {
         return root.relativize(absolute.normalize()).toString().replace('\\', '/');

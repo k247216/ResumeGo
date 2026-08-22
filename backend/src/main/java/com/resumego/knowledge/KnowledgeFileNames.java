@@ -25,12 +25,11 @@ public final class KnowledgeFileNames {
             }
         }
         int dot = name.lastIndexOf('.');
+        String extension;
         if (dot <= 0 || dot == name.length() - 1) {
-            throw new KnowledgeImportException(KnowledgeErrorCodes.UNSUPPORTED_TYPE, "仅支持 .md/.txt 文件");
-        }
-        String extension = name.substring(dot + 1).toLowerCase(Locale.ROOT);
-        if (!extension.equals("md") && !extension.equals("txt")) {
-            throw new KnowledgeImportException(KnowledgeErrorCodes.UNSUPPORTED_TYPE, "仅支持 .md/.txt 文件");
+            extension = KnowledgeFileTypes.UNKNOWN;
+        } else {
+            extension = KnowledgeFileTypes.normalizeExtension(name.substring(dot + 1));
         }
         String normalized = name.length() > 255 ? name.substring(name.length() - 255) : name;
         return new ParsedFileName(normalized, extension);

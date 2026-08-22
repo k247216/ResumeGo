@@ -31,6 +31,7 @@ class KnowledgeControllerTest {
     @MockBean KnowledgeService service;
     @MockBean KnowledgeClassificationService classification;
     @MockBean KnowledgeRecoveryService recovery;
+    @MockBean KnowledgeManagedContentService managedContent;
 
     @Test
     void createsAndListsNoteDocuments() throws Exception {
@@ -42,7 +43,7 @@ class KnowledgeControllerTest {
                         .content("{\"title\":\"  TensorFlow  笔记 \",\"sourceType\":\"NOTE\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.sourceType").value("NOTE"))
-                .andExpect(jsonPath("$.data.processingStatus").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.data.processingStatus").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.sourceFile").value((Object) null));
 
         mockMvc.perform(get("/api/v2/knowledge/documents"))
@@ -64,8 +65,8 @@ class KnowledgeControllerTest {
     }
 
     private KnowledgeDocumentResponse sample(long id) {
-        return new KnowledgeDocumentResponse(id, "TensorFlow 笔记", "NOTE", "NOT_STARTED",
-                null, LocalDateTime.now().toString(), LocalDateTime.now().toString());
+        return new KnowledgeDocumentResponse(id, "TensorFlow 笔记", "NOTE", "COMPLETED",
+                null, null, LocalDateTime.now().toString(), LocalDateTime.now().toString());
     }
 
     @Test
@@ -179,7 +180,7 @@ class KnowledgeControllerTest {
 
     @Test
     void savesNoteContentViaPut() throws Exception {
-        org.mockito.Mockito.when(service.saveNoteContent(7L, "笔记正文"))
+        org.mockito.Mockito.when(managedContent.saveContent(7L, "笔记正文"))
                 .thenReturn(new KnowledgeContentResponse(7L, "笔记正文"));
         mockMvc.perform(put("/api/v2/knowledge/documents/7/content")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -190,8 +191,8 @@ class KnowledgeControllerTest {
 
     @Test
     void noteContentFileRejectionMapsToConflict() throws Exception {
-        org.mockito.Mockito.when(service.saveNoteContent(6L, "x"))
-                .thenThrow(new IllegalStateException("仅 NOTE 文档支持保存正文"));
+        org.mockito.Mockito.when(managedContent.saveContent(6L, "x"))
+                .thenThrow(new IllegalStateException("NOT_EDITABLE: 仅 Markdown 文件可编辑，TXT 只读"));
         mockMvc.perform(put("/api/v2/knowledge/documents/6/content")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"x\"}"))
@@ -200,7 +201,7 @@ class KnowledgeControllerTest {
 
     @Test
     void noteContentTooLargeMapsToBadRequest() throws Exception {
-        org.mockito.Mockito.when(service.saveNoteContent(7L, "a".repeat(1024 * 1024 + 1)))
+        org.mockito.Mockito.when(managedContent.saveContent(7L, "a".repeat(1024 * 1024 + 1)))
                 .thenThrow(new IllegalArgumentException("正文不能超过 1 MiB"));
         mockMvc.perform(put("/api/v2/knowledge/documents/7/content")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -19,12 +19,14 @@ public class KnowledgeController {
     private final KnowledgeService service;
     private final KnowledgeClassificationService classification;
     private final KnowledgeRecoveryService recovery;
+    private final KnowledgeManagedContentService managedContent;
 
     public KnowledgeController(KnowledgeService service, KnowledgeClassificationService classification,
-                               KnowledgeRecoveryService recovery) {
+                               KnowledgeRecoveryService recovery, KnowledgeManagedContentService managedContent) {
         this.service = service;
         this.classification = classification;
         this.recovery = recovery;
+        this.managedContent = managedContent;
     }
 
     @PostMapping
@@ -51,11 +53,19 @@ public class KnowledgeController {
         return ApiResponse.ok(service.getContent(id));
     }
 
+    /** NOTE 与受管 Markdown 共用 content 端点；TXT 只读（KnowledgeManagedContentService 分支）。 */
     @PutMapping("/{id}/content")
     public ApiResponse<KnowledgeContentResponse> saveContent(
             @PathVariable long id,
             @Valid @RequestBody com.resumego.knowledge.dto.SaveKnowledgeNoteContentRequest request) {
-        return ApiResponse.ok(service.saveNoteContent(id, request.content()));
+        return ApiResponse.ok(managedContent.saveContent(id, request.content()));
+    }
+
+    @PatchMapping("/{id}")
+    public ApiResponse<KnowledgeDocumentResponse> updateTitle(
+            @PathVariable long id,
+            @Valid @RequestBody com.resumego.knowledge.dto.UpdateKnowledgeDocumentTitleRequest request) {
+        return ApiResponse.ok(service.updateTitle(id, request));
     }
 
     @GetMapping("/{documentId}/classification")

@@ -162,17 +162,18 @@ public class KnowledgeRepository {
                     INSERT INTO knowledge_source_files
                         (document_id, user_id, original_name, stored_relative_path, mime_type,
                          staging_relative_path, extension, size_bytes, sha256, availability)
-                    VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, documentId);
             statement.setLong(2, userId);
             statement.setString(3, draft.originalName());
             statement.setString(4, draft.storedRelativePath());
-            statement.setString(5, draft.stagingRelativePath());
-            statement.setString(6, draft.extension());
-            statement.setLong(7, draft.sizeBytes());
-            statement.setString(8, draft.sha256());
-            statement.setString(9, draft.availability());
+            statement.setString(5, draft.mediaType());
+            statement.setString(6, draft.stagingRelativePath());
+            statement.setString(7, draft.extension());
+            statement.setLong(8, draft.sizeBytes());
+            statement.setString(9, draft.sha256());
+            statement.setString(10, draft.availability());
             return statement;
         }, keys);
         return requiredKey(keys, "创建知识来源文件失败：未返回主键");
@@ -256,6 +257,55 @@ public class KnowledgeRepository {
                 SET availability = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """, availability, sourceFileId);
+    }
+
+    /** 标题更新必须同时带 id 与 user_id（owner-scoped）；失败不改变旧值。 */
+    public boolean updateDocumentTitle(long userId, long documentId, String title) {
+        int updated = jdbcTemplate.update("""
+                UPDATE knowledge_documents
+                SET title = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ?
+                """, title, documentId, userId);
+        return updated > 0;
+    }
+
+    /** NOTE 创建即持久化空正文并标记 COMPLETED；同一事务，失败不留半成品。 */
+    @Transactional
+    public long createNoteWithEmptyContent(long userId, String title) {
+        long documentId = insertDocument(userId, title, "NOTE", "COMPLETED");
+        insertExtractedContent(documentId, userId, "");
+        return documentId;
+    }
+
+    /** 受管文件替换成功后同步 stored_relative_path/size/sha/updated_at（hash 命名不变量）。 */
+    public void updateSourceFileAfterEdit(long sourceFileId, String storedRelativePath, long sizeBytes, String sha256) {
+        jdbcTemplate.update("""
+                UPDATE knowledge_source_files
+                SET stored_relative_path = ?, size_bytes = ?, sha256 = ?, availability = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """, storedRelativePath, sizeBytes, sha256, sourceFileId);
+    }
+
+    /** 批量取文档 source metadata（真实 source record，用于列表 sourceFile/sourceExtension 一致）。 */
+    public Map<Long, KnowledgeSourceFile> listSourceMetadataByDocuments(long userId, java.util.Collection<Long> documentIds) {
+        Map<Long, KnowledgeSourceFile> result = new java.util.HashMap<>();
+        if (documentIds == null || documentIds.isEmpty()) {
+            return result;
+        }
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, document_id, user_id, original_name, stored_relative_path, mime_type,
+                       extension, size_bytes, sha256, availability, staging_relative_path, created_at, updated_at
+                FROM knowledge_source_files
+                WHERE user_id = ? AND document_id IN (
+                """);
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        params.add(userId);
+        for (int i = 0; i < documentIds.size(); i++) sql.append(i == 0 ? "?" : ", ?");
+        sql.append(")");
+        params.addAll(documentIds);
+        jdbcTemplate.query(sql.toString(), sourceMapper, params.toArray())
+                .forEach(source -> result.put(source.documentId(), source));
+        return result;
     }
 
     private void updateDocumentStatus(long documentId, String processingStatus) {

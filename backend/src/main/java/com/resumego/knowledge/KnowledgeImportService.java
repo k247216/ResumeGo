@@ -55,6 +55,7 @@ public class KnowledgeImportService {
         Path staged = fileStore.stage(bytes);
 
         String localTitle = KnowledgeFileNames.basename(parsed);
+        boolean parseable = KnowledgeFileTypes.isParseable(parsed.extension());
         KnowledgeImportIds ids;
         try {
             ids = repository.insertImportRecords(userId(), localTitle, new KnowledgeSourceFileDraft(
@@ -64,7 +65,8 @@ public class KnowledgeImportService {
                     bytes.length,
                     sha256,
                     "STAGED",
-                    fileStore.relativePath(staged)));
+                    fileStore.relativePath(staged),
+                    KnowledgeFileTypes.mediaTypeOf(parsed.extension())));
         } catch (DuplicateKeyException exception) {
             // 并发同 fingerprint：唯一约束兜底，事务已回滚，不创建第二份
             fileStore.deleteQuietly(staged);
@@ -86,19 +88,26 @@ public class KnowledgeImportService {
             return failedResponse(ids.documentId(), exception.errorCode());
         }
 
-        try {
-            String content = KnowledgeTextExtractor.decodeUtf8(bytes);
-            repository.completeImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
-                    userId(), content);
-        } catch (KnowledgeImportException exception) {
-            repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
-                    exception.errorCode(), true);
-            log.warn("知识文件导入失败 code={}", exception.errorCode());
-            return failedResponse(ids.documentId(), exception.errorCode());
+        if (parseable) {
+            try {
+                String content = KnowledgeTextExtractor.decodeUtf8(bytes);
+                repository.completeImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
+                        userId(), content);
+            } catch (KnowledgeImportException exception) {
+                repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
+                        exception.errorCode(), true);
+                log.warn("知识文件导入失败 code={}", exception.errorCode());
+                return failedResponse(ids.documentId(), exception.errorCode());
+            }
+            log.info("知识文件导入完成");
+            return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_COMPLETED, false, null);
         }
 
-        log.info("知识文件导入完成");
-        return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_COMPLETED, false, null);
+        // 已识别但不可解析（pdf/doc/docx/unknown）：只保存安全副本与元数据，FAILED + 稳定 code，不提取正文、禁止假装可编辑
+        repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
+                KnowledgeErrorCodes.UNSUPPORTED_FORMAT, true);
+        log.warn("知识文件导入不支持解析 code={}", KnowledgeErrorCodes.UNSUPPORTED_FORMAT);
+        return failedResponse(ids.documentId(), KnowledgeErrorCodes.UNSUPPORTED_FORMAT);
     }
 
     private KnowledgeImportResponse duplicateResponse(KnowledgeSourceFile sourceFile) {

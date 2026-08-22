@@ -6,6 +6,7 @@ public record KnowledgeDocumentResponse(
         String sourceType,
         String processingStatus,
         String sourceFile,
+        String sourceExtension,
         String createdAt,
         String updatedAt
 ) {

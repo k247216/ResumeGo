@@ -2,6 +2,7 @@ package com.resumego.knowledge;
 
 import com.resumego.knowledge.dto.CreateKnowledgeDocumentRequest;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
+import com.resumego.knowledge.dto.UpdateKnowledgeDocumentTitleRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -30,17 +31,34 @@ class KnowledgeServiceTest {
     }
 
     @Test
-    void createsNoteWithNormalizedTitleAndNotStartedStatus() {
-        when(repository.insertDocument(1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED")).thenReturn(10L);
-        when(repository.findById(1L, 10L)).thenReturn(Optional.of(new KnowledgeDocument(10L, 1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED",
+    void createsNoteWithEmptyContentAndCompletedStatus() {
+        when(repository.createNoteWithEmptyContent(1L, "TensorFlow 学习笔记")).thenReturn(10L);
+        when(repository.findById(1L, 10L)).thenReturn(Optional.of(new KnowledgeDocument(10L, 1L, "TensorFlow 学习笔记", "NOTE", "COMPLETED",
                 LocalDateTime.now(), LocalDateTime.now())));
         KnowledgeDocumentResponse response = service.create(new CreateKnowledgeDocumentRequest(
                 "  TensorFlow  学习笔记 ", "NOTE"));
         assertThat(response.id()).isEqualTo(10L);
         assertThat(response.sourceType()).isEqualTo("NOTE");
-        assertThat(response.processingStatus()).isEqualTo("NOT_STARTED");
-        assertThat(response.sourceFile()).isNull();
-        verify(repository).insertDocument(1L, "TensorFlow 学习笔记", "NOTE", "NOT_STARTED");
+        assertThat(response.processingStatus()).isEqualTo("COMPLETED");
+        assertThat(response.sourceExtension()).isNull();
+        verify(repository).createNoteWithEmptyContent(1L, "TensorFlow 学习笔记");
+    }
+
+    @Test
+    void updatesOwnedTitleAndRejectsBlankOrForeign() {
+        when(repository.updateDocumentTitle(1L, 5L, "新标题")).thenReturn(true);
+        when(repository.findById(1L, 5L)).thenReturn(Optional.of(new KnowledgeDocument(5L, 1L, "新标题", "NOTE", "COMPLETED",
+                LocalDateTime.now(), LocalDateTime.now())));
+        KnowledgeDocumentResponse response = service.updateTitle(5L, new UpdateKnowledgeDocumentTitleRequest("  新标题  "));
+        assertThat(response.title()).isEqualTo("新标题");
+
+        // 空白标题拒绝
+        assertThatThrownBy(() -> service.updateTitle(5L, new UpdateKnowledgeDocumentTitleRequest("   ")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("标题");
+        // 跨用户/缺失：updateDocumentTitle 返回 false → 404
+        when(repository.updateDocumentTitle(1L, 404L, "x")).thenReturn(false);
+        assertThatThrownBy(() -> service.updateTitle(404L, new UpdateKnowledgeDocumentTitleRequest("x")))
+                .isInstanceOf(java.util.NoSuchElementException.class).hasMessageContaining("不存在");
     }
 
     @Test
