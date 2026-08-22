@@ -2,7 +2,7 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-be-02-classification-search`
 - Base commit: `fbe13e2bbc3366371c5ca0955dc5fd8f6356e1f1`
 - Depends on: integrated F2-IO-01 and F2-FE-00
@@ -69,5 +69,7 @@ backend/src/test/resources/sql/knowledge_schema.sql
 ## Delivery
 
 Commit: `feat(knowledge): add classification tags and keyword search`
+
+Integrated commits: `0d01cfd`, `b856a4b`.
 
 通过 DSH 回传最终 commit、迁移版本、端点行为、搜索边界与必要测试结果；不得自行合并。

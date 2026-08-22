@@ -1,0 +1,74 @@
+# V2-F2-FE-01：Knowledge 分类搜索可用前端切片
+
+## Identity
+
+- Status: `READY`
+- Branch: `codex/v2-f2-fe-01-knowledge-client-store`
+- Base commit: `834a525bccf36e439d1e4a6aa04474dcc0184cf1`
+- Depends on: integrated F2-BE-02 contracts
+
+## User result
+
+用户在现有 Knowledge 页面能搜索真实标题/正文片段、按分类与标签筛选，并查看或修改所选文档的分类标签。所有状态来自后端，失败不会伪造本地关联。
+
+## Frozen client contract
+
+- 扩展现有 `types/knowledge.ts`：category、tag、document classification、search item 与 filter 类型。
+- 扩展现有 API client：category/tag list/create，classification get，category set/remove，tag add/remove，search。
+- 严格使用已集成 BE-02 method/path/body；统一复用现有 `parseResponse` 与 `KnowledgeHttpError`，页面不得拼 URL。
+- 不增加 open-source、retry、delete API；它们尚未集成。
+
+## Frozen store behavior
+
+- 保留 FE-00 已有 documents/import/content 状态与行为，不重写为新 store。
+- 新增 category/tag catalog、`classificationByDocumentId` 及各自 loading/error。
+- 选择文档后按需读取 classification；关联写入成功后重新读取服务端状态，失败保留旧值，禁止乐观伪造。
+- 搜索状态包含 query/categoryId/tagId/results/loading/error；空 query 清空结果且不请求。
+- 使用递增 request sequence 丢弃过期搜索响应；后发请求完成后，早发响应不得覆盖结果或错误。
+- category/tag filter 失效时清空对应 filter；不改变文档选择、Pipeline、Resume 或 Interview。
+
+## Minimal visible UI
+
+- 在现有 `KnowledgeLibraryView` 顶部增加紧凑搜索框与分类/标签筛选，不重做整体布局。
+- 有 query 时左栏展示真实搜索结果：标题、matchedField、snippet、正文 lineNumber；清空 query 回到文档列表。
+- 右侧详情增加紧凑的分类选择与标签增删；提供“新建分类/标签”的轻量输入或弹窗。
+- loading/empty/error 都局部展示；搜索失败不清空已有文档，关联失败不伪造成功。
+- 1080×720 可操作，沿用现有深浅主题变量；本卡是功能切片，不代替后续 UX-01 视觉设计。
+
+## Scope out
+
+不做文件系统调用、打开原文、删除/重试、RAG、AI、自动标签、正文编辑、Pipeline 绑定或全局视觉重构。
+
+## File ownership to freeze
+
+只授权：
+
+```text
+frontend/src/types/knowledge.ts
+frontend/src/api/knowledge.ts
+frontend/src/api/knowledge.test.ts
+frontend/src/stores/knowledge.ts
+frontend/src/stores/knowledge.test.ts
+frontend/src/views/knowledge/KnowledgeLibraryView.vue
+frontend/src/views/knowledge/KnowledgeLibraryView.test.ts
+frontend/src/components/knowledge/**
+```
+
+若需要修改 router、DesktopShell、`http.ts` 或其他页面，必须停止并重新授权。
+
+## Required tests
+
+只覆盖准确 method/path/body、分类标签所有权错误展示、空搜索不请求、搜索乱序、过滤、空结果、关联成功后端回读、关联失败保留旧状态，以及页面真实结果/局部失败。先跑 Knowledge 针对性测试，交付前仅一次前端全量、build 与 diff-check。
+
+## Direct rejection
+
+- 页面直接调用 fetch 或自行拼 API。
+- 乐观修改分类/标签后把失败显示为成功。
+- 用静态示例替代 search result，或把 snippet 当完整正文。
+- 顺带实现删除、重试、Electron、AI 或重做 Knowledge 全页面。
+
+## Delivery
+
+Commit: `feat(knowledge): add usable classification and search`
+
+通过 DSH 回传最终 commit、真实用户流程、乱序/错误恢复策略和必要测试结果；不得自行合并。
