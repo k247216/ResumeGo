@@ -71,3 +71,23 @@ export interface ApiResponse<T> {
   data: T
   message: string | null
 }
+
+/** 对应后端 UpdateCareerPipelineRequest：五个字段全部必需，后两个可显式 null 解除关联 */
+export interface UpdatePipelineRequest {
+  name: string
+  companyName: string
+  roleTitle: string
+  jobDescriptionId: number | null
+  resumeVersionId: number | null
+}
+
+/** 对应后端 PipelineStageTransitionResponse：阶段历史，只读 */
+export interface PipelineStageTransition {
+  id: number
+  pipelineId: number
+  fromStageId: number | null
+  toStageId: number
+  actor: string
+  note: string | null
+  occurredAt: string
+}

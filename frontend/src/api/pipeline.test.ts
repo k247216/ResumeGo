@@ -12,9 +12,11 @@ import {
   renamePipelineStage,
   reorderPipelineStages,
   restorePipeline,
+  listPipelineTransitions,
   transitionPipelineStage,
   unlinkInterviewPlan,
   unlinkScheduleEvent,
+  updatePipeline,
 } from './pipeline'
 import type { CareerPipeline } from '../types/pipeline'
 
@@ -197,5 +199,25 @@ describe('pipeline api client', () => {
   it('FE-06 falls back to a Chinese message when the body cannot be parsed', async () => {
     mockedFetch.mockResolvedValue(new Response('not json', { status: 500 }))
     await expect(getPipeline(7)).rejects.toThrow('获取求职管线失败')
+  })
+
+  it('FE-02B updates a pipeline with all five fields including explicit nulls', async () => {
+    mockedFetch.mockResolvedValue(okResponse(pipeline))
+    await updatePipeline(7, { name: '腾讯 Java 后端', companyName: '腾讯', roleTitle: 'Java 后端实习', jobDescriptionId: 20, resumeVersionId: null })
+    const [url, init] = mockedFetch.mock.calls[0]!
+    expect(url).toBe('/api/v2/pipelines/7')
+    expect(init?.method).toBe('PATCH')
+    const body = JSON.parse((init?.body ?? '') as string)
+    expect(body).toEqual({ name: '腾讯 Java 后端', companyName: '腾讯', roleTitle: 'Java 后端实习', jobDescriptionId: 20, resumeVersionId: null })
+    // 显式 null 必须保留在请求中，不得被省略
+    expect(JSON.stringify(body)).toContain('"resumeVersionId":null')
+  })
+
+  it('FE-02B lists transition history in server order without rewriting', async () => {
+    mockedFetch.mockResolvedValue(okResponse([{ id: 1, pipelineId: 7, fromStageId: null, toStageId: 11, actor: 'USER', note: null, occurredAt: '2026-08-22T14:30:00' }]))
+    const result = await listPipelineTransitions(7)
+    expect(mockedFetch).toHaveBeenCalledWith('/api/v2/pipelines/7/transitions')
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0].fromStageId).toBeNull()
   })
 })

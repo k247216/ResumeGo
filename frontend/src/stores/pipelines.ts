@@ -7,11 +7,13 @@ import {
   linkInterviewPlan,
   linkScheduleEvent,
   listPipelines,
+  listPipelineTransitions,
   renamePipelineStage,
   reorderPipelineStages,
   restorePipeline,
   transitionPipelineStage,
   unlinkInterviewPlan,
+  updatePipeline,
   unlinkScheduleEvent,
 } from '../api/pipeline'
 import type {
@@ -20,7 +22,9 @@ import type {
   CreatePipelineRequest,
   RenamePipelineStageRequest,
   ReorderPipelineStagesRequest,
+  PipelineStageTransition,
   TransitionPipelineStageRequest,
+  UpdatePipelineRequest,
 } from '../types/pipeline'
 
 const selectedStorageKey = 'resumego:v2:selectedPipelineId'
@@ -37,6 +41,9 @@ export const usePipelinesStore = defineStore('pipelines', () => {
   const selectedPipelineId = ref<number | null>(readPersistedId())
   const loading = ref(false)
   const errorMessage = ref('')
+  const transitionHistoryByPipelineId = ref<Record<number, PipelineStageTransition[]>>({})
+  const historyLoadingPipelineId = ref<number | null>(null)
+  const historyErrorMessage = ref('')
 
   const selectedPipeline = computed(() => (
     pipelines.value.find((pipeline) => pipeline.id === selectedPipelineId.value) ?? null
@@ -137,6 +144,28 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     replacePipeline(response.data)
   }
 
+  async function updateImpl(pipelineId: number, request: UpdatePipelineRequest) {
+    const response = await updatePipeline(pipelineId, request)
+    replacePipeline(response.data)
+  }
+
+  async function loadTransitionHistory(pipelineId: number) {
+    historyErrorMessage.value = ''
+    historyLoadingPipelineId.value = pipelineId
+    try {
+      const response = await listPipelineTransitions(pipelineId)
+      transitionHistoryByPipelineId.value = {
+        ...transitionHistoryByPipelineId.value,
+        [pipelineId]: response.data,
+      }
+    } catch (error) {
+      historyErrorMessage.value = error instanceof Error ? error.message : '读取阶段历史失败'
+      throw error
+    } finally {
+      historyLoadingPipelineId.value = null
+    }
+  }
+
   async function linkScheduleEventImpl(pipelineId: number, eventId: number) {
     const response = await linkScheduleEvent(pipelineId, eventId)
     replacePipeline(response.data)
@@ -182,6 +211,11 @@ export const usePipelinesStore = defineStore('pipelines', () => {
     transitionStage: (pipelineId: number, req: TransitionPipelineStageRequest) => guardMutation(() => transitionStageImpl(pipelineId, req)),
     archive: (pipelineId: number) => guardMutation(() => archiveImpl(pipelineId)),
     restore: (pipelineId: number) => guardMutation(() => restoreImpl(pipelineId)),
+    update: (pipelineId: number, request: UpdatePipelineRequest) => guardMutation(() => updateImpl(pipelineId, request)),
+    loadTransitionHistory,
+    transitionHistoryByPipelineId,
+    historyLoadingPipelineId,
+    historyErrorMessage,
     linkScheduleEvent: (pipelineId: number, eventId: number) => guardMutation(() => linkScheduleEventImpl(pipelineId, eventId)),
     unlinkScheduleEvent: (pipelineId: number, eventId: number) => guardMutation(() => unlinkScheduleEventImpl(pipelineId, eventId)),
     linkInterviewPlan: (pipelineId: number, planId: number) => guardMutation(() => linkInterviewPlanImpl(pipelineId, planId)),

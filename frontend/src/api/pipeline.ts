@@ -3,9 +3,11 @@ import type {
   ApiResponse,
   CareerPipeline,
   CreatePipelineRequest,
+  PipelineStageTransition,
   RenamePipelineStageRequest,
   ReorderPipelineStagesRequest,
   TransitionPipelineStageRequest,
+  UpdatePipelineRequest,
 } from '../types/pipeline'
 import { apiFetch } from './http'
 
@@ -46,6 +48,32 @@ export async function createPipeline(req: CreatePipelineRequest): Promise<ApiRes
     }),
   })
   return parseResponse<CareerPipeline>(res, '创建求职管线失败')
+}
+
+export async function updatePipeline(
+  pipelineId: number,
+  req: UpdatePipelineRequest,
+): Promise<ApiResponse<CareerPipeline>> {
+  const res = await apiFetch(`${PIPELINE_BASE}/${pipelineId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    // 五个字段全部显式发送，含两个可空的 null
+    body: JSON.stringify({
+      name: req.name,
+      companyName: req.companyName,
+      roleTitle: req.roleTitle,
+      jobDescriptionId: req.jobDescriptionId,
+      resumeVersionId: req.resumeVersionId,
+    }),
+  })
+  return parseResponse<CareerPipeline>(res, '更新求职管线失败')
+}
+
+export async function listPipelineTransitions(
+  pipelineId: number,
+): Promise<ApiResponse<PipelineStageTransition[]>> {
+  const res = await apiFetch(`${PIPELINE_BASE}/${pipelineId}/transitions`)
+  return parseResponse<PipelineStageTransition[]>(res, '读取阶段历史失败')
 }
 
 export async function addPipelineStage(

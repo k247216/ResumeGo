@@ -16,6 +16,8 @@ vi.mock('../api/pipeline', () => {
     linkScheduleEvent: vi.fn(),
     unlinkScheduleEvent: vi.fn(),
     linkInterviewPlan: vi.fn(),
+    updatePipeline: vi.fn(),
+    listPipelineTransitions: vi.fn(),
     unlinkInterviewPlan: vi.fn(),
   }
   return api
@@ -157,5 +159,48 @@ describe('usePipelinesStore', () => {
     // select with unknown id must not change selection
     store.select(99)
     expect(store.selectedPipelineId).toBe(2)
+  })
+
+  it('FE-02B update replaces the pipeline and keeps selection; failure does not pollute', async () => {
+    api.listPipelines.mockResolvedValue(ok([p(1)]))
+    const store = usePipelinesStore()
+    await store.load()
+    store.select(1)
+
+    const updated = { ...p(1), name: '腾讯 Java 后端', roleTitle: 'Java 后端实习' }
+    api.updatePipeline.mockResolvedValue(ok(updated))
+    await store.update(1, { name: '腾讯 Java 后端', companyName: '公司', roleTitle: 'Java 后端实习', jobDescriptionId: 20, resumeVersionId: null })
+    expect(store.pipelines.find((x) => x.id === 1)?.name).toBe('腾讯 Java 后端')
+    expect(store.selectedPipelineId).toBe(1)
+
+    api.updatePipeline.mockRejectedValueOnce(new Error('更新失败'))
+    const before = store.pipelines
+    await expect(store.update(1, { name: 'x', companyName: 'y', roleTitle: 'z', jobDescriptionId: null, resumeVersionId: null })).rejects.toThrow('更新失败')
+    expect(store.pipelines).toEqual(before)
+    expect(store.errorMessage).toContain('更新失败')
+  })
+
+  it('FE-02B keeps history per pipeline and preserves old history on failure', async () => {
+    api.listPipelines.mockResolvedValue(ok([p(1), p(2)]))
+    const store = usePipelinesStore()
+    await store.load()
+
+    const h1 = [{ id: 1, pipelineId: 1, fromStageId: null, toStageId: 11, actor: 'USER', note: null, occurredAt: '2026-08-22T14:30:00' }]
+    const h2 = [{ id: 5, pipelineId: 2, fromStageId: 11, toStageId: 12, actor: 'USER', note: '技术面', occurredAt: '2026-08-22T15:00:00' }]
+    api.listPipelineTransitions.mockResolvedValueOnce(ok(h1)).mockResolvedValueOnce(ok(h2))
+    await store.loadTransitionHistory(1)
+    await store.loadTransitionHistory(2)
+    expect(store.transitionHistoryByPipelineId[1]).toEqual(h1)
+    expect(store.transitionHistoryByPipelineId[2]).toEqual(h2)
+
+    api.listPipelineTransitions.mockRejectedValueOnce(new Error('历史读取失败'))
+    await expect(store.loadTransitionHistory(1)).rejects.toThrow('历史读取失败')
+    expect(store.transitionHistoryByPipelineId[1]).toEqual(h1)
+    expect(store.historyErrorMessage).toContain('历史读取失败')
+
+    api.listPipelineTransitions.mockResolvedValueOnce(ok([...h1, { id: 2, pipelineId: 1, fromStageId: 11, toStageId: 12, actor: 'USER', note: '进入技术面', occurredAt: '2026-08-22T16:00:00' }]))
+    await store.loadTransitionHistory(1)
+    expect(store.historyErrorMessage).toBe('')
+    expect(store.historyLoadingPipelineId).toBeNull()
   })
 })
