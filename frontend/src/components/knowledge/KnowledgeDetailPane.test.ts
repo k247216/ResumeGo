@@ -59,9 +59,19 @@ describe('KnowledgeDetailPane', () => {
     expect(wrapper.find('[data-test="knowledge-content"]').exists()).toBe(false)
   })
 
-  it('shows not-started state for NOT_STARTED notes', () => {
+  it('shows the real NOTE state without implying content exists', () => {
     const wrapper = mountPane({ document: doc('NOT_STARTED') })
-    expect(wrapper.get('[data-test="knowledge-content-not-started"]').text()).toContain('尚未开始处理')
+    expect(wrapper.get('[data-test="knowledge-content-not-started"]').text()).toContain('笔记已保存')
+    expect(wrapper.get('[data-test="knowledge-content-not-started"]').text()).toContain('当前已保存笔记标题')
+    expect(wrapper.get('[data-test="knowledge-content-not-started"]').text()).not.toContain('即可查看')
+  })
+
+  it('tells the user to refresh for pending results instead of promising auto-display', () => {
+    const wrapper = mountPane({ document: doc('PENDING') })
+    const text = wrapper.get('[data-test="knowledge-content-pending"]').text()
+    expect(text).toContain('内容仍在处理中')
+    expect(text).toContain('刷新')
+    expect(text).not.toContain('自动显示')
   })
 
   it('offers a create entry when the library is empty', async () => {

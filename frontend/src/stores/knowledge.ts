@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import {
   createKnowledgeNote,
   getKnowledgeContent,
+  getKnowledgeDocument,
   importKnowledgeFile,
   KnowledgeHttpError,
   listKnowledgeDocuments,
@@ -22,6 +23,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const creating = ref(false)
   const importing = ref(false)
   const importErrorMessage = ref('')
+  const listRefreshError = ref('')
   const contentByDocumentId = ref<Record<number, string>>({})
   const contentLoadingDocumentId = ref<number | null>(null)
   const contentErrorsByDocumentId = ref<Record<number, string>>({})
@@ -50,6 +52,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   async function load() {
     loading.value = true
     errorMessage.value = ''
+    listRefreshError.value = ''
     try {
       const response = await listKnowledgeDocuments()
       documents.value = response.data
@@ -86,24 +89,39 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
-  /** 导入：成功或 duplicate 都刷新列表并选中目标文档；失败不影响既有列表。 */
+  /**
+   * 导入：上传结果与刷新结果分离。
+   * 上传成功后绝不改写为“导入失败”；detail 获取目标文档并 upsert/select，
+   * 列表刷新失败仅显示“已导入，列表刷新失败，可重试刷新”。
+   */
   async function importFile(file: File): Promise<KnowledgeImportResponse> {
     importing.value = true
     importErrorMessage.value = ''
+    listRefreshError.value = ''
+    let imported: KnowledgeImportResponse
     try {
-      const response = await importKnowledgeFile(file)
-      const targetId = response.data.documentId
-      await load()
-      if (documents.value.some((doc) => doc.id === targetId)) {
-        selectedDocumentId.value = targetId
-      }
-      return response.data
+      imported = (await importKnowledgeFile(file)).data
     } catch (error) {
       importErrorMessage.value = error instanceof Error ? error.message : '导入文件失败'
       throw error
     } finally {
       importing.value = false
     }
+    try {
+      const detail = await getKnowledgeDocument(imported.documentId)
+      upsertDocument(detail.data)
+      selectedDocumentId.value = detail.data.id
+    } catch {
+      listRefreshError.value = '已导入，列表刷新失败，可重试刷新'
+      return imported
+    }
+    try {
+      const response = await listKnowledgeDocuments()
+      documents.value = response.data
+    } catch {
+      listRefreshError.value = '已导入，列表刷新失败，可重试刷新'
+    }
+    return imported
   }
 
   /** COMPLETED 按需加载正文；409 显示处理中，404 显示不可用；已有正文不重复请求。 */
@@ -145,6 +163,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     creating,
     importing,
     importErrorMessage,
+    listRefreshError,
     contentByDocumentId,
     contentLoadingDocumentId,
     contentErrorsByDocumentId,

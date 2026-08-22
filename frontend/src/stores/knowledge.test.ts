@@ -8,6 +8,7 @@ vi.mock('../api/knowledge', () => {
     listKnowledgeDocuments: vi.fn(),
     createKnowledgeNote: vi.fn(),
     importKnowledgeFile: vi.fn(),
+    getKnowledgeDocument: vi.fn(),
     getKnowledgeContent: vi.fn(),
     KnowledgeHttpError: class KnowledgeHttpError extends Error {
       status: number
@@ -105,12 +106,15 @@ describe('useKnowledgeStore', () => {
     api.importKnowledgeFile.mockResolvedValue(ok({
       documentId: 9, sourceType: 'FILE', processingStatus: 'COMPLETED', duplicate: false, errorCode: null,
     }))
+    api.getKnowledgeDocument.mockResolvedValue(ok(doc(9, 'COMPLETED', 'notes.md')))
     api.listKnowledgeDocuments.mockResolvedValueOnce(ok([doc(9, 'COMPLETED', 'notes.md'), doc(1, 'COMPLETED')]))
 
     const result = await store.importFile(file())
     expect(result.documentId).toBe(9)
+    expect(store.listRefreshError).toBe('')
     expect(api.listKnowledgeDocuments).toHaveBeenCalledTimes(2)
     expect(store.selectedDocumentId).toBe(9)
+    expect(store.documents.map((d) => d.id)).toContain(9)
   })
 
   it('FE-00 duplicate import still refreshes and selects the existing document', async () => {
@@ -121,10 +125,12 @@ describe('useKnowledgeStore', () => {
     api.importKnowledgeFile.mockResolvedValue(ok({
       documentId: 1, sourceType: 'FILE', processingStatus: 'COMPLETED', duplicate: true, errorCode: null,
     }))
+    api.getKnowledgeDocument.mockResolvedValue(ok(doc(1, 'COMPLETED')))
     api.listKnowledgeDocuments.mockResolvedValueOnce(ok([doc(1, 'COMPLETED')]))
 
     const result = await store.importFile(file())
     expect(result.duplicate).toBe(true)
+    expect(store.listRefreshError).toBe('')
     expect(store.selectedDocumentId).toBe(1)
   })
 
@@ -193,5 +199,60 @@ describe('useKnowledgeStore', () => {
     expect(store.contentByDocumentId[1]).toBe('正文一')
     expect(store.contentByDocumentId[2]).toBeUndefined()
     expect(store.contentErrorsByDocumentId[2]).toContain('网络错误')
+  })
+
+  it('FE-00 import success is not rewritten as failure when list refresh fails', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+
+    api.importKnowledgeFile.mockResolvedValue(ok({
+      documentId: 9, sourceType: 'FILE', processingStatus: 'COMPLETED', duplicate: false, errorCode: null,
+    }))
+    api.getKnowledgeDocument.mockResolvedValue(ok(doc(9, 'COMPLETED', 'notes.md')))
+    api.listKnowledgeDocuments.mockRejectedValueOnce(new Error('网络错误'))
+
+    const result = await store.importFile(file())
+
+    expect(result.documentId).toBe(9)
+    expect(store.importErrorMessage).toBe('')
+    expect(store.listRefreshError).toContain('已导入，列表刷新失败，可重试刷新')
+    expect(store.selectedDocumentId).toBe(9)
+    expect(store.documents.map((d) => d.id)).toContain(9)
+  })
+
+  it('FE-00 detail fetch failure after upload keeps success and shows refresh notice', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+
+    api.importKnowledgeFile.mockResolvedValue(ok({
+      documentId: 9, sourceType: 'FILE', processingStatus: 'COMPLETED', duplicate: false, errorCode: null,
+    }))
+    api.getKnowledgeDocument.mockRejectedValue(new Error('网络错误'))
+
+    const result = await store.importFile(file())
+
+    expect(result.documentId).toBe(9)
+    expect(store.importErrorMessage).toBe('')
+    expect(store.listRefreshError).toContain('已导入，列表刷新失败')
+  })
+
+  it('FE-00 a successful retry clears the list refresh notice', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+
+    api.importKnowledgeFile.mockResolvedValue(ok({
+      documentId: 9, sourceType: 'FILE', processingStatus: 'COMPLETED', duplicate: false, errorCode: null,
+    }))
+    api.getKnowledgeDocument.mockResolvedValue(ok(doc(9, 'COMPLETED', 'notes.md')))
+    api.listKnowledgeDocuments.mockRejectedValueOnce(new Error('网络错误'))
+    await store.importFile(file())
+    expect(store.listRefreshError).toContain('已导入')
+
+    api.listKnowledgeDocuments.mockResolvedValueOnce(ok([doc(9, 'COMPLETED'), doc(1, 'COMPLETED')]))
+    await store.retry()
+    expect(store.listRefreshError).toBe('')
   })
 })

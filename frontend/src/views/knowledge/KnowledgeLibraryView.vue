@@ -8,6 +8,7 @@
           :error="store.importErrorMessage"
           @file-selected="handleImport"
         />
+        <span v-if="store.listRefreshError" class="import-error" data-test="knowledge-list-refresh-error">{{ store.listRefreshError }}</span>
         <button type="button" class="tool-btn primary" data-test="knowledge-create-note" @click="noteOpen = true">新建笔记</button>
       </template>
     </PageHeader>
@@ -111,4 +112,5 @@ onMounted(() => {
 .tool-btn.primary{border:0;background:var(--action-bg);color:var(--action-fg);font-weight:600}
 .tool-btn.primary:hover{opacity:.92;color:var(--action-fg)}
 .tool-btn:disabled{opacity:.55;cursor:not-allowed}
+.import-error{color:var(--danger);font-size:12px;max-width:280px}
 </style>

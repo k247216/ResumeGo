@@ -39,12 +39,12 @@
 
         <div v-else-if="document.processingStatus === 'PENDING' || document.processingStatus === 'RUNNING'" class="content-state" data-test="knowledge-content-pending">
           <strong>内容仍在处理中</strong>
-          <span>完成后会自动显示提取正文。</span>
+          <span>当前没有自动刷新，处理完成后点击顶部“刷新”查看提取结果。</span>
         </div>
 
         <div v-else class="content-state" data-test="knowledge-content-not-started">
-          <strong>尚未开始处理</strong>
-          <span>笔记创建后即可查看，无需提取。</span>
+          <strong>笔记已保存</strong>
+          <span>当前已保存笔记标题，正文编辑将在后续版本开放。</span>
         </div>
       </section>
     </template>

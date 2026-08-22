@@ -28,6 +28,7 @@ function storeStub(overrides: Record<string, unknown> = {}) {
     creating: false,
     importing: false,
     importErrorMessage: '',
+    listRefreshError: '',
     contentByDocumentId: {} as Record<number, string>,
     contentLoadingDocumentId: null,
     contentErrorsByDocumentId: {} as Record<number, string>,
@@ -144,5 +145,21 @@ describe('KnowledgeLibraryView', () => {
     store.contentErrorsByDocumentId = { 1: '内容仍在处理中，请稍后重试' }
     await flushPromises()
     expect(wrapper.get('[data-test="stub-detail"]').attributes('data-error')).toBe('内容仍在处理中，请稍后重试')
+  })
+
+  it('shows the refresh notice after a successful import with failed list refresh', async () => {
+    const store = storeStub({ listRefreshError: '已导入，列表刷新失败，可重试刷新' })
+    const wrapper = mountView(store)
+    await flushPromises()
+    const notice = wrapper.get('[data-test="knowledge-list-refresh-error"]')
+    expect(notice.text()).toContain('已导入，列表刷新失败')
+    expect(store.importErrorMessage).toBe('')
+  })
+
+  it('hides the refresh notice when the list is healthy', async () => {
+    const store = storeStub()
+    const wrapper = mountView(store)
+    await flushPromises()
+    expect(wrapper.find('[data-test="knowledge-list-refresh-error"]').exists()).toBe(false)
   })
 })
