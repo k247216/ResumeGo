@@ -2,9 +2,9 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-be-03-recovery-delete`
-- Base commit: `834a525bccf36e439d1e4a6aa04474dcc0184cf1`
+- Integrated commits: `2d1fa2a`、`60221fe`、`b5cc6a4`
 - Depends on: integrated F2-BE-02
 
 ## User result

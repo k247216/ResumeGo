@@ -2,9 +2,9 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-fe-01-knowledge-client-store`
-- Base commit: `834a525bccf36e439d1e4a6aa04474dcc0184cf1`
+- Integrated commits: `8ff5829`、`8eb2b33`
 - Depends on: integrated F2-BE-02 contracts
 
 ## User result
