@@ -20,6 +20,12 @@ const router = createRouter({
       meta: { fill: true },
     },
     {
+      path: '/knowledge',
+      name: 'knowledge',
+      component: () => import('../views/knowledge/KnowledgeLibraryView.vue'),
+      meta: { fill: true },
+    },
+    {
       path: '/editor',
       name: 'resume-editor',
       component: () => import('../views/resumes/ResumeEditorView.vue'),

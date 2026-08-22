@@ -28,4 +28,19 @@ describe('product routes', () => {
     expect(serialized).not.toContain('TargetListView')
     expect(serialized).not.toContain('useTargetsStore')
   })
+
+  it('routes /knowledge to the V2 KnowledgeLibraryView with fill meta', () => {
+    const resolved = router.resolve({ name: 'knowledge' })
+    expect(resolved.path).toBe('/knowledge')
+    expect(resolved.matched[0]?.meta?.fill).toBe(true)
+    expect(String(resolved.matched[0]?.components?.default ?? '')).toContain('KnowledgeLibraryView')
+  })
+
+  it('keeps legacy evidences route untouched and never reuses it for Knowledge', () => {
+    const names = router.getRoutes().map((route) => route.name)
+    expect(names).toContain('evidences')
+    expect(names).toContain('knowledge')
+    const resolved = router.resolve({ name: 'knowledge' })
+    expect(String(resolved.matched[0]?.components?.default ?? '')).not.toContain('EvidenceLibraryView')
+  })
 })

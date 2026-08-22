@@ -11,6 +11,7 @@ function createShellRouter() {
       { path: '/', name: 'workbench', component: empty },
       { path: '/targets', name: 'targets', component: empty },
       { path: '/resumes', name: 'resumes', component: empty },
+      { path: '/knowledge', name: 'knowledge', component: empty },
       { path: '/interview', name: 'interview', component: empty },
       { path: '/schedule', name: 'schedule', component: empty },
       { path: '/settings', name: 'settings', component: empty },
@@ -35,7 +36,7 @@ describe('DesktopShell', () => {
       slots: { default: '<main data-test="route-content">内容</main>' },
     })
 
-    for (const label of ['工作台', '求职目标', '简历', '模拟面试', '日程']) {
+    for (const label of ['工作台', '求职目标', '简历', '知识库', '模拟面试', '日程']) {
       wrapper.get(`[aria-label="${label}"]`)
     }
     wrapper.get('[aria-label="设置"]')
