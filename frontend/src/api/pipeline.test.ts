@@ -151,6 +151,7 @@ describe('pipeline api client', () => {
     const [url, init] = mockedFetch.mock.calls[0]!
     expect(url).toBe('/api/v2/pipelines/7/schedule-events/100')
     expect(init?.method).toBe('PUT')
+    expect(init?.body).toBeUndefined()
   })
 
   it('FE-04 unlinks a schedule event with DELETE on the same path', async () => {
@@ -159,6 +160,7 @@ describe('pipeline api client', () => {
     const [url, init] = mockedFetch.mock.calls[0]!
     expect(url).toBe('/api/v2/pipelines/7/schedule-events/100')
     expect(init?.method).toBe('DELETE')
+    expect(init?.body).toBeUndefined()
   })
 
   it('FE-04 links an interview plan with PUT', async () => {
@@ -167,6 +169,7 @@ describe('pipeline api client', () => {
     const [url, init] = mockedFetch.mock.calls[0]!
     expect(url).toBe('/api/v2/pipelines/7/interview-plans/300')
     expect(init?.method).toBe('PUT')
+    expect(init?.body).toBeUndefined()
   })
 
   it('FE-04 unlinks an interview plan with DELETE on the same path', async () => {
@@ -175,6 +178,15 @@ describe('pipeline api client', () => {
     const [url, init] = mockedFetch.mock.calls[0]!
     expect(url).toBe('/api/v2/pipelines/7/interview-plans/300')
     expect(init?.method).toBe('DELETE')
+    expect(init?.body).toBeUndefined()
+  })
+
+  it('FE-05 rejects a success=false payload with the server message', async () => {
+    mockedFetch.mockResolvedValue(new Response(JSON.stringify({ success: false, data: null, message: '目标阶段不是待进入状态' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    await expect(transitionPipelineStage(7, { targetStageId: 12 })).rejects.toThrow('目标阶段不是待进入状态')
   })
 
   it('FE-05 prefers the server message on failure', async () => {
