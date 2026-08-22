@@ -15,6 +15,8 @@ Updated: 2026-08-22
 
 目标：让 V2 成为可独立开发、安装和验证的产品线。
 
+进度（2026-08-22）：Preview 应用身份和运行数据目录隔离已完成。应用 ID 为 `com.resumego.careeros.preview`，显示名为“职达 Career OS Preview”，数据目录名为 `ZhidaCareerOSPreview`；前端 149 项、后端 294 项测试和前端生产构建通过。V1 数据迁移预检与导入回执尚未实现，因此 F0 尚未完成。
+
 交付：
 
 - V2 产品与架构文档成为权威定义；
