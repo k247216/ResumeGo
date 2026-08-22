@@ -17,6 +17,8 @@ import java.util.NoSuchElementException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.hamcrest.Matchers.nullValue;
@@ -166,6 +168,26 @@ class CareerPipelineControllerTest {
                         .content("{\"name\":\"腾讯\",\"companyName\":\"腾讯\",\"roleTitle\":\"Java\",\"jobDescriptionId\":null,\"resumeVersionId\":null}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("求职管线不存在"));
+    }
+
+    @Test
+    void updateRejectsMissingNullableFieldAsBadRequest() throws Exception {
+        // jobDescriptionId / resumeVersionId 是必现字段：缺失应 400，不调用 service
+        mockMvc.perform(patch("/api/v2/pipelines/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"腾讯\",\"companyName\":\"腾讯\",\"roleTitle\":\"Java\",\"jobDescriptionId\":20}"))
+                .andExpect(status().isBadRequest());
+        verify(service, never()).update(anyLong(), any());
+    }
+
+    @Test
+    void updateAllowsExplicitNullToUnlink() throws Exception {
+        when(service.update(anyLong(), any())).thenReturn(sample());
+        mockMvc.perform(patch("/api/v2/pipelines/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"腾讯\",\"companyName\":\"腾讯\",\"roleTitle\":\"Java\",\"jobDescriptionId\":null,\"resumeVersionId\":null}"))
+                .andExpect(status().isOk());
+        verify(service).update(anyLong(), any());
     }
 
     private CareerPipelineResponse sample() {
