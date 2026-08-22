@@ -2,10 +2,10 @@
 
 ## Identity
 
-- Status: `CORE_RESERVED`
+- Status: `INTEGRATED`
 - Owner: Core Controller
 - Branch: `codex/v2-f2-arch-01-knowledge-contract`
-- Base commit: assigned after F1 domain boundary is stable
+- Frozen contract: `docs/superpowers/specs/2026-08-22-v2-knowledge-library-foundation.md`
 
 ## Outcome
 
@@ -39,4 +39,3 @@ Embedding、RAG、OCR、云盘同步、网页抓取、知识图谱、Agent、自
 ## Exit gate
 
 设计必须包含 H2/MySQL 等价 schema、端点和 DTO、目录布局、路径攻击防护、删除恢复、测试矩阵，并由用户批准。之后才可提升 F2-BE-01。
-
