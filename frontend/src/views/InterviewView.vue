@@ -1533,7 +1533,11 @@ async function handleCreateAndStart() {
 
     ElMessage.success('面试已开始')
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '启动面试失败'
+    const message = error instanceof Error ? error.message : '启动面试失败'
+    errorMessage.value = message
+    if (message.includes('AI 模型服务')) {
+      window.dispatchEvent(new CustomEvent('resumego:ai-not-configured'))
+    }
   } finally {
     actionLoading.value = false
     stopElapsedTimer()

@@ -83,6 +83,7 @@ public class InterviewService {
     private final InterviewPromptBuilder promptBuilder;
     private final InterviewerPersonaMapper personaMapper;
     private final AiClient aiClient;
+    private final AiClientSelector aiClientSelector;
     private final AiInvocationService aiInvocationService;
     private final AiInvocationMapper aiInvocationMapper;
     private final AiOutputValidator outputValidator;
@@ -117,6 +118,7 @@ public class InterviewService {
         this.promptBuilder = promptBuilder;
         this.personaMapper = personaMapper;
         this.aiClient = aiClientSelector.getClient();
+        this.aiClientSelector = aiClientSelector;
         this.aiInvocationService = aiInvocationService;
         this.aiInvocationMapper = aiInvocationMapper;
         this.outputValidator = outputValidator;
@@ -192,6 +194,11 @@ public class InterviewService {
     @Transactional
     public InterviewStatusResponse startInterview(Long sessionId) {
         InterviewSession session = loadSession(sessionId);
+
+        // 0. AI 未配置时明确拒绝，避免静默生成空面试
+        if (!aiClientSelector.isConfigured()) {
+            throw new IllegalStateException("尚未配置 AI 模型服务，请先在设置页添加模型服务");
+        }
 
         // 1. 先校验状态，避免非法状态下产生多余 AI 调用
         if (!stateMachine.canTransition(session, InterviewAction.START)) {

@@ -199,6 +199,7 @@ async function startApplication(): Promise<void> {
     cwd: app.isPackaged ? process.resourcesPath : projectRoot,
     env: spec.env,
     stdio: ['ignore', backendLogFd, backendLogFd],
+    windowsHide: true,
   })
   runtimeConfig = {
     backendOrigin: `http://127.0.0.1:${backendPort}`,

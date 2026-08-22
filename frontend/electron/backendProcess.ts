@@ -23,7 +23,8 @@ export interface BackendLaunchSpec {
 }
 
 export function buildBackendLaunchSpec(options: BackendLaunchOptions): BackendLaunchSpec {
-  const runtimeExecutable = options.platform === 'win32' ? 'java.exe' : 'java'
+  // javaw.exe runs without a console window on Windows (java.exe pops a terminal)
+  const runtimeExecutable = options.platform === 'win32' ? 'javaw.exe' : 'java'
   const command = options.isPackaged
     ? path.join(options.resourcesPath, 'runtime', 'bin', runtimeExecutable)
     : 'java'

@@ -446,7 +446,17 @@ onMounted(async () => {
                   <label>Base URL<input v-model="form.baseUrl" maxlength="500" placeholder="https://api.example.com/v1" /></label>
                   <label>模型名称
                     <div class="model-input-row">
-                      <input v-model="form.defaultModel" list="provider-models" maxlength="120" placeholder="模型 ID" />
+                      <el-select
+  v-model="form.defaultModel"
+  filterable
+  allow-create
+  default-first-option
+  placeholder="选择或输入模型 ID"
+  data-test="provider-model-select"
+  class="provider-model-select"
+>
+  <el-option v-for="model in availableModels" :key="model" :label="model" :value="model" />
+</el-select>
                     </div>
                     <small>连接成功但未获取到模型列表时，可在此手工填写模型 ID。</small>
                   </label>
@@ -473,10 +483,20 @@ onMounted(async () => {
                 </div>
                 <label>模型名称
                   <div class="model-input-row">
-                    <input v-model="form.defaultModel" list="provider-models" maxlength="120" placeholder="从服务商列表中选择，或输入模型 ID" />
+                    <el-select
+  v-model="form.defaultModel"
+  filterable
+  allow-create
+  default-first-option
+  placeholder="选择或输入模型 ID"
+  data-test="provider-model-select"
+  class="provider-model-select"
+>
+  <el-option v-for="model in availableModels" :key="model" :label="model" :value="model" />
+</el-select>
                     <button type="button" :disabled="fetchingModels" @click="fetchModels">{{ fetchingModels ? '获取中…' : '刷新模型' }}</button>
                   </div>
-                  <datalist id="provider-models"><option v-for="model in availableModels" :key="model" :value="model" /></datalist>
+                  
                   <small>模型列表由服务商返回；也可以直接输入模型 ID。</small>
                 </label>
                 <div class="advanced-block">
@@ -545,7 +565,17 @@ onMounted(async () => {
                     <label>Base URL<input v-model="form.baseUrl" maxlength="500" placeholder="https://api.example.com/v1" /></label>
                     <label>模型名称
                       <div class="model-input-row">
-                        <input v-model="form.defaultModel" list="provider-models" maxlength="120" placeholder="模型 ID" />
+                        <el-select
+  v-model="form.defaultModel"
+  filterable
+  allow-create
+  default-first-option
+  placeholder="选择或输入模型 ID"
+  data-test="provider-model-select"
+  class="provider-model-select"
+>
+  <el-option v-for="model in availableModels" :key="model" :label="model" :value="model" />
+</el-select>
                       </div>
                       <small>连接成功但未获取到模型列表时，可在此手工填写模型 ID。</small>
                     </label>
@@ -572,10 +602,20 @@ onMounted(async () => {
                   </div>
                   <label>模型名称
                     <div class="model-input-row">
-                      <input v-model="form.defaultModel" list="provider-models" maxlength="120" placeholder="从服务商列表中选择，或输入模型 ID" />
+                      <el-select
+  v-model="form.defaultModel"
+  filterable
+  allow-create
+  default-first-option
+  placeholder="选择或输入模型 ID"
+  data-test="provider-model-select"
+  class="provider-model-select"
+>
+  <el-option v-for="model in availableModels" :key="model" :label="model" :value="model" />
+</el-select>
                       <button type="button" :disabled="fetchingModels" @click="fetchModels">{{ fetchingModels ? '获取中…' : '刷新模型' }}</button>
                     </div>
-                    <datalist id="provider-models"><option v-for="model in availableModels" :key="model" :value="model" /></datalist>
+                    
                     <small>模型列表由服务商返回；也可以直接输入模型 ID。</small>
                   </label>
                   <div class="advanced-block">
@@ -617,10 +657,20 @@ onMounted(async () => {
                 </div>
                 <label>模型名称
                   <div class="model-input-row">
-                    <input v-model="form.defaultModel" list="provider-models" maxlength="120" placeholder="模型 ID" />
+                    <el-select
+  v-model="form.defaultModel"
+  filterable
+  allow-create
+  default-first-option
+  placeholder="选择或输入模型 ID"
+  data-test="provider-model-select"
+  class="provider-model-select"
+>
+  <el-option v-for="model in availableModels" :key="model" :label="model" :value="model" />
+</el-select>
                     <button type="button" :disabled="fetchingModels" @click="fetchModels">{{ fetchingModels ? '获取中…' : '获取模型' }}</button>
                   </div>
-                  <datalist id="provider-models"><option v-for="model in availableModels" :key="model" :value="model" /></datalist>
+                  
                 </label>
                 <label>API Key
                   <input v-model="form.apiKey" type="password" autocomplete="off" :placeholder="selected?.apiKeyConfigured ? '已安全保存；留空表示不修改' : '粘贴 API Key'" />
@@ -739,6 +789,7 @@ onMounted(async () => {
 .provider-form label small{color:var(--muted);font-size:12px;font-weight:400}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .model-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.provider-model-select{width:100%}
 .model-input-row button{padding:0 13px;border:1px solid var(--border-default);border-radius:var(--radius-control);background:var(--bg-surface);color:var(--copy);font-weight:600;white-space:nowrap;cursor:pointer}
 .model-input-row button:disabled{opacity:.5;cursor:default}
 .form-actions{display:flex;align-items:center;gap:9px;margin-top:8px}

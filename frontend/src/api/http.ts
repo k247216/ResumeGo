@@ -52,10 +52,24 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   if (workspaceToken) {
     headers.set('X-Workspace-Token', workspaceToken)
   }
-  const response = await fetch(resolveApiUrl(input), {
-    ...init,
-    headers,
-  })
+  const controller = new AbortController()
+  const timeoutMs = init.signal ? undefined : 25_000
+  const timer = timeoutMs ? setTimeout(() => controller.abort(new Error('请求超时')), timeoutMs) : null
+  let response: Response
+  try {
+    response = await fetch(resolveApiUrl(input), {
+      ...init,
+      headers,
+      signal: init.signal ?? controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('请求超时，请检查网络后重试')
+    }
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
   if (typeof window !== 'undefined') {
     void response.clone().text().then((body) => {
       if (body.includes('NOT_CONFIGURED') || body.includes('尚未配置 AI 模型服务')) {

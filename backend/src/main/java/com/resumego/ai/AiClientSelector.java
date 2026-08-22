@@ -36,6 +36,10 @@ public class AiClientSelector implements AiClient {
         return this;
     }
 
+    public boolean isConfigured() {
+        return registry.activeRuntime() != null;
+    }
+
     @Override
     public AiResult invoke(AiRequest request) {
         return registry.client().invoke(request);
