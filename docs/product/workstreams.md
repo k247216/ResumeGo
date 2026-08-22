@@ -24,11 +24,25 @@ Dispatch baseline: `1f83b1ac02e62793813d174a2f451a42fc5c3e57`
 
 | Task ID | 模块 | 状态 | 基线/生成规则 | 功能分支 | 文件所有权摘要 | 依赖 | 集成顺序 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| V2-F0-MIG-01 | V1 只读导入 | `CORE_RESERVED` | 由迁移设计冻结 | `codex/v2-f0-mig-01-v1-import` | 迁移器、迁移 DTO、迁移测试；禁止写 V1 数据 | 迁移设计与恢复策略 | 单独审查后才可进入 F1 |
+| V2-F0-MIG-01 | 导入契约与 dry-run | `CORE_RESERVED` | 由 Core Controller 冻结 | `codex/v2-f0-mig-01-import-contract` | 迁移契约、manifest/result/receipt DTO、决策文档 | 无 | A 后可并行设计 |
+| V2-F0-MIG-02 | V1 只读检查与事务导入 | `QUEUED` | MIG-01 集成后填写 | `codex/v2-f0-mig-02-import-engine` | migration service/repository/API、迁移测试 | V2-F0-MIG-01 | MIG-01 后 |
+| V2-F0-MIG-03 | 桌面导入审阅流程 | `DESIGN_REQUIRED` | MIG-02 集成后填写 | `codex/v2-f0-mig-03-import-ui` | Electron IPC、导入页面与测试 | MIG-02；导入交互批准 | MIG-02 后 |
 | V2-F1-BE-01 | Pipeline 阶段历史查询 | `READY` | `1f83b1ac02e62793813d174a2f451a42fc5c3e57` | `codex/v2-f1-be-01-transition-history` | Pipeline repository/service/controller、新响应 DTO、对应三层测试 | 无 | 1 |
 | V2-F1-FE-01 | Pipeline 类型与 API client | `READY` | `1f83b1ac02e62793813d174a2f451a42fc5c3e57` | `codex/v2-f1-fe-01-pipeline-api` | 新建 Pipeline 类型、API client 及其测试 | 只依赖已冻结的现有 `/api/v2/pipelines` 契约 | 1，可与 BE-01 并行 |
 | V2-F1-FE-02 | Pipeline Pinia store | `QUEUED` | FE-01 集成后填写真实提交 | `codex/v2-f1-fe-02-pipeline-store` | 新建 store 及其测试 | V2-F1-FE-01 已集成 | 2 |
-| V2-F1-UI-01 | Pipeline 页面 | `DESIGN_REQUIRED` | 不适用 | 未分配 | 路由、页面、组件、样式、视图测试 | Pipeline 信息架构与交互稿确认；FE-02 已集成 | 3 |
+| V2-F1-BE-02 | Pipeline 身份与材料更新 | `QUEUED` | BE-01 集成后填写 | `codex/v2-f1-be-02-pipeline-update` | Pipeline 三层、新 update DTO 与测试 | V2-F1-BE-01 | 2 |
+| V2-F1-UX-01 | Pipeline 交互契约 | `DESIGN_REQUIRED` | 不适用 | 不创建代码分支 | Pipeline 页面设计规范与验收场景 | F1 数据契约稳定 | FE-03 前 |
+| V2-F1-FE-03 | V2 Pipeline 页面 | `QUEUED` | BE-02、FE-02、UX-01 集成后填写 | `codex/v2-f1-fe-03-pipeline-page` | 路由、Pipeline view/components/tests | V2-F1-BE-02、FE-02、UX-01 | 3 |
+| V2-F1-QA-01 | Pipeline 纵向验收 | `QUEUED` | FE-03 集成后填写 | `codex/v2-f1-qa-01-pipeline-acceptance` | 集成/E2E/桌面验收资产 | MIG-03、FE-03 | 4 |
+| V2-F2-ARCH-01 | Knowledge 存储与生命周期契约 | `CORE_RESERVED` | F1 数据边界稳定后填写 | `codex/v2-f2-arch-01-knowledge-contract` | 架构、决策、迁移设计 | F1 领域边界稳定 | F2 首项 |
+| V2-F2-BE-01 | Knowledge 元数据基础 | `QUEUED` | ARCH-01 集成后填写 | `codex/v2-f2-be-01-metadata` | 迁移、domain/repository/service/controller/tests | V2-F2-ARCH-01 | 1 |
+| V2-F2-IO-01 | 文件导入与可恢复解析 | `QUEUED` | BE-01 集成后填写 | `codex/v2-f2-io-01-import-extraction` | 文件能力、导入/解析 job、IPC/API/tests | V2-F2-BE-01 | 2 |
+| V2-F2-BE-02 | 分类、标签、搜索与原文定位 | `QUEUED` | IO-01 集成后填写 | `codex/v2-f2-be-02-search` | Knowledge backend API 与测试 | V2-F2-IO-01 | 3 |
+| V2-F2-BE-03 | 重试与派生数据清理 | `QUEUED` | BE-02 集成后填写 | `codex/v2-f2-be-03-recovery-delete` | job retry/delete service/API/tests | V2-F2-BE-02 | 4 |
+| V2-F2-FE-01 | Knowledge client 与 store | `QUEUED` | BE-02 契约集成后填写 | `codex/v2-f2-fe-01-client-store` | types/API/store/tests | V2-F2-BE-02 | 4，可与 BE-03 并行且不得重叠文件 |
+| V2-F2-UX-01 | Knowledge Library 交互契约 | `DESIGN_REQUIRED` | 不适用 | 不创建代码分支 | Knowledge 页面设计规范与验收场景 | ARCH-01 | FE-02 前 |
+| V2-F2-FE-02 | Knowledge Library 页面 | `QUEUED` | BE-03、FE-01、UX-01 集成后填写 | `codex/v2-f2-fe-02-library-ui` | 路由、view/components/tests | V2-F2-BE-03、FE-01、UX-01 | 5 |
+| V2-F2-QA-01 | Knowledge F2 纵向验收 | `QUEUED` | FE-02 集成后填写 | `codex/v2-f2-qa-01-library-acceptance` | 集成/E2E/桌面验收资产 | V2-F2-FE-02 | 6 |
 
 ## 并行与所有权规则
 
