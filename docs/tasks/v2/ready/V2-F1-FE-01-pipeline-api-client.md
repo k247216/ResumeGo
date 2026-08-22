@@ -125,4 +125,3 @@ git status --short
 ## 13. Integration gates
 
 以下任一项成立即退回：新增 UI/Pinia；路径或 method 漂移；绕开 `apiFetch`；失败被吞掉；用假默认值掩盖可空数据；缺少真实 RED；存在未授权文件。
-

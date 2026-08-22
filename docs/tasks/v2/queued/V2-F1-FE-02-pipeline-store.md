@@ -42,4 +42,3 @@ frontend/src/stores/pipelines.test.ts
 - 空列表、持久选择失效、并发加载、失败重试与归档后选择行为。
 - 真实 RED/GREEN 命令和完整前端回归要求。
 - 提交信息、交付格式与直接退回条件。
-

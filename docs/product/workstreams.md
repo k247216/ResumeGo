@@ -1,8 +1,11 @@
 # Career OS V2 工作流登记表
 
-Status: Active control register  
-Controller: Core Controller  
-Integration branch: `codex/v2-career-os`  
+Status: Active control register
+
+Controller: Core Controller
+
+Integration branch: `codex/v2-career-os`
+
 Dispatch baseline: `1f83b1ac02e62793813d174a2f451a42fc5c3e57`
 
 本文件是 V2 外部 Agent 的唯一任务状态入口。只有位于 `docs/tasks/v2/ready/` 且状态为 `READY` 的任务可以开始。执行者领取任务时，将对应任务卡全文交给该 Agent；不得只转述标题。
@@ -41,4 +44,3 @@ Dispatch baseline: `1f83b1ac02e62793813d174a2f451a42fc5c3e57`
 2. 明确要求 Agent 先核验 `Base commit`，再创建任务卡指定分支和独立 worktree。
 3. Agent 返回最终提交哈希与完整交付报告后，将二者交给 Core Controller 审查。
 4. 未获 `APPROVED` 前，不要把分支合并到 `codex/v2-career-os`。
-

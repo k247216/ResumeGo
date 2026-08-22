@@ -106,4 +106,3 @@ git diff <BASE_COMMIT>..<FINAL_COMMIT> -- . ':!*.lock'
 - `REJECT`：越权、契约漂移、数据/隐私风险、缺失关键行为或测试证据不可信。列出阻塞项并退回原 Agent。
 
 审查记录必须包含 Task ID、Base/Final commit、复现命令与结果、发现分级、最终结论和集成提交（如有）。
-
