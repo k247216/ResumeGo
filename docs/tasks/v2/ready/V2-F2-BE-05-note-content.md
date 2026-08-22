@@ -2,9 +2,9 @@
 
 ## Identity
 
-- Status: `QUEUED`
+- Status: `READY`
 - Branch: `codex/v2-f2-be-05-note-content`
-- Base commit: integration HEAD after BE-04
+- Base commit: `5d26fa1`
 - Depends on: integrated F2-BE-04
 
 ## User result
