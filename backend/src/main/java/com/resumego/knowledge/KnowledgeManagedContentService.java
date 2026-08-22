@@ -116,13 +116,9 @@ public class KnowledgeManagedContentService {
         return new KnowledgeContentResponse(documentId, content);
     }
 
-    /** 规范化扩展名：仅 md/txt 暴露，其余视为未知。 */
+    /** 统一扩展名识别（小写归一，未知 → unknown）。 */
     static String normalizeExtension(String extension) {
-        if (extension == null) {
-            return null;
-        }
-        String lower = extension.toLowerCase(java.util.Locale.ROOT);
-        return ("md".equals(lower) || "txt".equals(lower)) ? lower : null;
+        return KnowledgeFileTypes.normalizeExtension(extension);
     }
 
     private String sha256(byte[] bytes) {

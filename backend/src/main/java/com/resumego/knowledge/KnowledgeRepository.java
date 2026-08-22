@@ -162,17 +162,18 @@ public class KnowledgeRepository {
                     INSERT INTO knowledge_source_files
                         (document_id, user_id, original_name, stored_relative_path, mime_type,
                          staging_relative_path, extension, size_bytes, sha256, availability)
-                    VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, documentId);
             statement.setLong(2, userId);
             statement.setString(3, draft.originalName());
             statement.setString(4, draft.storedRelativePath());
-            statement.setString(5, draft.stagingRelativePath());
-            statement.setString(6, draft.extension());
-            statement.setLong(7, draft.sizeBytes());
-            statement.setString(8, draft.sha256());
-            statement.setString(9, draft.availability());
+            statement.setString(5, draft.mediaType());
+            statement.setString(6, draft.stagingRelativePath());
+            statement.setString(7, draft.extension());
+            statement.setLong(8, draft.sizeBytes());
+            statement.setString(9, draft.sha256());
+            statement.setString(10, draft.availability());
             return statement;
         }, keys);
         return requiredKey(keys, "创建知识来源文件失败：未返回主键");

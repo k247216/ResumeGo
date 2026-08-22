@@ -104,22 +104,63 @@ class KnowledgeImportServiceTest {
     }
 
     @Test
-    void rejectsUnsupportedExtensionWithoutCreatingRecords() {
+    void importsPdfAsMetadataOnlyFailedWithUnsupportedFormat() {
+        when(repository.findSourceFileBySha(1L, sha(MD_BYTES))).thenReturn(Optional.empty());
+        when(repository.insertImportRecords(eq(1L), any(), any())).thenReturn(ids());
         MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", MD_BYTES);
-        assertThatThrownBy(() -> service.importFile(file))
-                .isInstanceOfSatisfying(KnowledgeImportException.class,
-                        e -> assertThat(e.errorCode()).isEqualTo("UNSUPPORTED_TYPE"));
-        verify(repository, never()).insertImportRecords(anyLong(), any(), any());
+
+        KnowledgeImportResponse response = service.importFile(file);
+
+        assertThat(response.documentId()).isEqualTo(10L);
+        assertThat(response.duplicate()).isFalse();
+        assertThat(response.processingStatus()).isEqualTo("FAILED");
+        assertThat(response.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        ArgumentCaptor<KnowledgeSourceFileDraft> draft = ArgumentCaptor.forClass(KnowledgeSourceFileDraft.class);
+        verify(repository).insertImportRecords(eq(1L), eq("doc"), draft.capture());
+        assertThat(draft.getValue().extension()).isEqualTo("pdf");
+        assertThat(draft.getValue().mediaType()).isEqualTo("application/pdf");
+        verify(repository).failImport(eq(10L), eq(20L), eq(30L), eq("UNSUPPORTED_FORMAT"), eq(true));
         verify(repository, never()).completeImport(anyLong(), anyLong(), anyLong(), anyLong(), any());
-        assertThat(tempDir.resolve("knowledge")).doesNotExist();
+        // 副本已落位且可用（不假装可编辑，但保留安全副本）
+        Path stored = fileStore.resolveStored(fileStore.sourceRelativePath(1L, sha(MD_BYTES), "pdf"));
+        assertThat(stored).exists();
+        assertThat(stored).hasBinaryContent(MD_BYTES);
     }
 
     @Test
-    void rejectsMissingExtension() {
+    void importsUnknownExtensionAsMetadataOnlyFailedWithUnknownType() {
+        when(repository.findSourceFileBySha(1L, sha(MD_BYTES))).thenReturn(Optional.empty());
+        when(repository.insertImportRecords(eq(1L), any(), any())).thenReturn(ids());
+        MockMultipartFile file = new MockMultipartFile("file", "archive.xyz", "application/octet-stream", MD_BYTES);
+
+        KnowledgeImportResponse response = service.importFile(file);
+
+        assertThat(response.processingStatus()).isEqualTo("FAILED");
+        assertThat(response.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        ArgumentCaptor<KnowledgeSourceFileDraft> draft = ArgumentCaptor.forClass(KnowledgeSourceFileDraft.class);
+        verify(repository).insertImportRecords(eq(1L), eq("archive"), draft.capture());
+        assertThat(draft.getValue().extension()).isEqualTo("xyz");
+        assertThat(draft.getValue().mediaType()).isEqualTo("application/octet-stream");
+        verify(repository).failImport(eq(10L), eq(20L), eq(30L), eq("UNSUPPORTED_FORMAT"), eq(true));
+        verify(repository, never()).completeImport(anyLong(), anyLong(), anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void importsFileWithoutExtensionAsUnknownTypeFailed() {
+        when(repository.findSourceFileBySha(1L, sha(MD_BYTES))).thenReturn(Optional.empty());
+        when(repository.insertImportRecords(eq(1L), any(), any())).thenReturn(ids());
         MockMultipartFile file = new MockMultipartFile("file", "README", "text/plain", MD_BYTES);
-        assertThatThrownBy(() -> service.importFile(file))
-                .isInstanceOfSatisfying(KnowledgeImportException.class,
-                        e -> assertThat(e.errorCode()).isEqualTo("UNSUPPORTED_TYPE"));
+
+        KnowledgeImportResponse response = service.importFile(file);
+
+        assertThat(response.processingStatus()).isEqualTo("FAILED");
+        assertThat(response.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        ArgumentCaptor<KnowledgeSourceFileDraft> draft = ArgumentCaptor.forClass(KnowledgeSourceFileDraft.class);
+        verify(repository).insertImportRecords(eq(1L), eq("README"), draft.capture());
+        assertThat(draft.getValue().extension()).isEqualTo(KnowledgeFileTypes.UNKNOWN);
+        assertThat(draft.getValue().mediaType()).isEqualTo("application/octet-stream");
+        verify(repository).failImport(eq(10L), eq(20L), eq(30L), eq("UNSUPPORTED_FORMAT"), eq(true));
+        verify(repository, never()).completeImport(anyLong(), anyLong(), anyLong(), anyLong(), any());
     }
 
     @Test

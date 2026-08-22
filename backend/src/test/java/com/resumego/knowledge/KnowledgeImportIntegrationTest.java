@@ -163,6 +163,75 @@ class KnowledgeImportIntegrationTest {
         assertThat(joined).doesNotContain(content, filename, "knowledge/sources");
     }
 
+    @Test
+    void importsPdfAsMetadataOnlyFailedWithUnsupportedFormat() {
+        byte[] bytes = "%PDF-1.4 fake pdf body".getBytes(StandardCharsets.UTF_8);
+        String sha = sha(bytes);
+
+        KnowledgeImportResponse response = service.importFile(
+                new MockMultipartFile("file", "doc.pdf", "application/pdf", bytes));
+
+        assertThat(response.processingStatus()).isEqualTo("FAILED");
+        assertThat(response.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        assertThat(response.duplicate()).isFalse();
+
+        Map<String, Object> doc = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_documents WHERE id = ?", response.documentId());
+        assertThat(String.valueOf(doc.get("processing_status"))).isEqualTo("FAILED");
+        assertThat(String.valueOf(doc.get("source_type"))).isEqualTo("FILE");
+
+        Map<String, Object> source = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_source_files WHERE document_id = ?", response.documentId());
+        assertThat(String.valueOf(source.get("availability"))).isEqualTo("AVAILABLE");
+        assertThat(String.valueOf(source.get("extension"))).isEqualTo("pdf");
+        assertThat(String.valueOf(source.get("mime_type"))).isEqualTo("application/pdf");
+        assertThat(String.valueOf(source.get("stored_relative_path")))
+                .isEqualTo("knowledge/sources/1/" + sha + ".pdf");
+
+        Map<String, Object> job = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_import_jobs WHERE document_id = ?", response.documentId());
+        assertThat(String.valueOf(job.get("job_status"))).isEqualTo("FAILED");
+        assertThat(String.valueOf(job.get("error_code"))).isEqualTo("UNSUPPORTED_FORMAT");
+
+        // 不提取正文：content 表无此行
+        Integer contents = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_extracted_contents WHERE document_id = ?",
+                Integer.class, response.documentId());
+        assertThat(contents).isZero();
+
+        Path stored = StoreConfig.dataDir.resolve(String.valueOf(source.get("stored_relative_path")));
+        assertThat(stored).exists();
+        assertThat(stored).hasBinaryContent(bytes);
+    }
+
+    @Test
+    void importsUnknownAndMissingExtensionAsUnknownTypeFailed() {
+        byte[] xyzBytes = "unknown body".getBytes(StandardCharsets.UTF_8);
+        byte[] noExtBytes = "readme body without extension".getBytes(StandardCharsets.UTF_8);
+
+        KnowledgeImportResponse xyz = service.importFile(
+                new MockMultipartFile("file", "archive.xyz", "application/octet-stream", xyzBytes));
+        assertThat(xyz.processingStatus()).isEqualTo("FAILED");
+        assertThat(xyz.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        Map<String, Object> xyzSource = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_source_files WHERE document_id = ?", xyz.documentId());
+        assertThat(String.valueOf(xyzSource.get("extension"))).isEqualTo("xyz");
+        assertThat(String.valueOf(xyzSource.get("mime_type"))).isEqualTo("application/octet-stream");
+
+        KnowledgeImportResponse noExt = service.importFile(
+                new MockMultipartFile("file", "README", "text/plain", noExtBytes));
+        assertThat(noExt.processingStatus()).isEqualTo("FAILED");
+        assertThat(noExt.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        Map<String, Object> noExtSource = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_source_files WHERE document_id = ?", noExt.documentId());
+        assertThat(String.valueOf(noExtSource.get("extension"))).isEqualTo(KnowledgeFileTypes.UNKNOWN);
+        assertThat(String.valueOf(noExtSource.get("mime_type"))).isEqualTo("application/octet-stream");
+
+        // 两条记录独立存在（不同 fingerprint）
+        Integer docs = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM knowledge_documents", Integer.class);
+        assertThat(docs).isEqualTo(2);
+    }
+
     private ListAppender<ILoggingEvent> attachAppender() {
         ch.qos.logback.classic.Logger logger = logger();
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
