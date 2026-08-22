@@ -2,9 +2,10 @@
 
 ## Identity
 
-- Status: `READY`
+- Status: `INTEGRATED`
 - Branch: `codex/v2-f2-fe-02-library-ui`
 - Base commit: `03788f3`
+- Integrated commit: `a039833`
 - Depends on: integrated F2-IO-02, F2-BE-04, F2-BE-05, F2-FE-01 and approved F2-UX-01
 
 ## User result
