@@ -1,0 +1,66 @@
+package com.resumego.pipeline;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@JdbcTest
+@Import(CareerPipelineRepository.class)
+@Sql(scripts = "/sql/career_pipeline_schema.sql")
+class CareerPipelineRepositoryTest {
+
+    @Autowired CareerPipelineRepository repository;
+    @Autowired JdbcTemplate jdbcTemplate;
+
+    @Test
+    void createsIndependentUserScopedPipelinesWithOrderedStages() {
+        long first = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", 10L, 31L);
+        long second = repository.createPipeline(1L, "字节后端", "字节跳动", "后端开发", null, null);
+        repository.createStage(first, "准备中", 0, PipelineStageState.CURRENT);
+        repository.createStage(first, "技术面", 1, PipelineStageState.PENDING);
+
+        assertThat(repository.findAll(1L)).extracting(CareerPipeline::id)
+                .containsExactly(second, first);
+        assertThat(repository.findAll(2L)).isEmpty();
+        assertThat(repository.findById(2L, first)).isEmpty();
+        assertThat(repository.findStages(1L, first)).extracting(PipelineStage::name)
+                .containsExactly("准备中", "技术面");
+    }
+
+    @Test
+    void persistsCurrentStageAndAppendOnlyTransitionHistory() {
+        long pipelineId = repository.createPipeline(1L, "腾讯 Java", "腾讯", "Java 后端", null, null);
+        long prepare = repository.createStage(pipelineId, "准备中", 0, PipelineStageState.CURRENT);
+        long interview = repository.createStage(pipelineId, "技术面", 1, PipelineStageState.PENDING);
+        repository.setCurrentStage(1L, pipelineId, prepare);
+        repository.appendTransition(pipelineId, null, prepare, "USER", "创建管线");
+
+        repository.updateStageState(pipelineId, prepare, PipelineStageState.COMPLETED);
+        repository.updateStageState(pipelineId, interview, PipelineStageState.CURRENT);
+        repository.setCurrentStage(1L, pipelineId, interview);
+        repository.appendTransition(pipelineId, prepare, interview, "USER", "进入技术面");
+
+        assertThat(repository.findById(1L, pipelineId)).get()
+                .extracting(CareerPipeline::currentStageId)
+                .isEqualTo(interview);
+        assertThat(repository.findTransitions(1L, pipelineId))
+                .extracting(PipelineStageTransition::toStageId)
+                .containsExactly(prepare, interview);
+        assertThat(repository.findStages(1L, pipelineId))
+                .extracting(PipelineStage::state)
+                .containsExactly(PipelineStageState.COMPLETED, PipelineStageState.CURRENT);
+    }
+
+    @Test
+    void validatesLinkedAssetOwnership() {
+        assertThat(repository.ownsJobDescription(1L, 10L)).isTrue();
+        assertThat(repository.ownsJobDescription(1L, 20L)).isFalse();
+        assertThat(repository.ownsResumeVersion(1L, 31L)).isTrue();
+        assertThat(repository.ownsResumeVersion(1L, 41L)).isFalse();
+    }
+}

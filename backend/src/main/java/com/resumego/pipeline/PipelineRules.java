@@ -1,5 +1,8 @@
 package com.resumego.pipeline;
 
+import org.springframework.stereotype.Component;
+
+@Component
 public final class PipelineRules {
 
     public void validateLifecycle(PipelineLifecycle lifecycle, PipelineOutcome outcome) {
