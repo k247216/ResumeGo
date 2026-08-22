@@ -6,7 +6,7 @@ Controller: Core Controller
 
 Integration branch: `codex/v2-career-os`
 
-Dispatch baseline: `fc98ad0f5ac9edc8749c6ddcbf614429133c1713`
+Dispatch baseline: `42435cb3e75e539d14fa365b56f349c00710598f`
 
 本文件是 V2 外部 Agent 的唯一任务状态入口。只有位于 `docs/tasks/v2/ready/` 且状态为 `READY` 的任务可以开始。执行者领取任务时，将对应任务卡全文交给该 Agent；不得只转述标题。
 
@@ -29,8 +29,8 @@ Dispatch baseline: `fc98ad0f5ac9edc8749c6ddcbf614429133c1713`
 | V2-F0-MIG-03 | 桌面导入审阅流程 | `DESIGN_REQUIRED` | MIG-02 集成后填写 | `codex/v2-f0-mig-03-import-ui` | Electron IPC、导入页面与测试 | MIG-02；导入交互批准 | MIG-02 后 |
 | V2-F1-BE-01 | Pipeline 阶段历史查询 | `INTEGRATED` | `9274a5e`、`7974b98` | `codex/v2-f1-be-01-transition-history` | Pipeline repository/service/controller、新响应 DTO、对应三层测试 | 无 | 已集成 |
 | V2-F1-FE-01 | Pipeline 类型与 API client | `INTEGRATED` | `f4b8aee`、`fc98ad0` | `codex/v2-f1-fe-01-pipeline-api` | 新建 Pipeline 类型、API client 及其测试 | 无 | 已集成 |
-| V2-F1-FE-02 | Pipeline Pinia store | `READY` | `fc98ad0f5ac9edc8749c6ddcbf614429133c1713` | `codex/v2-f1-fe-02-pipeline-store` | 仅新建 store 及其测试 | V2-F1-FE-01 已集成 | 2，可与 BE-02 并行 |
-| V2-F1-BE-02 | Pipeline 身份与材料更新 | `READY` | `fc98ad0f5ac9edc8749c6ddcbf614429133c1713` | `codex/v2-f1-be-02-pipeline-update` | Pipeline 三层、新 update DTO 与测试 | V2-F1-BE-01 已集成 | 2，可与 FE-02 并行 |
+| V2-F1-FE-02 | Pipeline Pinia store | `INTEGRATED` | `00a81a9`、`8d9a640` | `codex/v2-f1-fe-02-pipeline-store` | 仅新建 store 及其测试 | V2-F1-FE-01 已集成 | 已集成 |
+| V2-F1-BE-02 | Pipeline 身份与材料更新 | `INTEGRATED` | `d33433f`、`42435cb` | `codex/v2-f1-be-02-pipeline-update` | Pipeline 三层、新 update DTO 与测试 | V2-F1-BE-01 已集成 | 已集成 |
 | V2-F1-UX-01 | Pipeline 交互契约 | `DESIGN_REQUIRED` | 不适用 | 不创建代码分支 | Pipeline 页面设计规范与验收场景 | F1 数据契约稳定 | FE-03 前 |
 | V2-F1-FE-03 | V2 Pipeline 页面 | `QUEUED` | BE-02、FE-02、UX-01 集成后填写 | `codex/v2-f1-fe-03-pipeline-page` | 路由、Pipeline view/components/tests | V2-F1-BE-02、FE-02、UX-01 | 3 |
 | V2-F1-QA-01 | Pipeline 纵向验收 | `QUEUED` | FE-03 集成后填写 | `codex/v2-f1-qa-01-pipeline-acceptance` | 集成/E2E/桌面验收资产 | MIG-03、FE-03 | 4 |
@@ -46,9 +46,9 @@ Dispatch baseline: `fc98ad0f5ac9edc8749c6ddcbf614429133c1713`
 
 ## 并行与所有权规则
 
-1. 当前仅 `V2-F1-BE-02` 与 `V2-F1-FE-02` 可分发，且必须从同一冻结基线创建不同分支和独立 worktree。
-2. 两个任务没有重叠文件；BE-02 不得改前端，FE-02 不得改 API client/types。任一 Agent 需要越界时必须停止。
-3. BE-02 与 FE-02 均通过并集成后，仍需完成 `V2-F1-UX-01`，才能提升 Pipeline 页面任务。
+1. 当前没有可分发的 `READY` 代码任务；`V2-F1-BE-02` 与 `V2-F1-FE-02` 已完成并集成。
+2. 下一步由 Core Controller 冻结并提交 `V2-F1-UX-01` 交互契约，获得用户批准后才能提升 `V2-F1-FE-03`。
+3. `V2-F1-FE-03` 不得在交互契约批准前领取，也不得提前修改全局 DesktopShell 或 V1 页面。
 4. 迁移和 Pipeline 页面不因“实现容易”而提前；它们的状态只能由 Core Controller 修改。
 5. 外部 Agent 只提交功能分支和 `docs/templates/v2-agent-delivery-report.md` 对应的交付内容，不得合并。
 

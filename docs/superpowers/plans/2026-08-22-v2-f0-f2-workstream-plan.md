@@ -29,12 +29,13 @@
 - [x] `V2-F1-FE-01`: create Pipeline types and API client.
 - [x] Review and integrate both independently.
 - [x] Promote `V2-F1-FE-02` and `V2-F1-BE-02` from the shared post-integration baseline.
+- [x] Integrate `V2-F1-FE-02` Pipeline store after functional review.
 
 Wave exit: Pipeline history is readable and the frontend has one typed state-management foundation without UI replacement.
 
 ## Wave B — Finish Pipeline and V1 import
 
-- [ ] `V2-F1-BE-02`: add deterministic Pipeline identity/material update after BE-01 integration.
+- [x] `V2-F1-BE-02`: add deterministic Pipeline identity/material update after BE-01 integration.
 - [ ] `V2-F0-MIG-01`: freeze import manifest, dry-run result, fingerprint and receipt contracts.
 - [ ] `V2-F0-MIG-02`: implement read-only inspection and transactional idempotent import.
 - [ ] `V2-F0-MIG-03`: expose the import review/confirmation desktop flow.
