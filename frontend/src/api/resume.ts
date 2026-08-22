@@ -27,6 +27,13 @@ export async function listResumes(): Promise<ApiResponse<Resume[]>> {
   return parseResponse<Resume[]>(res, '获取简历列表失败')
 }
 
+export async function deleteResume(resumeId: number): Promise<ApiResponse<null>> {
+  const res = await apiFetch(`${RESUME_BASE}/${resumeId}`, {
+    method: 'DELETE',
+  })
+  return parseResponse<null>(res, '删除简历失败')
+}
+
 export async function createResume(req: CreateResumeRequest): Promise<ApiResponse<Resume>> {
   const res = await apiFetch(RESUME_BASE, {
     method: 'POST',

@@ -105,6 +105,19 @@
               </button>
             </template>
           </section>
+
+          <div class="inspector-danger">
+            <button
+              type="button"
+              class="danger-link"
+              data-test="delete-resume"
+              :disabled="deleting"
+              @click="confirmDeleteResume"
+            >
+              {{ deleting ? '删除中…' : '删除这份简历' }}
+            </button>
+            <p>删除后简历及其版本不再显示，关联的求职目标不受影响。</p>
+          </div>
         </template>
         <div v-else class="inspector-empty">选择一份简历查看详情</div>
       </aside>
@@ -135,6 +148,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { ArrowDown, ArrowRight, ArrowUp, Check, Upload } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { createResume } from '../../api/resume'
 import { getJobDescription } from '../../api/job'
@@ -220,6 +234,31 @@ watch(() => library.selectedResumeId.value, () => { showAllVersions.value = fals
 onMounted(() => { void library.load() })
 function createdByLabel(type: string) { if (type === 'user') return '手工维护'; if (type === 'system') return '系统创建'; if (type === 'ai_suggestion') return '建议生成'; return '版本记录' }
 function formatTime(value: string) { if (!value) return '时间未知'; return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }
+
+const deleting = ref(false)
+
+async function confirmDeleteResume() {
+  const resume = library.selectedResume.value
+  if (!resume) return
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${resume.title}」吗？删除后简历及其全部版本不再显示，此操作不可恢复。`,
+      '删除简历',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  deleting.value = true
+  try {
+    await library.remove(resume.id)
+    ElMessage.success('简历已删除')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '删除简历失败')
+  } finally {
+    deleting.value = false
+  }
+}
 
 function paperName(resume: Resume) {
   const basic = resume.currentVersion?.content.basicInfo
@@ -363,6 +402,11 @@ async function confirmImport() {
 .version-count{color:var(--muted);font-size:12px}
 .inspector-note{padding:10px 2px;color:var(--muted);font-size:13px}
 .inspector-error{padding:10px 2px;color:var(--danger);font-size:13px}
+.inspector-danger{padding:16px 0;border-top:1px solid var(--border-subtle)}
+.danger-link{border:0;background:transparent;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
+.danger-link:hover:not(:disabled){text-decoration:underline}
+.danger-link:disabled{opacity:.5;cursor:not-allowed}
+.inspector-danger p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
 .version-list{display:grid;margin-top:6px}
 .version-row{display:grid;gap:4px;border:0;background:transparent;padding:11px 10px;text-align:left;cursor:pointer;color:var(--ink);border-radius:var(--radius-control)}
 .version-row:hover{background:var(--bg-hover)}

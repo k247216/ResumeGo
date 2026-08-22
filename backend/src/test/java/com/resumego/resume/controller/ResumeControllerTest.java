@@ -46,8 +46,15 @@ class ResumeControllerTest {
         long lastVersionId;
         long lastResumeId;
         Long storedTargetJobId;
+        Long softDeletedResumeId;
 
         TestRepo() { super(null, new ObjectMapper()); }
+
+        @Override
+        public int softDelete(long userId, long resumeId) {
+            softDeletedResumeId = resumeId;
+            return resumeId == 1L || resumeId == 3L ? 1 : 0;
+        }
 
         @Override public String findTitleById(long id) {
             if (id == 1L) return "简历1";
@@ -230,6 +237,27 @@ class ResumeControllerTest {
         void rejectMissingResume() {
             assertThatThrownBy(() -> resumeService.updateTargetJob(999L, new UpdateResumeTargetJobRequest(66L)))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("简历不存在");
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteResume 边界")
+    class DeleteResume {
+
+        @Test
+        @DisplayName("存在的简历 → 删除成功并记录删除 id")
+        void deleteExisting() {
+            boolean result = resumeService.deleteResume(1L);
+            assertThat(result).isTrue();
+            assertThat(repo.softDeletedResumeId).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("不存在的简历 → 返回 false")
+        void deleteMissing() {
+            boolean result = resumeService.deleteResume(999L);
+            assertThat(result).isFalse();
+            assertThat(repo.softDeletedResumeId).isEqualTo(999L);
         }
     }
 }

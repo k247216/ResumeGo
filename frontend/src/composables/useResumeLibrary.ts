@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { getResumeVersions, listResumes } from '../api/resume'
+import { deleteResume, getResumeVersions, listResumes } from '../api/resume'
 import type { Resume, ResumeVersion } from '../types/resume'
 
 export function useResumeLibrary() {
@@ -59,9 +59,19 @@ export function useResumeLibrary() {
     }
   }
 
+  async function remove(id: number) {
+    await deleteResume(id)
+    if (selectedResumeId.value === id) {
+      selectedResumeId.value = null
+      versions.value = []
+      selectedVersionId.value = null
+    }
+    await load()
+  }
+
   function selectVersion(id: number) {
     if (versions.value.some((version) => version.id === id)) selectedVersionId.value = id
   }
 
-  return { resumes, selectedResumeId, selectedResume, versions, selectedVersionId, selectedVersion, loading, versionLoading, errorMessage, versionError, load, selectResume, selectVersion }
+  return { resumes, selectedResumeId, selectedResume, versions, selectedVersionId, selectedVersion, loading, versionLoading, errorMessage, versionError, load, selectResume, selectVersion, remove }
 }
