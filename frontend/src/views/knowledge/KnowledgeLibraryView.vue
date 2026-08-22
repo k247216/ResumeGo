@@ -4,22 +4,28 @@
       :query="store.searchQuery"
       :importing="store.importing"
       :import-error-message="store.importErrorMessage"
+      :show-navigator-restore="navigatorCollapsed"
+      :show-list-restore="listCollapsed"
+      :show-inspector-restore="!inspectorOpen"
       @update-query="store.setSearchQuery"
       @import-file="handleImport"
-      @create-note="noteOpen = true"
+      @create-note="handleCreateNote"
+      @restore-navigator="openNavigator"
+      @restore-list="openDocumentList"
+      @restore-inspector="openInspector"
     />
     <p v-if="store.categorizeWarning" class="categorize-warning" data-test="categorize-warning">{{ store.categorizeWarning }}</p>
 
     <div class="library-body">
       <KnowledgeNavigator
+        v-if="!navigatorCollapsed"
         :nodes="store.categoryTree"
         :tags="store.tags"
         :expanded-ids="expandedFolderIds"
         :selected-id="selectedFolderId"
         :active-tag-id="activeTagId"
-        :collapsed="navigatorCollapsed"
         :tree-error="store.categoryTreeError"
-        @toggle-collapse="navigatorCollapsed = !navigatorCollapsed"
+        @close="closeNavigator"
         @new-folder="openFolderCreate(null)"
         @toggle-folder="toggleFolder"
         @select-folder="selectFolder"
@@ -33,17 +39,17 @@
       />
 
       <KnowledgeDocumentList
+        v-if="!listCollapsed"
         :documents="store.documents"
         :results="store.searchResults"
         :has-search="hasSearch"
         :selected-id="store.selectedDocumentId"
         :loading="store.searchQuery.trim() ? store.searchLoading : store.loading"
         :error-message="store.searchQuery.trim() ? store.searchErrorMessage : store.errorMessage"
-        :collapsed="listCollapsed"
         :scope-label="scopeLabel"
         :classification-by-document-id="store.classificationByDocumentId"
         :category-paths="categoryPaths"
-        @toggle-collapse="listCollapsed = !listCollapsed"
+        @close="closeDocumentList"
         @select="handleSelectDocument"
         @retry="store.retry"
         @retry-search="store.runSearch"
@@ -59,9 +65,11 @@
           :content-error="selectedContentError"
           :saving="store.noteSavingDocumentId === store.selectedDocumentId"
           :error="selectedNoteSaveError"
-          @open-inspector="inspectorOpen = true"
+          :title-error="selectedTitleError"
+          @open-inspector="openInspector"
           @load-content="loadSelectedContent"
           @save-content="handleSaveNote"
+          @rename-title="handleRenameTitle"
         />
         <p v-if="selectedMetadataWarning" class="metadata-warning" data-test="note-metadata-warning">{{ selectedMetadataWarning }}</p>
       </div>
@@ -79,7 +87,7 @@
         :retry-error="selectedRetryError"
         :delete-error="selectedDeleteError"
         :source-result-message="selectedSourceResultMessage"
-        @close="inspectorOpen = false"
+        @close="closeInspector"
         @set-category="handleSetCategory"
         @toggle-tag="handleToggleTag"
         @open-source="handleOpenSource"
@@ -90,7 +98,6 @@
       </div>
     </div>
 
-    <KnowledgeNoteDialog v-if="noteOpen" :submitting="store.creating" :error="store.errorMessage" @close="noteOpen = false" @create="handleCreateNote" />
     <KnowledgeNameDialog v-if="nameDialogKind" :kind="nameDialogKind" :submitting="nameDialogBusy" :error="store.catalogErrorMessage" @close="nameDialogKind = null" @create="handleCreateName" />
     <KnowledgeFolderDialog
       v-if="folderDialog"
@@ -113,30 +120,40 @@
       @close="deleteOpen = false"
       @confirm="handleDeleteConfirm"
     />
+    <KnowledgeUnsavedDialog
+      v-if="unsavedOpen"
+      :saving="pendingSaveBusy"
+      :error="pendingSaveError"
+      @keep-editing="cancelPendingSelection"
+      @discard="discardAndSelect"
+      @save="saveAndSelect"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import KnowledgeCommandBar from '../../components/knowledge/KnowledgeCommandBar.vue'
 import KnowledgeNavigator from '../../components/knowledge/KnowledgeNavigator.vue'
 import KnowledgeDocumentList from '../../components/knowledge/KnowledgeDocumentList.vue'
 import KnowledgeReadingPane from '../../components/knowledge/KnowledgeReadingPane.vue'
 import KnowledgeSourceInspector from '../../components/knowledge/KnowledgeSourceInspector.vue'
-import KnowledgeNoteDialog from '../../components/knowledge/KnowledgeNoteDialog.vue'
 import KnowledgeNameDialog from '../../components/knowledge/KnowledgeNameDialog.vue'
 import KnowledgeFolderDialog from '../../components/knowledge/KnowledgeFolderDialog.vue'
 import KnowledgeDeleteDialog from '../../components/knowledge/KnowledgeDeleteDialog.vue'
+import KnowledgeUnsavedDialog from '../../components/knowledge/KnowledgeUnsavedDialog.vue'
 import { useKnowledgeStore } from '../../stores/knowledge'
 import type { KnowledgeDeletionImpact } from '../../types/knowledge'
 
 const store = useKnowledgeStore()
-const noteOpen = ref(false)
 const nameDialogKind = ref<'category' | 'tag' | null>(null)
 const nameDialogBusy = ref(false)
 const inspectorOpen = ref(true)
 const navigatorCollapsed = ref(false)
 const listCollapsed = ref(false)
+const navigatorPreferenceSet = ref(false)
+const listPreferenceSet = ref(false)
+const inspectorPreferenceSet = ref(false)
 const expandedFolderIds = ref<Set<number>>(new Set())
 const selectedFolderId = ref<number | null>(null)
 const activeTagId = ref<number | null>(null)
@@ -147,6 +164,10 @@ const impactLoading = ref(false)
 const folderBusy = ref(false)
 const folderDialog = ref<{ kind: 'create' | 'edit'; id: number | null; name: string; parentId: number | null; excludedIds: number[] } | null>(null)
 const viewportWidth = ref(window.innerWidth)
+const unsavedOpen = ref(false)
+const pendingSelectionId = ref<number | null>(null)
+const pendingSaveBusy = ref(false)
+const pendingSaveError = ref('')
 
 const hasSearch = computed(() => store.searchQuery.trim().length > 0)
 
@@ -155,6 +176,11 @@ const inspectorOverlay = computed(() => viewportWidth.value < 1320)
 const selectedNoteSaveError = computed(() => {
   const id = store.selectedDocumentId
   return id == null ? '' : store.noteSaveErrorsByDocumentId[id] ?? ''
+})
+
+const selectedTitleError = computed(() => {
+  const id = store.selectedDocumentId
+  return id == null ? '' : store.titleErrorsByDocumentId[id] ?? ''
 })
 
 const selectedRetryError = computed(() => {
@@ -244,6 +270,36 @@ function toggleFolder(id: number) {
   expandedFolderIds.value = next
 }
 
+function closeNavigator() {
+  navigatorPreferenceSet.value = true
+  navigatorCollapsed.value = true
+}
+
+function openNavigator() {
+  navigatorPreferenceSet.value = true
+  navigatorCollapsed.value = false
+}
+
+function closeDocumentList() {
+  listPreferenceSet.value = true
+  listCollapsed.value = true
+}
+
+function openDocumentList() {
+  listPreferenceSet.value = true
+  listCollapsed.value = false
+}
+
+function closeInspector() {
+  inspectorPreferenceSet.value = true
+  inspectorOpen.value = false
+}
+
+function openInspector() {
+  inspectorPreferenceSet.value = true
+  inspectorOpen.value = true
+}
+
 function selectFolder(id: number) {
   selectedFolderId.value = id
   activeTagId.value = null
@@ -268,10 +324,57 @@ function handleTag(id: number | null) {
 const pendingScrollLine = ref<number | null>(null)
 
 function handleSelectDocument(id: number) {
+  if (id === store.selectedDocumentId) return
+  if (readingPane.value?.hasUnsavedChanges()) {
+    pendingSelectionId.value = id
+    pendingSaveError.value = ''
+    unsavedOpen.value = true
+    return
+  }
+  performSelectDocument(id)
+}
+
+function performSelectDocument(id: number) {
   store.select(id)
   if (hasSearch.value) {
     const item = store.searchResults.find((r) => r.document.id === id)
     pendingScrollLine.value = item?.lineNumber ?? null
+  }
+}
+
+function cancelPendingSelection() {
+  unsavedOpen.value = false
+  pendingSelectionId.value = null
+  pendingSaveError.value = ''
+}
+
+function discardAndSelect() {
+  const id = pendingSelectionId.value
+  readingPane.value?.discardChanges()
+  cancelPendingSelection()
+  if (id != null) performSelectDocument(id)
+}
+
+async function saveAndSelect() {
+  const id = pendingSelectionId.value
+  const documentId = store.selectedDocumentId
+  const pending = readingPane.value?.pendingChanges()
+  if (id == null || documentId == null || !pending) {
+    cancelPendingSelection()
+    return
+  }
+  pendingSaveBusy.value = true
+  pendingSaveError.value = ''
+  try {
+    if (pending.titleChanged) await store.renameDocument(documentId, pending.title)
+    if (pending.contentChanged) await store.saveNoteContent(documentId, pending.content)
+    readingPane.value?.discardChanges()
+    cancelPendingSelection()
+    performSelectDocument(id)
+  } catch (error) {
+    pendingSaveError.value = error instanceof Error ? error.message : '保存失败，请重试'
+  } finally {
+    pendingSaveBusy.value = false
   }
 }
 
@@ -336,15 +439,26 @@ async function handleDeleteFolder(id: number) {
   }
 }
 
-async function handleCreateNote(title: string) {
+async function handleCreateNote() {
   try {
-    await store.createNote(title)
-    noteOpen.value = false
-    if (store.selectedDocumentId != null && selectedFolderId.value != null) {
-      await store.categorizeCreatedDocument(store.selectedDocumentId, selectedFolderId.value)
+    const created = await store.createUntitledNote()
+    if (selectedFolderId.value != null) {
+      await store.categorizeCreatedDocument(created.id, selectedFolderId.value)
     }
+    await nextTick()
+    await readingPane.value?.beginEdit({ focusTitle: true })
   } catch {
     // 错误在 store.errorMessage
+  }
+}
+
+async function handleRenameTitle(title: string) {
+  const id = store.selectedDocumentId
+  if (id == null) return
+  try {
+    await store.renameDocument(id, title)
+  } catch {
+    // 错误按文档隔离到 titleErrorsByDocumentId
   }
 }
 
@@ -467,18 +581,20 @@ watch(() => store.selectedDocumentId, () => {
 })
 
 function applyResponsive() {
-  const width = window.innerWidth
+  const width = window.innerWidth || 1440
   viewportWidth.value = width
   if (width >= 1320) {
-    inspectorOpen.value = true
-    navigatorCollapsed.value = false
+    if (!inspectorPreferenceSet.value) inspectorOpen.value = true
+    if (!navigatorPreferenceSet.value) navigatorCollapsed.value = false
+    if (!listPreferenceSet.value) listCollapsed.value = false
   } else if (width >= 1160) {
-    inspectorOpen.value = false
-    navigatorCollapsed.value = false
+    if (!inspectorPreferenceSet.value) inspectorOpen.value = false
+    if (!navigatorPreferenceSet.value) navigatorCollapsed.value = false
+    if (!listPreferenceSet.value) listCollapsed.value = false
   } else {
-    inspectorOpen.value = false
-    navigatorCollapsed.value = true
-    if (width < 1080) listCollapsed.value = true
+    if (!inspectorPreferenceSet.value) inspectorOpen.value = false
+    if (!navigatorPreferenceSet.value) navigatorCollapsed.value = true
+    if (!listPreferenceSet.value) listCollapsed.value = width < 1080
   }
 }
 
@@ -497,9 +613,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.knowledge-library{display:flex;flex-direction:column;height:100%;min-height:0}
+.knowledge-library{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;background:var(--surface-solid);overflow:hidden}
 .categorize-warning{margin:0 24px 8px;padding:8px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:12px}
-.library-body{flex:1;min-height:0;display:flex;border:1px solid var(--border-subtle);border-radius:16px;background:var(--surface);overflow:hidden}
+.library-body{position:relative;flex:1;min-height:0;display:flex;background:var(--surface-solid);overflow:hidden}
 .reading-column{flex:1;min-width:0;display:flex;flex-direction:column}
 .inspector-wrap{position:relative;flex:none}
 .inspector-wrap.is-overlay{position:absolute;top:0;right:0;bottom:0;z-index:20;background:var(--surface-solid);box-shadow:-8px 0 24px rgba(0,0,0,.08)}

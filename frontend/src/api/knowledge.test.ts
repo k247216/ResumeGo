@@ -16,6 +16,7 @@ import {
   listKnowledgeTags,
   removeDocumentCategory,
   removeDocumentTag,
+  renameKnowledgeDocument,
   searchKnowledge,
   setDocumentCategory,
 } from './knowledge'
@@ -50,6 +51,7 @@ const doc = (id: number, status: KnowledgeDocument['processingStatus']): Knowled
   sourceType: 'NOTE',
   processingStatus: status,
   sourceFile: null,
+  sourceExtension: null,
   createdAt: '2026-08-22T10:00:00',
   updatedAt: '2026-08-22T10:00:00',
 })
@@ -80,6 +82,16 @@ describe('knowledge api client', () => {
     expect(url).toBe('/api/v2/knowledge/documents')
     expect(init?.method).toBe('POST')
     expect(JSON.parse((init?.body ?? '') as string)).toEqual({ title: 'TensorFlow 学习笔记', sourceType: 'NOTE' })
+  })
+
+  it('renames a knowledge document through the owner-scoped document endpoint', async () => {
+    mockedFetch.mockResolvedValue(okResponse({ ...doc(5, 'COMPLETED'), title: 'Redis 复习' }))
+    const result = await renameKnowledgeDocument(5, 'Redis 复习')
+    const [url, init] = mockedFetch.mock.calls[0]!
+    expect(url).toBe('/api/v2/knowledge/documents/5')
+    expect(init?.method).toBe('PATCH')
+    expect(JSON.parse((init?.body ?? '') as string)).toEqual({ title: 'Redis 复习' })
+    expect(result.data.title).toBe('Redis 复习')
   })
 
   it('FE-00 imports a file as multipart with the single "file" field and no content-type header', async () => {

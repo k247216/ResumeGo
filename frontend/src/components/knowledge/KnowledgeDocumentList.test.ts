@@ -7,7 +7,7 @@ import type { KnowledgeDocument, KnowledgeSearchItem } from '../../types/knowled
 
 function doc(id: number, status: KnowledgeDocument['processingStatus'], title = '文档 ' + id): KnowledgeDocument {
   return {
-    id, title, sourceType: 'FILE', processingStatus: status, sourceFile: null,
+    id, title, sourceType: 'FILE', processingStatus: status, sourceFile: null, sourceExtension: null,
     createdAt: '2026-08-22T10:00:00', updatedAt: '2026-08-22T10:00:00',
   }
 }
@@ -20,7 +20,7 @@ function mountList(props: Record<string, unknown> = {}) {
   return mount(KnowledgeDocumentList, {
     props: {
       documents: [], results: [], hasSearch: false, selectedId: null,
-      loading: false, errorMessage: '', collapsed: false, scopeLabel: '全部资料',
+      loading: false, errorMessage: '', scopeLabel: '全部资料',
       classificationByDocumentId: {}, categoryPaths: {},
       ...props,
     },
@@ -39,14 +39,14 @@ describe('KnowledgeDocumentList', () => {
     expect(wrapper.emitted('retry-doc')).toEqual([[2]])
   })
 
-  it('distinguishes Markdown, TXT, and local notes by their real source metadata', () => {
-    const markdown = { ...doc(1, 'COMPLETED', 'Markdown'), sourceFile: 'notes.md' }
-    const text = { ...doc(2, 'COMPLETED', 'Text'), sourceFile: 'notes.txt' }
-    const note = { ...doc(3, 'COMPLETED', 'Note'), sourceType: 'NOTE' as const }
+  it('uses the server extension contract to distinguish Markdown, TXT, and local notes', () => {
+    const markdown = { ...doc(1, 'COMPLETED', '资料一'), sourceFile: 'legacy.txt', sourceExtension: 'md' }
+    const text = { ...doc(2, 'COMPLETED', '资料二'), sourceFile: 'legacy.md', sourceExtension: 'txt' }
+    const note = { ...doc(3, 'COMPLETED', '资料三'), sourceType: 'NOTE' as const }
     const wrapper = mountList({ documents: [markdown, text, note] })
-    expect(wrapper.text()).toContain('Markdown')
-    expect(wrapper.text()).toContain('TXT')
-    expect(wrapper.text()).toContain('笔记')
+    expect(wrapper.get('[data-test="doc-row-1"]').text()).toContain('Markdown')
+    expect(wrapper.get('[data-test="doc-row-2"]').text()).toContain('TXT')
+    expect(wrapper.get('[data-test="doc-row-3"]').text()).toContain('笔记')
   })
 
   it('selects a row', async () => {
@@ -74,9 +74,10 @@ describe('KnowledgeDocumentList', () => {
     expect(wrapper.text()).toContain('旧命中')
   })
 
-  it('collapses and restores without losing selection', async () => {
+  it('requests a full close without rendering a collapsed restore rail', async () => {
     const wrapper = mountList({ documents: [doc(1, 'COMPLETED')], selectedId: 1 })
     await wrapper.get('[data-test="doc-list-collapse"]').trigger('click')
-    expect(wrapper.emitted('toggle-collapse')).toHaveLength(1)
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(wrapper.find('[data-test="doc-list-restore"]').exists()).toBe(false)
   })
 })

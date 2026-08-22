@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Aim, Calendar, ChatDotRound, Collection, Document, House, Moon, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
+import { Aim, Calendar, ChatDotRound, Document, House, Moon, Reading, Setting, Sunny, UserFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const themeStorageKey = 'resumego:theme'
@@ -62,7 +62,7 @@ const navItems = [
   { label: '工作台', icon: House, routeName: 'workbench' },
   { label: '求职目标', icon: Aim, routeName: 'targets' },
   { label: '简历', icon: Document, routeName: 'resumes' },
-  { label: '知识库', icon: Collection, routeName: 'knowledge' },
+  { label: '知识库', icon: Reading, routeName: 'knowledge' },
   { label: '模拟面试', icon: ChatDotRound, routeName: 'interview' },
   { label: '日程', icon: Calendar, routeName: 'schedule' },
 ]

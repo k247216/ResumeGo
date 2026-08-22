@@ -18,6 +18,7 @@ export interface KnowledgeDocument {
   sourceType: KnowledgeSourceType
   processingStatus: KnowledgeProcessingStatus
   sourceFile: string | null
+  sourceExtension: string | null
   createdAt: string
   updatedAt: string
 }

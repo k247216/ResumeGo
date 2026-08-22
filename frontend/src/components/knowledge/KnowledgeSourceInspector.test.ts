@@ -6,7 +6,7 @@ import KnowledgeSourceInspector from './KnowledgeSourceInspector.vue'
 import type { KnowledgeCategoryNode, KnowledgeDocument, KnowledgeDocumentClassification } from '../../types/knowledge'
 
 const doc = (id: number, sourceType: 'NOTE' | 'FILE', status: KnowledgeDocument['processingStatus']): KnowledgeDocument => ({
-  id, title: '文档 ' + id, sourceType, processingStatus: status, sourceFile: null,
+  id, title: '文档 ' + id, sourceType, processingStatus: status, sourceFile: null, sourceExtension: null,
   createdAt: 't', updatedAt: 't',
 })
 

@@ -1,13 +1,12 @@
 <template>
-  <section class="doc-list" :class="{ collapsed: collapsed }" data-test="knowledge-doc-list">
-    <template v-if="!collapsed">
+  <section class="doc-list" data-test="knowledge-doc-list">
       <div class="list-head">
         <strong>{{ scopeLabel }}</strong>
         <span class="list-actions">
           <button type="button" class="list-sort" data-test="doc-list-sort" @click="toggleSort">
             更新时间 {{ sortDesc ? '↓' : '↑' }}
           </button>
-          <button type="button" class="list-collapse" data-test="doc-list-collapse" aria-label="收起资料列表" @click="$emit('toggle-collapse')">«</button>
+          <button type="button" class="list-collapse" data-test="doc-list-collapse" aria-label="收起资料列表" @click="$emit('close')"><el-icon><ArrowLeft /></el-icon></button>
         </span>
       </div>
       <div v-if="hasSearch && loading && !results.length" class="list-state">正在搜索…</div>
@@ -38,7 +37,7 @@
             :data-test="'doc-row-' + item.document.id"
             @click="$emit('select', item.document.id)"
           >
-            <el-icon class="row-icon" :data-type="item.document.sourceType.toLowerCase()">
+            <el-icon class="row-icon" :data-type="iconType(item.document)">
               <component :is="iconOf(item.document)" />
             </el-icon>
             <span class="row-main">
@@ -53,14 +52,12 @@
           </li>
         </ul>
       </template>
-    </template>
-    <button v-else type="button" class="list-restore" data-test="doc-list-restore" aria-label="展开资料列表" @click="$emit('toggle-collapse')">»</button>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Document, Notebook } from '@element-plus/icons-vue'
+import { ArrowLeft, Document, DocumentCopy, Notebook } from '@element-plus/icons-vue'
 import { knowledgeStatusLabel } from './status'
 import type { KnowledgeDocument, KnowledgeSearchItem } from '../../types/knowledge'
 
@@ -71,7 +68,6 @@ const props = defineProps<{
   selectedId: number | null
   loading: boolean
   errorMessage: string
-  collapsed: boolean
   scopeLabel: string
   classificationByDocumentId: Record<number, { category: { id: number; name: string } | null; tags: { id: number; name: string }[] }>
   categoryPaths: Record<number, string>
@@ -84,7 +80,7 @@ function toggleSort() {
 }
 
 defineEmits<{
-  (e: 'toggle-collapse'): void
+  (e: 'close'): void
   (e: 'select', id: number): void
   (e: 'retry'): void
   (e: 'retry-search'): void
@@ -106,12 +102,18 @@ const rows = computed(() => {
 
 function iconOf(doc: KnowledgeDocument) {
   if (doc.sourceType === 'NOTE') return Notebook
+  if (doc.sourceExtension?.toLowerCase() === 'md') return DocumentCopy
   return Document
+}
+
+function iconType(doc: KnowledgeDocument): string {
+  if (doc.sourceType === 'NOTE') return 'note'
+  return doc.sourceExtension?.toLowerCase() || 'file'
 }
 
 function typeLabel(doc: KnowledgeDocument): string {
   if (doc.sourceType === 'NOTE') return '笔记'
-  const extension = doc.sourceFile?.split('.').pop()?.toLowerCase()
+  const extension = doc.sourceExtension?.toLowerCase()
   if (extension === 'md') return 'Markdown'
   if (extension === 'txt') return 'TXT'
   return '文件'
@@ -145,24 +147,25 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 </script>
 
 <style scoped>
-.doc-list{width:330px;min-width:0;border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;min-height:0}
-.doc-list.collapsed{width:44px}
+.doc-list{width:320px;min-width:0;border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;min-height:0;background:var(--surface-solid)}
 .list-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px}
 .list-head strong{font-size:12px;font-weight:600;color:var(--muted)}
 .list-actions{display:inline-flex;align-items:center;gap:8px}
 .list-sort{border:0;background:transparent;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 4px}
 .list-sort:hover{color:var(--brand)}
 .list-collapse{border:0;background:transparent;color:var(--copy);cursor:pointer;font-size:14px;padding:0 4px}
-.list-rows{list-style:none;margin:0;padding:0 8px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:1px}
-.row{display:flex;align-items:flex-start;gap:8px;width:100%;text-align:left;padding:8px 10px;border:0;border-radius:10px;background:transparent;cursor:pointer}
+.list-rows{list-style:none;margin:0;padding:0;overflow-y:auto;display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:8px;width:100%;text-align:left;padding:11px 14px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;cursor:pointer}
 .row:hover{background:var(--bg-hover)}
-.row.selected{background:var(--bg-selected)}
+.row.selected{background:var(--bg-selected);box-shadow:inset 2px 0 0 var(--brand)}
 .row-icon{flex:none;font-size:15px;color:var(--muted)}
+.row-icon[data-type='note']{color:var(--brand)}
+.row-icon[data-type='md']{color:#2f7ed8}
+.row-icon[data-type='txt']{color:#c48220}
 .row-main{flex:1;min-width:0;display:grid;gap:2px}
 .row-main strong{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-meta{font-size:11px;color:var(--muted)}
-.row-location{font-size:11px;color:var(--brand);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row-snippet{font-size:11px;color:var(--muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-location,.row-snippet{grid-column:2/-1;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-status{flex:none;font-size:10px;padding:1px 7px;border-radius:999px;margin-top:2px}
 .tone-ok{color:var(--brand);background:var(--brand-soft)}
 .tone-busy{color:var(--copy);background:var(--bg-subtle)}
@@ -173,6 +176,5 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 .list-state.error strong,.list-state.error{color:var(--danger)}
 .list-state.empty{color:var(--muted)}
 .stale-search{display:flex;align-items:center;justify-content:space-between;margin:0 10px 6px;padding:7px 9px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:11px}
-.list-restore{border:0;background:transparent;color:var(--copy);font-size:14px;cursor:pointer;width:100%;padding:10px 0}
 .text-btn{border:0;background:transparent;color:var(--brand);font-size:13px;cursor:pointer;padding:0}
 </style>

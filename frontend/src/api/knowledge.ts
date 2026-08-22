@@ -66,6 +66,15 @@ export async function createKnowledgeNote(title: string): Promise<ApiResponse<Kn
   return parseResponse<KnowledgeDocument>(res, '创建笔记失败')
 }
 
+export async function renameKnowledgeDocument(documentId: number, title: string): Promise<ApiResponse<KnowledgeDocument>> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  return parseResponse<KnowledgeDocument>(res, '修改资料标题失败')
+}
+
 /** 只发送 File 字节的 multipart（单字段 file），绝不发送系统路径。 */
 export async function importKnowledgeFile(file: File): Promise<ApiResponse<KnowledgeImportResponse>> {
   const form = new FormData()

@@ -19,6 +19,7 @@ import {
   listKnowledgeTags,
   removeDocumentCategory,
   removeDocumentTag,
+  renameKnowledgeDocument,
   retryKnowledgeDocument,
   saveKnowledgeNoteContent,
   searchKnowledge,
@@ -92,6 +93,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const noteSavingDocumentId = ref<number | null>(null)
   const noteSaveErrorsByDocumentId = ref<Record<number, string>>({})
   const noteMetadataWarningsByDocumentId = ref<Record<number, string>>({})
+  const titleErrorsByDocumentId = ref<Record<number, string>>({})
 
   const selectedDocument = computed(() => (
     documents.value.find((doc) => doc.id === selectedDocumentId.value)
@@ -165,7 +167,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     selectedDocumentId.value = id
   }
 
-  async function createNote(title: string) {
+  async function createNote(title: string): Promise<KnowledgeDocument> {
     creating.value = true
     errorMessage.value = ''
     categorizeWarning.value = ''
@@ -173,11 +175,31 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       const response = await createKnowledgeNote(title)
       upsertDocument(response.data)
       selectedDocumentId.value = response.data.id
+      return response.data
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : '创建笔记失败'
       throw error
     } finally {
       creating.value = false
+    }
+  }
+
+  function createUntitledNote(): Promise<KnowledgeDocument> {
+    return createNote('未命名笔记')
+  }
+
+  async function renameDocument(documentId: number, title: string): Promise<KnowledgeDocument> {
+    delete titleErrorsByDocumentId.value[documentId]
+    try {
+      const response = await renameKnowledgeDocument(documentId, title)
+      upsertDocument(response.data)
+      return response.data
+    } catch (error) {
+      titleErrorsByDocumentId.value = {
+        ...titleErrorsByDocumentId.value,
+        [documentId]: error instanceof Error ? error.message : '修改资料标题失败',
+      }
+      throw error
     }
   }
 
@@ -671,10 +693,13 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     noteSavingDocumentId,
     noteSaveErrorsByDocumentId,
     noteMetadataWarningsByDocumentId,
+    titleErrorsByDocumentId,
     load,
     retry,
     select,
     createNote,
+    createUntitledNote,
+    renameDocument,
     importFile,
     loadContent,
     loadCatalog,

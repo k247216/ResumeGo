@@ -7,6 +7,7 @@ vi.mock('../api/knowledge', () => {
   const api = {
     listKnowledgeDocuments: vi.fn(),
     createKnowledgeNote: vi.fn(),
+    renameKnowledgeDocument: vi.fn(),
     importKnowledgeFile: vi.fn(),
     getKnowledgeDocument: vi.fn(),
     getKnowledgeContent: vi.fn(),
@@ -45,7 +46,8 @@ const api = vi.mocked(knowledgeApi)
 function doc(id: number, status: KnowledgeDocument['processingStatus'], title = '笔记 ' + id): KnowledgeDocument {
   return {
     id, title, sourceType: id % 2 === 0 ? 'FILE' : 'NOTE', processingStatus: status,
-    sourceFile: null, createdAt: '2026-08-22T10:00:00', updatedAt: '2026-08-22T10:00:00',
+    sourceFile: null, sourceExtension: null,
+    createdAt: '2026-08-22T10:00:00', updatedAt: '2026-08-22T10:00:00',
   }
 }
 
@@ -97,10 +99,26 @@ describe('useKnowledgeStore', () => {
 
     const created = { ...doc(5, 'NOT_STARTED', '新笔记'), updatedAt: '2026-08-22T11:00:00' }
     api.createKnowledgeNote.mockResolvedValue(ok(created))
-    await store.createNote('新笔记')
+    const result = await store.createUntitledNote()
 
+    expect(api.createKnowledgeNote).toHaveBeenCalledWith('未命名笔记')
+    expect(result).toEqual(created)
     expect(store.documents[0].id).toBe(5)
     expect(store.selectedDocumentId).toBe(5)
+  })
+
+  it('renames a document and updates the selected document without losing content', async () => {
+    api.listKnowledgeDocuments.mockResolvedValue(ok([doc(1, 'COMPLETED')]))
+    const store = useKnowledgeStore()
+    await store.load()
+    store.contentByDocumentId[1] = '保留正文'
+    api.renameKnowledgeDocument.mockResolvedValue(ok({ ...doc(1, 'COMPLETED'), title: 'Redis 复习' }))
+
+    const result = await store.renameDocument(1, 'Redis 复习')
+
+    expect(result.title).toBe('Redis 复习')
+    expect(store.selectedDocument?.title).toBe('Redis 复习')
+    expect(store.contentByDocumentId[1]).toBe('保留正文')
   })
 
   it('FE-00 create failure keeps list and rethrows', async () => {

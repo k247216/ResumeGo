@@ -130,7 +130,7 @@ function statusLabel(status: KnowledgeDocument['processingStatus']): string {
 </script>
 
 <style scoped>
-.inspector{width:300px;min-width:0;border-left:1px solid var(--border-subtle);overflow-y:auto;padding:14px 16px}
+.inspector{box-sizing:border-box;width:284px;min-width:0;border-left:1px solid var(--border-subtle);overflow-y:auto;padding:14px 15px;background:var(--bg-subtle)}
 .inspector-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid var(--border-subtle)}
 .inspector-head strong{font-size:13px;font-weight:600;color:var(--ink)}
 .inspector-close{border:0;background:transparent;color:var(--copy);cursor:pointer;line-height:1;display:inline-flex;align-items:center}

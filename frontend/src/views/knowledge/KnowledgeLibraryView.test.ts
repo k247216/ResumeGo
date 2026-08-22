@@ -14,8 +14,10 @@ vi.mock('../../api/knowledgeDesktop', () => ({
 
 import { useKnowledgeStore } from '../../stores/knowledge'
 
+let viewportWidth = 1440
+
 function doc(id: number, status = 'COMPLETED', title = '文档 ' + id) {
-  return { id, title, sourceType: 'FILE', processingStatus: status, sourceFile: null, createdAt: 't', updatedAt: 't' }
+  return { id, title, sourceType: 'FILE', processingStatus: status, sourceFile: null, sourceExtension: null, createdAt: 't', updatedAt: 't' }
 }
 
 function storeStub(overrides: Record<string, unknown> = {}) {
@@ -62,10 +64,13 @@ function storeStub(overrides: Record<string, unknown> = {}) {
     noteSavingDocumentId: null,
     noteSaveErrorsByDocumentId: {} as Record<number, string>,
     noteMetadataWarningsByDocumentId: {} as Record<number, string>,
+    titleErrorsByDocumentId: {} as Record<number, string>,
     load: vi.fn().mockResolvedValue(undefined),
     retry: vi.fn().mockResolvedValue(undefined),
     select: vi.fn(),
     createNote: vi.fn().mockResolvedValue(undefined),
+    createUntitledNote: vi.fn().mockResolvedValue(doc(9, 'COMPLETED', '未命名笔记')),
+    renameDocument: vi.fn().mockResolvedValue(undefined),
     importFile: vi.fn().mockResolvedValue(undefined),
     loadContent: vi.fn().mockResolvedValue(undefined),
     loadCatalog: vi.fn().mockResolvedValue(undefined),
@@ -103,9 +108,11 @@ function mountView(store: ReturnType<typeof storeStub>) {
       plugins: [createPinia()],
       stubs: {
         KnowledgeNavigator: { template: '<div data-test="stub-navigator" />' },
-        KnowledgeDocumentList: { template: '<div data-test="stub-list" />' },
+        KnowledgeDocumentList: {
+          emits: ['select', 'close'],
+          template: '<div data-test="stub-list"><button data-test="stub-list-close" @click="$emit(\'close\')">收起</button><button data-test="stub-select-2" @click="$emit(\'select\', 2)">资料二</button></div>',
+        },
         KnowledgeSourceInspector: { template: '<div data-test="stub-inspector" />' },
-        KnowledgeNoteDialog: { template: '<div data-test="stub-note-dialog" />' },
         KnowledgeNameDialog: { template: '<div data-test="stub-name-dialog" />' },
         KnowledgeFolderDialog: { template: '<div data-test="stub-folder-dialog" />' },
         KnowledgeDeleteDialog: { template: '<div data-test="stub-delete-dialog" />' },
@@ -117,6 +124,9 @@ function mountView(store: ReturnType<typeof storeStub>) {
 
 describe('KnowledgeLibraryView', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
+    viewportWidth = 1440
+    vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => viewportWidth)
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
@@ -143,36 +153,76 @@ describe('KnowledgeLibraryView', () => {
     expect(store.setSearchQuery).toHaveBeenCalledWith('TensorFlow')
   })
 
-  it('creates a note and assigns it to the current folder', async () => {
+  it('creates a real note with one click and enters inline title editing without a dialog', async () => {
     const store = storeStub()
+    store.createUntitledNote = vi.fn(async () => {
+      const created = { ...doc(9, 'COMPLETED', '未命名笔记'), sourceType: 'NOTE' }
+      store.documents.unshift(created)
+      store.selectedDocumentId = created.id
+      store.selectedDocument = created
+      return created
+    })
     const wrapper = mountView(store)
     await flushPromises()
     await wrapper.get('[data-test="knowledge-command-create-note"]').trigger('click')
-    expect(wrapper.find('[data-test="stub-note-dialog"]').exists()).toBe(true)
+    await flushPromises()
+    expect(store.createUntitledNote).toHaveBeenCalledOnce()
+    expect(wrapper.find('[data-test="knowledge-note-dialog"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="knowledge-title-input"]').exists()).toBe(true)
   })
 
   it('shows the inspector by default on a wide window', async () => {
-    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1440)
     const store = storeStub()
     const wrapper = mountView(store)
     await flushPromises()
     expect(wrapper.find('[data-test="stub-inspector"]').exists()).toBe(true)
-    vi.restoreAllMocks()
+  })
+
+  it('blocks document switching while the editor is dirty and only switches after discard', async () => {
+    const note1 = { ...doc(1), sourceType: 'NOTE', title: '笔记一' }
+    const note2 = { ...doc(2), sourceType: 'NOTE', title: '笔记二' }
+    const store = storeStub({
+      documents: [note1, note2],
+      selectedDocument: note1,
+      contentByDocumentId: { 1: '原正文' },
+    })
+    const wrapper = mountView(store)
+    await flushPromises()
+
+    await wrapper.get('[data-test="knowledge-edit-start"]').trigger('click')
+    await wrapper.get('[data-test="knowledge-body-editor"]').setValue('未保存正文')
+    await wrapper.get('[data-test="stub-select-2"]').trigger('click')
+
+    expect(store.select).not.toHaveBeenCalledWith(2)
+    expect(wrapper.find('[data-test="knowledge-unsaved-dialog"]').exists()).toBe(true)
+
+    await wrapper.get('[data-test="knowledge-unsaved-discard"]').trigger('click')
+    expect(store.select).toHaveBeenCalledWith(2)
   })
 
   it('recomputes inspector overlay mode after window resize', async () => {
-    let width = 1440
-    vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => width)
     const store = storeStub()
     const wrapper = mountView(store)
     await flushPromises()
     expect(wrapper.find('.inspector-wrap').classes()).not.toContain('is-overlay')
 
-    width = 1200
+    viewportWidth = 1200
     window.dispatchEvent(new Event('resize'))
     await wrapper.vm.$nextTick()
     await wrapper.get('[data-test="reading-open-inspector"]').trigger('click')
     expect(wrapper.find('.inspector-wrap').classes()).toContain('is-overlay')
-    vi.restoreAllMocks()
+  })
+
+  it('fully removes a closed document list and restores it from the command bar', async () => {
+    const store = storeStub()
+    const wrapper = mountView(store)
+    await flushPromises()
+
+    await wrapper.get('[data-test="stub-list-close"]').trigger('click')
+    expect(wrapper.find('[data-test="stub-list"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="knowledge-restore-list"]').exists()).toBe(true)
+
+    await wrapper.get('[data-test="knowledge-restore-list"]').trigger('click')
+    expect(wrapper.find('[data-test="stub-list"]').exists()).toBe(true)
   })
 })
