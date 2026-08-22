@@ -73,4 +73,33 @@ class KnowledgeServiceTest {
         assertThatThrownBy(() -> service.get(404L))
                 .isInstanceOf(java.util.NoSuchElementException.class).hasMessageContaining("不存在");
     }
+
+    @Test
+    void returnsExtractedContentForCompletedDocument() {
+        KnowledgeDocument doc = new KnowledgeDocument(5L, 1L, "本地文件知识", "FILE", "COMPLETED",
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 5L)).thenReturn(Optional.of(doc));
+        when(repository.findExtractedContentByDocument(1L, 5L))
+                .thenReturn(Optional.of(new KnowledgeExtractedContent(1L, 5L, 1L, "提取正文",
+                        LocalDateTime.now(), LocalDateTime.now())));
+
+        assertThat(service.getContent(5L).content()).isEqualTo("提取正文");
+    }
+
+    @Test
+    void contentRejectsDocumentThatIsNotCompleted() {
+        KnowledgeDocument doc = new KnowledgeDocument(5L, 1L, "本地文件知识", "FILE", "PENDING",
+                LocalDateTime.now(), LocalDateTime.now());
+        when(repository.findById(1L, 5L)).thenReturn(Optional.of(doc));
+
+        assertThatThrownBy(() -> service.getContent(5L))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("尚未完成");
+    }
+
+    @Test
+    void contentRejectsMissingOrForeignDocument() {
+        when(repository.findById(1L, 404L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.getContent(404L))
+                .isInstanceOf(java.util.NoSuchElementException.class).hasMessageContaining("不存在");
+    }
 }

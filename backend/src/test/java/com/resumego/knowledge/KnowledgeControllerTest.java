@@ -1,5 +1,6 @@
 package com.resumego.knowledge;
 
+import com.resumego.knowledge.dto.KnowledgeContentResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,5 +62,30 @@ class KnowledgeControllerTest {
     private KnowledgeDocumentResponse sample(long id) {
         return new KnowledgeDocumentResponse(id, "TensorFlow 笔记", "NOTE", "NOT_STARTED",
                 null, LocalDateTime.now().toString(), LocalDateTime.now().toString());
+    }
+
+    @Test
+    void contentReturnsExtractedTextForOwnedCompletedDocument() throws Exception {
+        when(service.getContent(7L)).thenReturn(new KnowledgeContentResponse(7L, "提取的正文内容"));
+        mockMvc.perform(get("/api/v2/knowledge/documents/7/content"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.documentId").value(7))
+                .andExpect(jsonPath("$.data.content").value("提取的正文内容"));
+    }
+
+    @Test
+    void contentNotReadyMapsToConflict() throws Exception {
+        when(service.getContent(7L)).thenThrow(new IllegalStateException("知识文档尚未完成文本提取"));
+        mockMvc.perform(get("/api/v2/knowledge/documents/7/content"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("知识文档尚未完成文本提取"));
+    }
+
+    @Test
+    void contentMissingOrForeignMapsToNotFound() throws Exception {
+        when(service.getContent(404L)).thenThrow(new NoSuchElementException("知识文档不存在"));
+        mockMvc.perform(get("/api/v2/knowledge/documents/404/content"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("知识文档不存在"));
     }
 }

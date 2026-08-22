@@ -2,6 +2,7 @@ package com.resumego.knowledge;
 
 import com.resumego.common.ApiResponse;
 import com.resumego.knowledge.dto.CreateKnowledgeDocumentRequest;
+import com.resumego.knowledge.dto.KnowledgeContentResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -37,9 +38,19 @@ public class KnowledgeController {
         return ApiResponse.ok(service.get(id));
     }
 
+    @GetMapping("/{id}/content")
+    public ApiResponse<KnowledgeContentResponse> content(@PathVariable long id) {
+        return ApiResponse.ok(service.getContent(id));
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ApiResponse<Void>> notFound(NoSuchElementException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> conflict(IllegalStateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(exception.getMessage()));
     }
 
     @ExceptionHandler({IllegalArgumentException.class})

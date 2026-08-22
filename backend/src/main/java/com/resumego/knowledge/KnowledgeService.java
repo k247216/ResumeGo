@@ -2,6 +2,7 @@ package com.resumego.knowledge;
 
 import com.resumego.common.CurrentUser;
 import com.resumego.knowledge.dto.CreateKnowledgeDocumentRequest;
+import com.resumego.knowledge.dto.KnowledgeContentResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ public class KnowledgeService {
 
     private static final String SOURCE_NOTE = "NOTE";
     private static final String STATUS_NOT_STARTED = "NOT_STARTED";
+    private static final String STATUS_COMPLETED = "COMPLETED";
 
     private final KnowledgeRepository repository;
 
@@ -46,6 +48,18 @@ public class KnowledgeService {
 
     public KnowledgeDocumentResponse get(long documentId) {
         return findResponse(documentId);
+    }
+
+    /** 返回当前用户的提取文本；未完成 409，缺失/他人 404。 */
+    public KnowledgeContentResponse getContent(long documentId) {
+        KnowledgeDocument doc = repository.findById(userId(), documentId)
+                .orElseThrow(() -> new NoSuchElementException("知识文档不存在"));
+        if (!STATUS_COMPLETED.equals(doc.processingStatus())) {
+            throw new IllegalStateException("知识文档尚未完成文本提取");
+        }
+        KnowledgeExtractedContent content = repository.findExtractedContentByDocument(userId(), documentId)
+                .orElseThrow(() -> new IllegalStateException("提取内容不可用"));
+        return new KnowledgeContentResponse(doc.id(), content.content());
     }
 
     private KnowledgeDocumentResponse findResponse(long id) {
