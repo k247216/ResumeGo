@@ -6,7 +6,7 @@ import { createServer, type Server } from 'node:http'
 import net from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
 import { buildBackendLaunchSpec } from './backendProcess.js'
 import { DesktopKeyStore } from './keyStore.js'
 import { isTrustedRendererUrl } from './security.js'
@@ -18,6 +18,7 @@ import {
   listWorkspaceBackups,
   restoreWorkspaceBackup,
 } from './workspaceBackup.js'
+import { openManagedKnowledgeSource } from './managedKnowledgeSource.js'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 app.setName(V2_PREVIEW_IDENTITY.appName)
@@ -168,6 +169,28 @@ ipcMain.handle('resumego:backup-export', async (event, backupId: string | null) 
   }
   const result = await exportWorkspaceBackup(dataDir, backupId, choice.filePaths[0])
   return { canceled: false, ...result }
+})
+
+// 受管原文：renderer 只传正整数 documentId；路径与 internal token 绝不离开 main
+ipcMain.handle('resumego:knowledge-open-source', (event, documentId: unknown) => {
+  assertTrustedIpc(event)
+  return openManagedKnowledgeSource(documentId, 'open', {
+    backendOrigin: runtimeConfig.backendOrigin,
+    workspaceToken: runtimeConfig.workspaceToken,
+    internalToken,
+    dataDir,
+    shell,
+  })
+})
+ipcMain.handle('resumego:knowledge-reveal-source', (event, documentId: unknown) => {
+  assertTrustedIpc(event)
+  return openManagedKnowledgeSource(documentId, 'reveal', {
+    backendOrigin: runtimeConfig.backendOrigin,
+    workspaceToken: runtimeConfig.workspaceToken,
+    internalToken,
+    dataDir,
+    shell,
+  })
 })
 
 

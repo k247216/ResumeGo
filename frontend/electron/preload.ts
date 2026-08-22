@@ -11,4 +11,6 @@ contextBridge.exposeInMainWorld('resumeGoDesktop', {
   createBackup: () => ipcRenderer.invoke('resumego:backup-create'),
   restoreBackup: (backupId: string) => ipcRenderer.invoke('resumego:backup-restore', backupId),
   exportBackup: (backupId: string | null) => ipcRenderer.invoke('resumego:backup-export', backupId),
+  openKnowledgeSource: (documentId: number) => ipcRenderer.invoke('resumego:knowledge-open-source', documentId),
+  revealKnowledgeSource: (documentId: number) => ipcRenderer.invoke('resumego:knowledge-reveal-source', documentId),
 })

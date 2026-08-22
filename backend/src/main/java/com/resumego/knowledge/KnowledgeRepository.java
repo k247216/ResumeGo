@@ -221,7 +221,7 @@ public class KnowledgeRepository {
         requiredKey(keys, "保存提取文本失败：未返回主键");
     }
 
-    private void updateSourceAvailability(long sourceFileId, String availability) {
+    void updateSourceAvailability(long sourceFileId, String availability) {
         jdbcTemplate.update("""
                 UPDATE knowledge_source_files
                 SET availability = ?, updated_at = CURRENT_TIMESTAMP

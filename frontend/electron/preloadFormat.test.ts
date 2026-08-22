@@ -24,5 +24,7 @@ describe('preload module format', () => {
     const preload = readFileSync(path.join(electronDist, 'preload.js'), 'utf-8')
     expect(preload).toContain("exposeInMainWorld('resumeGoDesktop'")
     expect(preload).toContain("'resumego:runtime-config'")
+    expect(preload).toContain('openKnowledgeSource')
+    expect(preload).toContain('revealKnowledgeSource')
   })
 })

@@ -14,6 +14,13 @@ export interface DesktopExportResult {
   exportedTo?: string
 }
 
+/** 受管原文操作结果：只含 ok/code/message，绝不含本地路径。 */
+export interface KnowledgeDesktopResult {
+  ok: boolean
+  code?: string
+  message?: string
+}
+
 declare global {
   interface Window {
     resumeGoDesktop?: {
@@ -27,6 +34,9 @@ declare global {
       createBackup: () => Promise<{ backupDir: string } | null>
       restoreBackup: (backupId: string) => Promise<{ restored: boolean; backupDir: string }>
       exportBackup: (backupId: string | null) => Promise<DesktopExportResult>
+      // 受管原文能力仅桌面端 preload 提供；浏览器开发模式缺失，适配器返回 DESKTOP_REQUIRED
+      openKnowledgeSource?: (documentId: number) => Promise<KnowledgeDesktopResult>
+      revealKnowledgeSource?: (documentId: number) => Promise<KnowledgeDesktopResult>
     }
   }
 }
