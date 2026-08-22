@@ -248,10 +248,10 @@ defineExpose({ scrollToLine, beginEdit, hasUnsavedChanges, pendingChanges, disca
 .reading-empty{display:grid;gap:8px;align-content:center;justify-items:start;min-height:100%;padding:48px;color:var(--muted);font-size:13px}
 .reading-head{flex:none;padding:22px 34px 14px;border-bottom:1px solid var(--border-subtle)}
 .reading-title-row{display:flex;align-items:center;gap:12px}
-.title-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--border-default);background:transparent;color:var(--ink);font:650 21px/1.35 inherit;letter-spacing:-.015em;padding:2px 0 5px}
+.title-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--border-default);background:transparent;color:var(--ink);font-family:inherit;font-size:23px;font-weight:650;line-height:1.35;letter-spacing:-.015em;padding:2px 0 5px}
 .title-input:focus{outline:0;border-bottom-color:var(--brand)}
 .title-input:disabled{opacity:.6}
-.reading-title-row h2{margin:0;font-size:21px;font-weight:650;letter-spacing:-.015em;color:var(--ink)}
+.reading-title-row h2{margin:0;font-size:23px;font-weight:650;letter-spacing:-.015em;color:var(--ink)}
 .reading-status{flex:none;font-size:11px;padding:2px 9px;border-radius:999px}
 .tone-ok{color:var(--brand);background:var(--brand-soft)}
 .tone-busy{color:var(--copy);background:var(--bg-subtle)}
@@ -267,7 +267,7 @@ defineExpose({ scrollToLine, beginEdit, hasUnsavedChanges, pendingChanges, disca
 .text-btn{border:0;background:transparent;color:var(--brand);font-size:13px;cursor:pointer;padding:0}
 .text-btn:disabled{opacity:.5;cursor:default}
 /* 文档式直接编辑：textarea 与只读渲染视图同排版，无边框、无卡片 */
-.body-editor{box-sizing:border-box;display:block;width:100%;min-height:100%;padding:24px 34px 96px;border:0;background:transparent;color:var(--ink);font:14px/1.78 inherit;resize:none;outline:0;caret-color:var(--brand)}
+.body-editor{box-sizing:border-box;display:block;width:100%;min-height:100%;padding:26px 38px 100px;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
 .body-editor:disabled{opacity:.7}
 .body-editor::placeholder{color:var(--muted)}
 /* 底部保存条：仅脏状态出现 */

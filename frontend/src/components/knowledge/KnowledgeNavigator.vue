@@ -75,15 +75,15 @@ defineEmits<{
 </script>
 
 <style scoped>
-.navigator{box-sizing:border-box;width:212px;min-width:0;border-right:1px solid var(--border-subtle);overflow-y:auto;padding:12px 10px 20px;background:var(--bg-subtle)}
-.nav-section{display:flex;flex-direction:column;gap:4px;margin-bottom:20px}
-.nav-head{display:flex;align-items:center;justify-content:space-between;height:34px;flex:none;margin-bottom:6px;padding:0 6px;border-bottom:1px solid var(--border-subtle)}
+.navigator{box-sizing:border-box;width:184px;min-width:0;border-right:1px solid var(--border-subtle);overflow-y:auto;padding:10px 8px 18px;background:var(--bg-subtle)}
+.nav-section{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}
+.nav-head{display:flex;align-items:center;justify-content:space-between;height:32px;flex:none;margin-bottom:5px;padding:0 4px;border-bottom:1px solid var(--border-subtle)}
 .nav-head-actions{display:inline-flex;align-items:center;gap:2px}
 .nav-head strong{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.05em}
 .nav-action{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:var(--copy);cursor:pointer;transition:background .15s ease,color .15s ease}
 .nav-action:hover{background:var(--bg-hover);color:var(--brand)}
 .tag-list{list-style:none;margin:0;padding:0 2px;display:flex;flex-direction:column;gap:2px}
-.tag-item{display:flex;align-items:center;gap:8px;border:0;background:transparent;color:var(--ink);font-size:14px;text-align:left;padding:7px 10px;border-radius:8px;cursor:pointer;width:100%}
+.tag-item{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);font-size:13.5px;text-align:left;padding:6px 9px;border-radius:7px;cursor:pointer;width:100%}
 .tag-icon{flex:none;color:var(--copy)}
 .tag-item:hover{background:var(--bg-hover)}
 .tag-item.active{background:var(--bg-selected);color:var(--brand)}

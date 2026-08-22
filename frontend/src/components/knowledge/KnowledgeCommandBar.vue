@@ -1,7 +1,7 @@
 <template>
   <header class="command-bar" data-test="knowledge-command-bar">
     <div class="bar-identity">
-      <h1 class="bar-title">知识库</h1>
+      <h1 class="bar-title"><span class="bar-title-icon" aria-hidden="true"><el-icon :size="16"><Notebook /></el-icon></span><span>知识库</span></h1>
       <div v-if="showNavigatorRestore || showListRestore || showInspectorRestore" class="restore-actions" aria-label="恢复面板">
         <button v-if="showNavigatorRestore" type="button" data-test="knowledge-restore-navigator" aria-label="展开资料库导航" @click="$emit('restore-navigator')"><el-icon><Menu /></el-icon></button>
         <button v-if="showListRestore" type="button" data-test="knowledge-restore-list" aria-label="展开资料列表" @click="$emit('restore-list')"><el-icon><Tickets /></el-icon></button>
@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { EditPen, Menu, Operation, Tickets } from '@element-plus/icons-vue'
+import { EditPen, Menu, Notebook, Operation, Tickets } from '@element-plus/icons-vue'
 import KnowledgeImportControl from './KnowledgeImportControl.vue'
 
 defineProps<{
@@ -74,7 +74,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 <style scoped>
 .command-bar{display:flex;align-items:center;gap:18px;min-height:58px;padding:8px 18px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
 .bar-identity{display:flex;align-items:center;gap:10px}
-.bar-title{margin:0;font-size:22px;font-weight:650;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
+.bar-title{display:inline-flex;align-items:center;gap:10px;margin:0;font-size:22px;font-weight:650;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
+.bar-title-icon{display:grid;width:30px;height:30px;place-items:center;border-radius:9px;background:var(--brand-soft);color:var(--brand)}
 .restore-actions{display:inline-flex;gap:3px}.restore-actions button{display:grid;width:28px;height:28px;place-items:center;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}.restore-actions button:hover{background:var(--bg-hover);color:var(--ink)}
 .bar-search{flex:1;min-width:0;max-width:520px;padding:9px 14px;border:1px solid var(--border-default);border-radius:11px;background:var(--bg-subtle);color:var(--ink);font-size:13px}
 .bar-search:focus{outline:2px solid var(--brand);border-color:transparent}

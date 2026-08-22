@@ -76,7 +76,7 @@ const navItems = [
 .desktop-shell.shell-workspace{height:100vh;overflow:hidden;gap:32px}
 .desktop-shell.shell-workspace .desktop-content{justify-self:stretch;max-width:1270px;box-sizing:border-box;height:100%;min-height:0;padding:0 8px 0 0}
 /* 全高页面（meta.fill：目标/简历/日程/设置）：full-bleed、内部面板滚动，不再居中窄容器 */
-.desktop-shell.shell-fill{height:100vh;overflow:hidden;gap:32px}
+.desktop-shell.shell-fill{height:100vh;overflow:hidden;gap:16px}
 .desktop-shell.shell-fill .desktop-content{justify-self:stretch;max-width:none;box-sizing:border-box;height:100%;min-height:0;padding:0 8px 0 0}
 @media(max-width:900px){.desktop-shell{padding-left:14px}.nav-tooltip{display:none!important}}
 @media(max-height:899px){.desktop-shell{padding-top:12px;padding-bottom:12px}.desktop-rail{top:12px;height:calc(100vh - 24px);min-height:480px;padding-top:36px}.desktop-content{min-height:calc(100vh - 24px)}}

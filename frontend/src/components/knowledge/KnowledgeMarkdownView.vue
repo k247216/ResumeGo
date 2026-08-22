@@ -87,10 +87,10 @@ const blocks = computed(() => parseBlocks(props.source))
 </script>
 
 <style scoped>
-.markdown-view{font-size:14px;line-height:1.78;color:var(--ink);max-width:72ch}
-.md-h2{margin:22px 0 10px;font-size:19px;font-weight:650;color:var(--ink);line-height:1.35}
-.md-h3{margin:18px 0 8px;font-size:16px;font-weight:600;color:var(--ink);line-height:1.35}
+.markdown-view{font-size:16px;line-height:1.85;color:var(--ink);max-width:70ch}
+.md-h2{margin:24px 0 10px;font-size:21px;font-weight:650;color:var(--ink);line-height:1.35}
+.md-h3{margin:20px 0 8px;font-size:18px;font-weight:600;color:var(--ink);line-height:1.35}
 .md-para{margin:0 0 12px}
 .md-list{margin:0 0 12px;padding-left:22px;display:grid;gap:4px}
-.md-code{margin:0 0 12px;padding:12px 14px;border-radius:10px;background:var(--bg-subtle);color:var(--ink);font-size:13px;overflow-x:auto;white-space:pre-wrap}
+.md-code{margin:0 0 12px;padding:13px 15px;border-radius:10px;background:var(--bg-subtle);color:var(--ink);font-size:14px;overflow-x:auto;white-space:pre-wrap}
 </style>
