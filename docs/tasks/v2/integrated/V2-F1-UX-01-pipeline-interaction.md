@@ -2,9 +2,10 @@
 
 ## Identity
 
-- Status: `DESIGN_REQUIRED`
+- Status: `INTEGRATED`
 - Owner: Core Controller with user approval
 - Code branch: none
+- Approved contract: `docs/superpowers/specs/2026-08-22-v2-pipeline-interaction-design.md`
 
 ## Product question
 
@@ -28,4 +29,4 @@
 
 ## Exit gate
 
-用户批准信息层级和关键交互后，记录组件边界、route、data-test 和响应式规则，才能将 F1-FE-03 升为 `READY`。
+已满足。用户授权 Core Controller 按依赖连续发放，交互契约已冻结；F1-FE-03 可以提升为 `READY`。

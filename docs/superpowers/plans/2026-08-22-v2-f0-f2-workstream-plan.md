@@ -40,7 +40,7 @@ Wave exit: Pipeline history is readable and the frontend has one typed state-man
 - [ ] `V2-F0-MIG-01`: freeze import manifest, dry-run result, fingerprint and receipt contracts.
 - [ ] `V2-F0-MIG-02`: implement read-only inspection and transactional idempotent import.
 - [ ] `V2-F0-MIG-03`: expose the import review/confirmation desktop flow.
-- [ ] `V2-F1-UX-01`: approve Pipeline list/detail/stage interaction contract.
+- [x] `V2-F1-UX-01`: approve Pipeline list/detail/stage interaction contract.
 - [ ] `V2-F1-FE-03`: implement the approved V2 Pipeline page.
 - [ ] `V2-F1-QA-01`: verify two independent Pipelines, restart persistence and V1 import.
 
