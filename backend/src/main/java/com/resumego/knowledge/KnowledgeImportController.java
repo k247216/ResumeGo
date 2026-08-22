@@ -28,8 +28,16 @@ public class KnowledgeImportController {
         return ResponseEntity.status(status).body(ApiResponse.ok(response));
     }
 
+    /** 服务端 I/O 类失败（读取/暂存）返回 500 且不暴露异常详情；校验类返回 400 + 稳定 errorCode。 */
+    private static final java.util.Set<String> SERVER_IO_CODES = java.util.Set.of(
+            KnowledgeErrorCodes.READ_FAILED, KnowledgeErrorCodes.STAGING_FAILED);
+
     @ExceptionHandler(KnowledgeImportException.class)
     public ResponseEntity<ApiResponse<Void>> importRejected(KnowledgeImportException exception) {
+        if (SERVER_IO_CODES.contains(exception.errorCode())) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.fail("文件处理失败，请稍后重试"));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(exception.errorCode() + ": " + exception.getMessage()));
     }

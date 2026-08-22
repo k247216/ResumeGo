@@ -28,7 +28,6 @@ public class KnowledgeImportService {
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_FAILED = "FAILED";
     private static final String JOB_RUNNING = "RUNNING";
-    private static final String DEFAULT_TITLE = "本地文件知识";
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeImportService.class);
 
@@ -55,9 +54,10 @@ public class KnowledgeImportService {
 
         Path staged = fileStore.stage(bytes);
 
+        String localTitle = KnowledgeFileNames.basename(parsed);
         KnowledgeImportIds ids;
         try {
-            ids = repository.insertImportRecords(userId(), DEFAULT_TITLE, new KnowledgeSourceFileDraft(
+            ids = repository.insertImportRecords(userId(), localTitle, new KnowledgeSourceFileDraft(
                     parsed.originalName(),
                     fileStore.sourceRelativePath(userId(), sha256, parsed.extension()),
                     parsed.extension(),

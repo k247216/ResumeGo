@@ -7,6 +7,7 @@ import com.resumego.knowledge.dto.KnowledgeImportResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -276,5 +277,31 @@ class KnowledgeImportServiceTest {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException(exception);
         }
+    }
+
+    @Test
+    void usesSafeFileBasenameAsLocalTitleWithoutExtension() {
+        when(repository.findSourceFileBySha(1L, sha(MD_BYTES))).thenReturn(Optional.empty());
+        when(repository.insertImportRecords(eq(1L), eq("笔记"), any())).thenReturn(ids());
+
+        service.importFile(mdFile());
+
+        verify(repository).insertImportRecords(eq(1L), eq("笔记"), any());
+    }
+
+    @Test
+    void normalizesAndTruncatesBasenameTo120Chars() {
+        String longName = "长标题".repeat(60); // 180 字符
+        byte[] bytes = longName.getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile file = new MockMultipartFile("file", longName + ".md", "text/markdown", bytes);
+        when(repository.findSourceFileBySha(1L, sha(bytes))).thenReturn(Optional.empty());
+        when(repository.insertImportRecords(eq(1L), any(), any())).thenReturn(ids());
+
+        service.importFile(file);
+
+        var captor = ArgumentCaptor.forClass(String.class);
+        verify(repository).insertImportRecords(eq(1L), captor.capture(), any());
+        assertThat(captor.getValue()).hasSizeLessThanOrEqualTo(120);
+        assertThat(captor.getValue()).isEqualTo("长标题".repeat(40)); // 120 字符截断
     }
 }

@@ -81,4 +81,27 @@ class KnowledgeImportControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(containsString("FILE_TOO_LARGE")));
     }
+
+    @Test
+    void serverIoFailureMapsToInternalServerErrorWithoutDetails() throws Exception {
+        when(importService.importFile(any())).thenThrow(
+                new KnowledgeImportException("STAGING_FAILED", "文件暂存失败"));
+
+        mockMvc.perform(multipart("/api/v2/knowledge/imports")
+                        .file(new MockMultipartFile("file", "notes.md", "text/markdown",
+                                "x".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("文件处理失败，请稍后重试"));
+    }
+
+    @Test
+    void readFailureAlsoMapsToInternalServerError() throws Exception {
+        when(importService.importFile(any())).thenThrow(
+                new KnowledgeImportException("READ_FAILED", "读取上传文件失败"));
+
+        mockMvc.perform(multipart("/api/v2/knowledge/imports")
+                        .file(new MockMultipartFile("file", "notes.md", "text/markdown",
+                                "x".getBytes(StandardCharsets.UTF_8))))
+                .andExpect(status().isInternalServerError());
+    }
 }

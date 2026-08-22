@@ -35,4 +35,17 @@ public final class KnowledgeFileNames {
         String normalized = name.length() > 255 ? name.substring(name.length() - 255) : name;
         return new ParsedFileName(normalized, extension);
     }
+
+    /** 安全文件基础名（去扩展名、折叠空白、截断 120）作为本地标题；不含路径，可安全展示。 */
+    public static String basename(ParsedFileName parsed) {
+        String raw = parsed.originalName();
+        int dot = raw.lastIndexOf('.');
+        String base = dot > 0 ? raw.substring(0, dot) : raw;
+        String collapsed = base.trim().replaceAll("\\s+", " ");
+        if (collapsed.length() > 120) {
+            collapsed = collapsed.substring(0, 120);
+        }
+        return collapsed.isEmpty() ? "本地文件" : collapsed;
+    }
+
 }
