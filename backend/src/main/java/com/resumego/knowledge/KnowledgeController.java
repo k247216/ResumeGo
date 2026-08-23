@@ -54,6 +54,11 @@ public class KnowledgeController {
     }
 
     /** NOTE 与受管 Markdown 共用 content 端点；TXT 只读（KnowledgeManagedContentService 分支）。 */
+    @GetMapping("/{documentId}/source")
+    public org.springframework.http.ResponseEntity<byte[]> source(@PathVariable long documentId) {
+        return managedContent.loadSource(documentId);
+    }
+
     @PutMapping("/{id}/content")
     public ApiResponse<KnowledgeContentResponse> saveContent(
             @PathVariable long id,

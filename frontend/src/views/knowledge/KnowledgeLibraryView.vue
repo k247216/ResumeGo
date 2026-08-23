@@ -30,8 +30,10 @@
         @toggle-folder="toggleFolder"
         @select-folder="selectFolder"
         @new-child="openFolderCreate"
-        @rename-folder="openFolderEdit"
-        @move-folder="openFolderEdit"
+        :renaming-id="renamingFolderId"
+        @rename-folder="startRename"
+        @rename-submit="handleRenameSubmit"
+        @rename-cancel="renamingFolderId = null"
         @delete-folder="handleDeleteFolder"
         @select-tag="handleTag"
         @new-tag="nameDialogKind = 'tag'"
@@ -49,6 +51,7 @@
         :scope-label="scopeLabel"
         :classification-by-document-id="store.classificationByDocumentId"
         :category-paths="categoryPaths"
+        :active-tag-id="activeTagId"
         @close="closeDocumentList"
         @select="handleSelectDocument"
         @retry="store.retry"
@@ -179,7 +182,8 @@ const readingPane = ref<InstanceType<typeof KnowledgeReadingPane> | null>(null)
 const deleteOpen = ref(false)
 const impactLoading = ref(false)
 const folderBusy = ref(false)
-const folderDialog = ref<{ kind: 'create' | 'edit'; id: number | null; name: string; parentId: number | null; excludedIds: number[] } | null>(null)
+const folderDialog = ref<{ kind: 'create'; id: number | null; name: string; parentId: number | null; excludedIds: number[] } | null>(null)
+const renamingFolderId = ref<number | null>(null)
 const viewportWidth = ref(window.innerWidth)
 
 const hasSearch = computed(() => store.searchQuery.trim().length > 0)
@@ -369,38 +373,29 @@ function openFolderCreate(parentId: number | null) {
   folderDialog.value = { kind: 'create', id: null, name: '', parentId, excludedIds: [] }
 }
 
-function openFolderEdit(id: number) {
-  const node = store.categoryTree.find((n) => n.id === id)
-  if (!node) return
-  const excluded = descendantsOf(id)
-  folderDialog.value = { kind: 'edit', id: node.id, name: node.name, parentId: node.parentId, excludedIds: excluded }
+/** 行内重命名：选中文件夹名直接在树中进入可编辑状态，不再弹窗。 */
+function startRename(id: number) {
+  renamingFolderId.value = id
 }
 
-function descendantsOf(id: number): number[] {
-  const result: number[] = [id]
-  const queue = [id]
-  while (queue.length) {
-    const cur = queue.shift()!
-    const children = store.categoryTree.filter((n) => n.parentId === cur)
-    for (const child of children) {
-      result.push(child.id)
-      queue.push(child.id)
-    }
+async function handleRenameSubmit(id: number, name: string) {
+  const node = store.categoryTree.find((n) => n.id === id)
+  if (!node) return
+  const trimmed = name.trim()
+  renamingFolderId.value = null
+  if (!trimmed || trimmed === node.name) return
+  try {
+    await store.updateCategoryNode(id, trimmed, node.parentId)
+  } catch {
+    // 错误在 store.categoryTreeError
   }
-  return result
 }
 
 async function handleFolderSubmit(name: string, parentId: number | null) {
   if (!folderDialog.value) return
   folderBusy.value = true
   try {
-    if (folderDialog.value.kind === 'create') {
-      await store.createCategoryNode(name, parentId)
-    } else {
-      const id = folderDialog.value.id
-      if (id == null) return
-      await store.updateCategoryNode(id, name, parentId)
-    }
+    await store.createCategoryNode(name, parentId)
     folderDialog.value = null
   } catch {
     // 错误在 store.categoryTreeError

@@ -83,7 +83,18 @@ export async function importKnowledgeFile(file: File): Promise<ApiResponse<Knowl
   return parseResponse<KnowledgeImportResponse>(res, '导入文件失败')
 }
 
+/** 读取受管来源文件为 Blob URL（浏览器内预览 PDF/图片等）；桌面"打开原文"走 IPC。 */
+export async function loadKnowledgeSourceBlob(documentId: number): Promise<string> {
+  const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/source`)
+  if (!res.ok) {
+    throw new KnowledgeHttpError(res.status, '读取来源文件失败')
+  }
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
 /** 未完成返回 409，缺失/他人返回 404；均由后端决定，前端只展示真实状态。 */
+
 export async function getKnowledgeContent(documentId: number): Promise<ApiResponse<KnowledgeContentResponse>> {
   const res = await apiFetch(`${KNOWLEDGE_BASE}/documents/${documentId}/content`)
   return parseResponse<KnowledgeContentResponse>(res, '读取提取内容失败')

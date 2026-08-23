@@ -41,6 +41,34 @@ public class KnowledgeManagedContentService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
+    /** 读取受管来源文件字节流（浏览器内预览：PDF/图片等）；路径越界/符号链接/跨用户一律拒绝。 */
+    public org.springframework.http.ResponseEntity<byte[]> loadSource(long documentId) {
+        KnowledgeDocument doc = repository.findById(userId(), documentId)
+                .orElseThrow(() -> new NoSuchElementException("知识文档不存在"));
+        if (!SOURCE_FILE.equals(doc.sourceType())) {
+            throw new NoSuchElementException("非文件资料没有本地来源");
+        }
+        KnowledgeSourceFile source = repository.findSourceFileByDocument(userId(), documentId)
+                .orElseThrow(() -> new NoSuchElementException("知识来源文件不存在"));
+        if (source.storedRelativePath() == null) {
+            throw new NoSuchElementException("来源文件暂不可用");
+        }
+        byte[] bytes = fileStore.readManagedForReplace(userId(), source.storedRelativePath());
+        String contentType = source.mimeType() == null || source.mimeType().isBlank()
+                ? "application/octet-stream" : source.mimeType();
+        String fileName;
+        try {
+            fileName = java.net.URLEncoder.encode(source.originalName(), StandardCharsets.UTF_8).replace("+", "%20");
+        } catch (Exception exception) {
+            fileName = "source";
+        }
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename*=UTF-8''" + fileName)
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .body(bytes);
+    }
+
     public KnowledgeContentResponse saveContent(long documentId, String content) {
         if (content == null) {
             throw new IllegalArgumentException("正文不能为空值");

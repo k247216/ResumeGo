@@ -82,11 +82,14 @@ describe('KnowledgeReadingPane', () => {
     expect(wrapper.emitted('save-content')).toBeUndefined()
   })
 
-  it('shows an honest notice for metadata-only PDF/DOC without pretending content', () => {
-    const wrapper = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'a.pdf', sourceExtension: 'pdf', processingStatus: 'METADATA_ONLY' }), content: '' })
-    expect(wrapper.find('[data-test="metadata-only-notice"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="mode-edit"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
+  it('shows an honest notice for metadata-only xlsx and a preview slot for pdf', () => {
+    const xlsx = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'a.xlsx', sourceExtension: 'xlsx', processingStatus: 'METADATA_ONLY' }), content: '' })
+    expect(xlsx.find('[data-test="metadata-only-notice"]').exists()).toBe(true)
+    expect(xlsx.find('[data-test="mode-edit"]').exists()).toBe(false)
+    expect(xlsx.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
+
+    const pdf = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'a.pdf', sourceExtension: 'pdf', processingStatus: 'METADATA_ONLY' }), content: '' })
+    expect(pdf.find('[data-test="source-preview-pdf"]').exists()).toBe(true)
   })
 
   it('flushPendingSave persists pending edits before a document switch', async () => {
@@ -96,6 +99,18 @@ describe('KnowledgeReadingPane', () => {
     await wrapper.get('[data-test="knowledge-body-editor"]').setValue('未保存的正文')
     await (wrapper.vm as unknown as { flushPendingSave: () => Promise<void> }).flushPendingSave()
     expect(wrapper.emitted('save-content')).toEqual([['未保存的正文']])
+  })
+
+  it('formatting toolbar wraps selection with markdown syntax', async () => {
+    const wrapper = mountPane()
+    await wrapper.get('[data-test="mode-edit"]').trigger('click')
+    const editor = wrapper.get<HTMLTextAreaElement>('[data-test="knowledge-body-editor"]')
+    await editor.setValue('核心内容')
+    editor.element.setSelectionRange(0, 2)
+    await wrapper.get('[data-test="fmt-bold"]').trigger('mousedown')
+    expect((wrapper.get('[data-test="knowledge-body-editor"]').element as HTMLTextAreaElement).value).toBe('**核心**内容')
+    await wrapper.get('[data-test="fmt-list"]').trigger('mousedown')
+    expect((wrapper.get('[data-test="knowledge-body-editor"]').element as HTMLTextAreaElement).value).toBe('**- 核心**内容')
   })
 
   it('beginEdit focuses the inline title and enters edit stage for a new note', async () => {

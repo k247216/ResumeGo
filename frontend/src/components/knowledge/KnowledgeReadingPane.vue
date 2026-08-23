@@ -48,10 +48,21 @@
           <button type="button" class="text-btn" data-test="file-content-retry" @click="$emit('load-content')">重试</button>
         </div>
 
-        <!-- 仅收录元数据（PDF/DOC）：诚实提示，不假装有正文 -->
-        <div v-else-if="metadataOnly" class="reading-state" data-test="metadata-only-notice">
-          <strong>{{ metadataTitle }}</strong>
-          <span>文件已收录进知识库，当前暂不支持文本提取，仅可查看属性与原文。</span>
+        <!-- 仅收录元数据（PDF/图片等）：文件内预览；无法预览的类型给出诚实提示 -->
+        <div v-else-if="metadataOnly" class="source-preview" data-test="source-preview">
+          <iframe
+            v-if="previewType === 'pdf'"
+            :src="sourceUrl"
+            class="preview-frame"
+            data-test="source-preview-pdf"
+            title="PDF 预览"
+          ></iframe>
+          <img v-else-if="previewType === 'image'" :src="sourceUrl" class="preview-image" data-test="source-preview-image" alt="文件预览" />
+          <div v-else-if="sourceLoading" class="reading-state">正在读取文件…</div>
+          <div v-else class="reading-state" data-test="metadata-only-notice">
+            <strong>{{ metadataTitle }}</strong>
+            <span>文件已收录进知识库。该类型暂不支持在应用内预览，可在右侧"属性"中通过桌面端打开原文。</span>
+          </div>
         </div>
 
         <!-- 可编辑（NOTE / 受管 Markdown）：阅读阶段渲染 Markdown，编辑阶段源码 + 实时预览，自动保存 -->
@@ -60,8 +71,20 @@
             <KnowledgeMarkdownView :source="content" />
           </div>
           <div v-else class="edit-column" data-test="edit-column">
+            <div class="md-toolbar" data-test="md-toolbar" role="toolbar" aria-label="Markdown 格式">
+              <button type="button" class="fmt-btn" title="加粗" aria-label="加粗" data-test="fmt-bold" @mousedown.prevent="applyFormat('**', '**', '加粗文字')">B</button>
+              <button type="button" class="fmt-btn italic" title="斜体" aria-label="斜体" data-test="fmt-italic" @mousedown.prevent="applyFormat('*', '*', '斜体文字')">I</button>
+              <span class="fmt-sep" aria-hidden="true"></span>
+              <button type="button" class="fmt-btn" title="标题" aria-label="标题" data-test="fmt-heading" @mousedown.prevent="applyFormat('## ', '', '标题')">H</button>
+              <button type="button" class="fmt-btn" title="无序列表" aria-label="无序列表" data-test="fmt-list" @mousedown.prevent="applyFormat('- ', '', '列表项')">• 列表</button>
+              <button type="button" class="fmt-btn" title="引用" aria-label="引用" data-test="fmt-quote" @mousedown.prevent="applyFormat('> ', '', '引用文字')">❝ 引用</button>
+              <span class="fmt-sep" aria-hidden="true"></span>
+              <button type="button" class="fmt-btn" title="行内代码" aria-label="行内代码" data-test="fmt-code" @mousedown.prevent="applyFormat('`', '`', '代码')">code</button>
+              <button type="button" class="fmt-btn" title="代码块" aria-label="代码块" data-test="fmt-codeblock" @mousedown.prevent="applyFormat('```\n', '\n```', '代码')">代码块</button>
+            </div>
             <textarea
               v-model="draft"
+              ref="editorEl"
               class="body-editor"
               data-test="knowledge-body-editor"
               placeholder="直接输入 Markdown 源码，自动保存…"
@@ -110,6 +133,7 @@ const draft = ref('')
 const titleDraft = ref('')
 const titleInput = ref<HTMLInputElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
+const editorEl = ref<HTMLTextAreaElement | null>(null)
 const mode = ref<'read' | 'edit'>('read')
 const saveStatus = ref<SaveStatus>('idle')
 
@@ -122,6 +146,15 @@ const draftTooLarge = computed(() => new TextEncoder().encode(draft.value).lengt
 const editable = computed(() => props.document?.sourceType === 'NOTE'
   || (props.document?.sourceType === 'FILE' && props.document.sourceExtension?.toLowerCase() === 'md'))
 const metadataOnly = computed(() => props.document?.processingStatus === 'METADATA_ONLY')
+const previewType = computed(() => {
+  if (!props.document) return null
+  const ext = props.document.sourceExtension?.toLowerCase()
+  if (ext === 'pdf') return 'pdf'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext ?? '')) return 'image'
+  return null
+})
+const sourceUrl = ref('')
+const sourceLoading = ref(false)
 const metadataTitle = computed(() => {
   const ext = props.document?.sourceExtension?.toLowerCase()
   return ext === 'pdf' ? 'PDF 文档已收录' : ext === 'doc' ? 'Word 文档已收录' : '资料已收录'
@@ -155,6 +188,21 @@ function tone(status: KnowledgeDocument['processingStatus']): string {
 
 function normalizedTitle(): string {
   return titleDraft.value.trim()
+}
+
+/** 格式工具栏：在光标处包裹/插入 Markdown 语法，保持焦点与选区。 */
+function applyFormat(before: string, after: string, placeholder: string) {
+  const el = editorEl.value
+  if (!el) return
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const selected = draft.value.slice(start, end) || placeholder
+  draft.value = draft.value.slice(0, start) + before + selected + after + draft.value.slice(end)
+  void nextTick(() => {
+    el.focus()
+    const newStart = start + before.length
+    el.setSelectionRange(newStart, newStart + selected.length)
+  })
 }
 
 /** 进入编辑（阅读阶段 → 编辑阶段）；新建笔记后聚焦标题。 */
@@ -233,12 +281,36 @@ function hasUnsavedChanges(): boolean {
   return draft.value !== props.content || normalizedTitle() !== props.document.title
 }
 
+// 加载来源文件预览（METADATA_ONLY 的 PDF/图片），切换/卸载时回收
+async function loadSourcePreview() {
+  if (!props.document || !metadataOnly.value || !previewType.value) return
+  sourceLoading.value = true
+  try {
+    const { loadKnowledgeSourceBlob } = await import('../../api/knowledge')
+    const url = await loadKnowledgeSourceBlob(props.document.id)
+    if (sourceUrl.value) URL.revokeObjectURL(sourceUrl.value)
+    sourceUrl.value = url
+  } catch {
+    // 预览失败保留诚实提示
+  } finally {
+    sourceLoading.value = false
+  }
+}
+function clearSourcePreview() {
+  if (sourceUrl.value) {
+    URL.revokeObjectURL(sourceUrl.value)
+    sourceUrl.value = ''
+  }
+}
+
 // 切换文档/首次挂载：重置草稿与模式（新文档默认阅读阶段）
 watch(() => props.document?.id, () => {
   draft.value = props.content
   titleDraft.value = props.document?.title ?? ''
   mode.value = 'read'
   saveStatus.value = 'idle'
+  clearSourcePreview()
+  void loadSourcePreview()
 }, { immediate: true })
 
 // 正文异步到达：未改动时同步；已改动绝不覆盖用户输入
@@ -274,6 +346,7 @@ watch(() => props.titleError, (e) => {
 onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer)
   if (savedFlashTimer) clearTimeout(savedFlashTimer)
+  clearSourcePreview()
 })
 
 async function scrollToLine(lineNumber: number | null) {
@@ -340,9 +413,18 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .document-view{padding:26px 38px 60px;min-height:100%;box-sizing:border-box}
 /* 编辑阶段：源码 + 实时预览（Obsidian 式双阶段） */
 .edit-column{display:flex;flex-direction:column;height:100%;min-height:0}
-.body-editor{box-sizing:border-box;display:block;width:100%;flex:1;min-height:0;padding:24px 38px 40px;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
+.md-toolbar{flex:none;display:flex;align-items:center;gap:2px;padding:8px 34px 6px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
+.fmt-btn{border:0;background:transparent;color:var(--copy);font-size:12.5px;font-weight:700;height:26px;padding:0 8px;border-radius:6px;cursor:pointer;font-family:inherit}
+.fmt-btn.italic{font-style:italic;font-weight:600}
+.fmt-btn:hover{background:var(--bg-hover);color:var(--ink)}
+.fmt-btn:active{background:var(--brand-soft);color:var(--brand)}
+.fmt-sep{width:1px;height:14px;background:var(--border-subtle);margin:0 6px}
+.body-editor{box-sizing:border-box;display:block;width:100%;flex:1;min-height:0;padding:22px 38px 40px;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
 .body-editor:disabled{opacity:.7}
-.body-editor::placeholder{color:var(--muted)}
+.body-editor::placeholder{color:var(--muted);font-size:14px;font-weight:450}
 .editor-hint{margin:0 38px 12px;font-size:12.5px;color:var(--danger)}
 .editor-error{margin:0 38px 14px;font-size:12.5px;color:var(--danger)}
+.source-preview{display:flex;flex-direction:column;height:100%;min-height:0;padding:0}
+.preview-frame{flex:1;min-height:0;width:100%;border:0;background:var(--surface-subtle)}
+.preview-image{max-width:100%;max-height:100%;object-fit:contain;margin:0 auto;display:block}
 </style>

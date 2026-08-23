@@ -80,6 +80,7 @@ const props = defineProps<{
   scopeLabel: string
   classificationByDocumentId: Record<number, { category: { id: number; name: string } | null; tags: { id: number; name: string }[] }>
   categoryPaths: Record<number, string>
+  activeTagId?: number | null
 }>()
 
 const sortDesc = ref(true)
@@ -147,7 +148,8 @@ function locationOf(doc: KnowledgeDocument): string {
   if (classification?.category) {
     return props.categoryPaths[classification.category.id] ?? classification.category.name
   }
-  if (classification?.tags.length) {
+  // 按标签浏览时范围标签已在列表头显示，行内不再重复标签，避免重叠
+  if (props.activeTagId == null && classification?.tags.length) {
     return '#' + classification.tags[0].name
   }
   return ''

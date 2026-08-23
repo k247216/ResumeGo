@@ -19,6 +19,7 @@
           :nodes="nodes"
           :expanded-ids="expandedIds"
           :selected-id="selectedId"
+          :renaming-id="renamingId"
           @toggle="$emit('toggle-folder', $event)"
           @select="$emit('select-folder', $event)"
           @new-child="$emit('new-child', $event)"
@@ -59,6 +60,7 @@ defineProps<{
   expandedIds: Set<number>
   selectedId: number | null
   activeTagId: number | null
+  renamingId?: number | null
   treeError: string
 }>()
 
@@ -71,6 +73,8 @@ defineEmits<{
   (e: 'rename-folder', id: number): void
   (e: 'move-folder', id: number): void
   (e: 'delete-folder', id: number): void
+  (e: 'rename-submit', id: number, name: string): void
+  (e: 'rename-cancel'): void
   (e: 'select-tag', id: number | null): void
   (e: 'new-tag'): void
   (e: 'retry-tree'): void
@@ -91,7 +95,7 @@ defineEmits<{
 .nav-action:disabled:hover{background:transparent;color:var(--muted)}
 .nav-action.danger:hover{color:var(--danger);background:var(--danger-soft)}
 .tag-list{list-style:none;margin:0;padding:0 4px;display:flex;flex-direction:column;gap:1px}
-.tag-item{display:flex;align-items:center;gap:8px;height:30px;border:0;background:transparent;color:var(--ink);font-size:13.5px;text-align:left;padding:0 10px;border-radius:7px;cursor:pointer;width:100%;transition:background .12s ease,color .12s ease}
+.tag-item{display:flex;align-items:center;gap:8px;height:30px;border:0;background:transparent;color:var(--ink);font-size:14px;text-align:left;padding:0 10px;border-radius:7px;cursor:pointer;width:100%;transition:background .12s ease,color .12s ease}
 .tag-icon{flex:none;color:var(--muted)}
 .tag-item:hover{background:var(--bg-hover)}
 .tag-item.active{background:var(--brand-soft);color:var(--brand);font-weight:600}

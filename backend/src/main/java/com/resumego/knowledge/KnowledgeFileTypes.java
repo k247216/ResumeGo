@@ -34,14 +34,31 @@ public final class KnowledgeFileTypes {
         return METADATA_ONLY.contains(extension);
     }
 
-    /** 服务端判定真实 mediaType（不信任客户端 MIME）。 */
+    /** 服务端判定真实 mediaType（不信任客户端 MIME；常见类型映射，未知归 octet-stream）。 */
     public static String mediaTypeOf(String extension) {
         return switch (extension) {
             case "md" -> "text/markdown";
-            case "txt" -> "text/plain";
+            case "txt", "csv" -> "text/plain";
             case "pdf" -> "application/pdf";
             case "doc" -> "application/msword";
             case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case "xls" -> "application/vnd.ms-excel";
+            case "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            case "ppt" -> "application/vnd.ms-powerpoint";
+            case "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "svg" -> "image/svg+xml";
+            case "bmp" -> "image/bmp";
+            case "ico" -> "image/x-icon";
+            case "json" -> "application/json";
+            case "html", "htm" -> "text/html";
+            case "xml" -> "application/xml";
+            case "zip" -> "application/zip";
+            case "mp3" -> "audio/mpeg";
+            case "mp4" -> "video/mp4";
             default -> "application/octet-stream";
         };
     }

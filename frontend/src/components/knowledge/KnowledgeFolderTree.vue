@@ -8,12 +8,15 @@
         :all-nodes="nodes"
         :expanded-ids="expandedIds"
         :selected-id="selectedId"
+        :renaming="root.id === renamingId"
         @toggle="$emit('toggle', $event)"
         @select="$emit('select', $event)"
         @new-child="$emit('new-child', $event)"
         @rename="$emit('rename', $event)"
         @move="$emit('move', $event)"
         @delete="$emit('delete', $event)"
+        @rename-submit="(id, name) => $emit('rename-submit', id, name)"
+        @rename-cancel="$emit('rename-cancel')"
       />
     </ul>
     <p v-if="!nodes.length" class="tree-empty" data-test="folder-tree-empty">还没有资料文件夹，点击「新建文件夹」开始整理。</p>
@@ -29,6 +32,7 @@ const props = defineProps<{
   nodes: KnowledgeCategoryNode[]
   expandedIds: Set<number>
   selectedId: number | null
+  renamingId?: number | null
 }>()
 
 defineEmits<{
@@ -38,6 +42,8 @@ defineEmits<{
   (e: 'rename', id: number): void
   (e: 'move', id: number): void
   (e: 'delete', id: number): void
+  (e: 'rename-submit', id: number, name: string): void
+  (e: 'rename-cancel'): void
 }>()
 
 const roots = computed(() => props.nodes.filter((n) => n.parentId == null))

@@ -23,4 +23,38 @@ describe('KnowledgeFolderNode', () => {
 
     expect(wrapper.get('[data-test="folder-icon-1"]').attributes('data-state')).toBe('open')
   })
+
+  it('renames inline: shows an editable input and submits on Enter', async () => {
+    const wrapper = mount(KnowledgeFolderNode, {
+      props: {
+        node: node(1, '技术知识', null),
+        allNodes: [node(1, '技术知识', null), node(2, 'Redis', 1)],
+        expandedIds: new Set([1]),
+        selectedId: 1,
+        renaming: true,
+      },
+      global: { stubs: { 'el-icon': { template: '<i><slot /></i>' } } },
+    })
+    const input = wrapper.get<HTMLInputElement>('[data-test="folder-rename-input-1"]')
+    expect(input.element.value).toBe('技术知识')
+    await input.setValue('技术知识（新）')
+    await input.trigger('keydown.enter')
+    expect(wrapper.emitted('rename-submit')).toEqual([[1, '技术知识（新）']])
+  })
+
+  it('cancels inline rename without emitting a submit', async () => {
+    const wrapper = mount(KnowledgeFolderNode, {
+      props: {
+        node: node(1, '技术知识', null),
+        allNodes: [node(1, '技术知识', null)],
+        expandedIds: new Set<number>(),
+        selectedId: 1,
+        renaming: true,
+      },
+      global: { stubs: { 'el-icon': { template: '<i><slot /></i>' } } },
+    })
+    await wrapper.get('[data-test="folder-rename-input-1"]').trigger('keydown.esc')
+    expect(wrapper.emitted('rename-cancel')).toBeTruthy()
+    expect(wrapper.emitted('rename-submit')).toBeUndefined()
+  })
 })
