@@ -252,14 +252,33 @@ const mediaFrameStyle = computed(() => {
 
 /** 舞台尺寸随缩放变化（不用 CSS transform，滚动区与实际页面一致，放大后不丢图）。 */
 function ensureMediaBase() {
+  if (mediaBase.value) return
   if (previewType.value === 'pdf') {
     mediaBase.value = { w: BASE_PDF_W, h: BASE_PDF_H }
     return
   }
-  if (!mediaBase.value) {
-    // 图片自然尺寸由 onload 设置
-    mediaBase.value = { w: 800, h: 600 }
+  // 图片自然尺寸由 onload 设置
+  mediaBase.value = { w: 800, h: 600 }
+}
+
+/** 从 PDF 字节解析首页 MediaBox（单位 pt，1pt = 96/72 px）；无则回退 A4。 */
+async function detectPdfPageSize(blobUrl: string): Promise<{ w: number; h: number }> {
+  try {
+    const res = await fetch(blobUrl)
+    const buf = new Uint8Array(await res.arrayBuffer())
+    const text = new TextDecoder('latin1').decode(buf)
+    const m = /\/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]/.exec(text)
+    if (m) {
+      const w = Math.round((Number(m[3]) - Number(m[1])) * 96 / 72)
+      const h = Math.round((Number(m[4]) - Number(m[2])) * 96 / 72)
+      if (w > 40 && h > 40 && w < 6000 && h < 6000) {
+        return { w, h }
+      }
+    }
+  } catch {
+    // 解析失败回退 A4
   }
+  return { w: BASE_PDF_W, h: BASE_PDF_H }
 }
 
 function onMediaImageLoad(event: Event) {
@@ -457,7 +476,12 @@ async function loadSourcePreview() {
     if (sourceUrl.value) URL.revokeObjectURL(sourceUrl.value)
     sourceUrl.value = url
     mediaZoom.value = 1
-    ensureMediaBase()
+    if (previewType.value === 'pdf') {
+      const page = await detectPdfPageSize(url)
+      mediaBase.value = page
+    } else {
+      ensureMediaBase()
+    }
     void nextTick(() => fitMedia())
   } catch {
     // 预览失败保留诚实提示
@@ -593,7 +617,7 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .body-editor::placeholder{color:var(--muted)}
 .editor-hint{margin:0 38px 12px;font-size:12.5px;color:var(--danger)}
 .editor-error{margin:0 38px 14px;font-size:12.5px;color:var(--danger)}
-.source-preview{display:flex;flex-direction:column;height:100%;min-height:0;padding:0}
+.source-preview{display:flex;flex-direction:column;height:100%;min-height:0;padding:0;background:var(--surface-solid)}
 .media-viewer{display:flex;flex-direction:column;height:100%;min-height:0}
 .media-toolbar{flex:none;display:flex;align-items:center;gap:6px;padding:7px 34px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
 .media-btn{min-width:28px;height:24px;border:1px solid var(--border-default);border-radius:6px;background:transparent;color:var(--copy);font-size:13px;cursor:pointer;line-height:1}
@@ -609,7 +633,7 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .notice-message{font-size:12px;color:var(--brand)}
 .media-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-solid)}
 .media-viewport.panning{cursor:grabbing;user-select:none}
-.media-stage{position:relative}
+.media-stage{position:relative;background:var(--surface-solid)}
 .media-frame{display:block;width:100%;height:100%;border:0;background:#fff;pointer-events:none;object-fit:contain}
 .pdf-frame{position:absolute;top:0;left:0}
 </style>
