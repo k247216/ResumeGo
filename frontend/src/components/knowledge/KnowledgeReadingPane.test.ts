@@ -61,17 +61,16 @@ describe('KnowledgeReadingPane', () => {
     expect(text.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
   })
 
-  it('edit mode shows source with live preview and autosaves after typing stops', async () => {
+  it('edit mode keeps source editing only (no extra preview pane) and autosaves', async () => {
     vi.useFakeTimers()
     const wrapper = mountPane()
     await wrapper.get('[data-test="mode-edit"]').trigger('click')
     const editor = wrapper.get('[data-test="knowledge-body-editor"]')
-    expect(wrapper.find('[data-test="live-preview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="live-preview"]').exists()).toBe(false)
     await editor.setValue('# 新正文\n\n**加粗**')
     expect(wrapper.emitted('save-content')).toBeUndefined()
     await vi.advanceTimersByTimeAsync(1000)
     expect(wrapper.emitted('save-content')).toEqual([['# 新正文\n\n**加粗**']])
-    expect(wrapper.get('[data-test="live-preview"]').text()).toContain('# 新正文')
   })
 
   it('autosaves an inline title change as an explicit rename', async () => {

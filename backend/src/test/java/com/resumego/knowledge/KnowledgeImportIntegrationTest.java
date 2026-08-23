@@ -246,14 +246,14 @@ class KnowledgeImportIntegrationTest {
     }
 
     @Test
-    void importsUnknownAndMissingExtensionAsUnknownTypeFailed() {
+    void importsUnknownAndMissingExtensionAsMetadataOnly() {
         byte[] xyzBytes = "unknown body".getBytes(StandardCharsets.UTF_8);
         byte[] noExtBytes = "readme body without extension".getBytes(StandardCharsets.UTF_8);
 
         KnowledgeImportResponse xyz = service.importFile(
                 new MockMultipartFile("file", "archive.xyz", "application/octet-stream", xyzBytes));
-        assertThat(xyz.processingStatus()).isEqualTo("FAILED");
-        assertThat(xyz.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        assertThat(xyz.processingStatus()).isEqualTo("METADATA_ONLY");
+        assertThat(xyz.errorCode()).isNull();
         Map<String, Object> xyzSource = jdbcTemplate.queryForMap(
                 "SELECT * FROM knowledge_source_files WHERE document_id = ?", xyz.documentId());
         assertThat(String.valueOf(xyzSource.get("extension"))).isEqualTo("xyz");
@@ -261,8 +261,8 @@ class KnowledgeImportIntegrationTest {
 
         KnowledgeImportResponse noExt = service.importFile(
                 new MockMultipartFile("file", "README", "text/plain", noExtBytes));
-        assertThat(noExt.processingStatus()).isEqualTo("FAILED");
-        assertThat(noExt.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        assertThat(noExt.processingStatus()).isEqualTo("METADATA_ONLY");
+        assertThat(noExt.errorCode()).isNull();
         Map<String, Object> noExtSource = jdbcTemplate.queryForMap(
                 "SELECT * FROM knowledge_source_files WHERE document_id = ?", noExt.documentId());
         assertThat(String.valueOf(noExtSource.get("extension"))).isEqualTo(KnowledgeFileTypes.UNKNOWN);

@@ -68,10 +68,6 @@
               :disabled="saving"
               spellcheck="false"
             ></textarea>
-            <div class="preview-pane" data-test="live-preview">
-              <span class="preview-label">预览</span>
-              <KnowledgeMarkdownView :source="draft" />
-            </div>
           </div>
           <p v-if="draftTooLarge" class="editor-hint" data-test="note-size-hint">正文不能超过 1 MiB，已停止自动保存</p>
           <p v-if="error" class="editor-error" data-test="note-save-error">{{ error }}</p>
@@ -344,11 +340,9 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .document-view{padding:26px 38px 60px;min-height:100%;box-sizing:border-box}
 /* 编辑阶段：源码 + 实时预览（Obsidian 式双阶段） */
 .edit-column{display:flex;flex-direction:column;height:100%;min-height:0}
-.body-editor{box-sizing:border-box;display:block;width:100%;flex:1.15;min-height:0;padding:24px 38px 20px;border:0;border-bottom:1px solid var(--border-subtle);background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
+.body-editor{box-sizing:border-box;display:block;width:100%;flex:1;min-height:0;padding:24px 38px 40px;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
 .body-editor:disabled{opacity:.7}
 .body-editor::placeholder{color:var(--muted)}
-.preview-pane{flex:1;min-height:0;overflow:auto;padding:20px 38px 48px;border-top:0;background:var(--surface-subtle)}
-.preview-label{display:block;margin-bottom:12px;font-size:11px;font-weight:650;color:var(--muted);letter-spacing:.05em}
 .editor-hint{margin:0 38px 12px;font-size:12.5px;color:var(--danger)}
 .editor-error{margin:0 38px 14px;font-size:12.5px;color:var(--danger)}
 </style>

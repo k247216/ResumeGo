@@ -106,18 +106,11 @@ public class KnowledgeImportService {
             return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_COMPLETED, false, null);
         }
 
-        if (KnowledgeFileTypes.isMetadataOnly(parsed.extension())) {
-            // PDF/DOC：安全副本与元数据入库，文档 METADATA_ONLY（真实状态，不伪造正文/可编辑），job COMPLETED
-            repository.completeMetadataOnlyImport(ids.documentId(), ids.sourceFileId(), ids.importJobId());
-            log.info("知识文件仅收录元数据 extension={}", parsed.extension());
-            return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_METADATA_ONLY, false, null);
-        }
-
-        // 未知类型：FAILED + 稳定 code，不提取正文、不假装可编辑
-        repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
-                KnowledgeErrorCodes.UNSUPPORTED_FORMAT, true);
-        log.warn("知识文件导入不支持解析 code={}", KnowledgeErrorCodes.UNSUPPORTED_FORMAT);
-        return failedResponse(ids.documentId(), KnowledgeErrorCodes.UNSUPPORTED_FORMAT);
+        // 非可解析类型（pdf/doc/xlsx/pptx/图片等任意扩展名）：安全副本与元数据入库，
+        // 文档 METADATA_ONLY（真实状态，不伪造正文/可编辑），job COMPLETED —— 任何合法文件都可导入
+        repository.completeMetadataOnlyImport(ids.documentId(), ids.sourceFileId(), ids.importJobId());
+        log.info("知识文件仅收录元数据 extension={}", parsed.extension());
+        return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_METADATA_ONLY, false, null);
     }
 
     private KnowledgeImportResponse duplicateResponse(KnowledgeSourceFile sourceFile) {

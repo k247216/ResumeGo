@@ -20,11 +20,6 @@
         <span>{{ node.name }}</span>
       </button>
       <span class="tree-count">{{ node.descendantDocumentCount }}</span>
-      <span class="tree-actions">
-        <button type="button" class="tree-action" data-test="folder-new-child" title="新建子文件夹" @click.stop="$emit('new-child', node.id)"><el-icon :size="13"><Plus /></el-icon></button>
-        <button type="button" class="tree-action" data-test="folder-rename" title="重命名/移动" @click.stop="$emit('rename', node.id)"><el-icon :size="13"><EditPen /></el-icon></button>
-        <button type="button" class="tree-action danger" data-test="folder-delete" title="删除" aria-label="删除文件夹" @click.stop="$emit('delete', node.id)"><el-icon :size="13"><Close /></el-icon></button>
-      </span>
     </div>
     <ul v-if="expanded && children.length" class="tree-children">
       <KnowledgeFolderNode
@@ -47,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CaretBottom, CaretRight, Close, EditPen, Folder, FolderOpened, Plus } from '@element-plus/icons-vue'
+import { CaretBottom, CaretRight, Folder, FolderOpened } from '@element-plus/icons-vue'
 import KnowledgeFolderNode from './KnowledgeFolderNode.vue'
 import type { KnowledgeCategoryNode } from '../../types/knowledge'
 
@@ -91,10 +86,5 @@ function toggle() {
 .tree-row.selected .folder-icon,.tree-name:hover .folder-icon{color:var(--brand)}
 .tree-name:hover{color:var(--brand)}
 .tree-count{color:var(--muted);font-size:10.5px;flex:none;min-width:18px;text-align:right}
-.tree-actions{display:none;gap:1px}
-.tree-row:hover .tree-actions{display:inline-flex}
-.tree-action{display:grid;place-items:center;width:22px;height:22px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;padding:0}
-.tree-action:hover{background:var(--bg-hover);color:var(--brand)}
-.tree-action.danger:hover{color:var(--danger);background:var(--danger-soft)}
 .tree-children{margin:1px 0 0 11px;padding:1px 0 1px 8px;border-left:1px solid var(--border-subtle)}
 </style>

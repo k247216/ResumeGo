@@ -4,7 +4,10 @@
         <div class="nav-head">
           <strong>资料库</strong>
           <span class="nav-head-actions">
-            <button type="button" class="nav-action" data-test="navigator-new-folder" title="新建文件夹" aria-label="新建文件夹" @click="$emit('new-folder')"><el-icon :size="14"><Plus /></el-icon></button>
+            <button type="button" class="nav-action" data-test="navigator-new-folder" title="新建文件夹" aria-label="新建文件夹" @click="$emit('new-folder')"><el-icon :size="14"><FolderAdd /></el-icon></button>
+            <button type="button" class="nav-action" data-test="navigator-new-child" title="在选中文件夹下新建子文件夹" aria-label="新建子文件夹" :disabled="selectedId == null" @click="selectedId != null && $emit('new-child', selectedId)"><el-icon :size="14"><FolderOpened /></el-icon></button>
+            <button type="button" class="nav-action" data-test="navigator-rename-folder" title="重命名/移动选中文件夹" aria-label="重命名文件夹" :disabled="selectedId == null" @click="selectedId != null && $emit('rename-folder', selectedId)"><el-icon :size="14"><EditPen /></el-icon></button>
+            <button type="button" class="nav-action danger" data-test="navigator-delete-folder" title="删除选中文件夹" aria-label="删除文件夹" :disabled="selectedId == null" @click="selectedId != null && $emit('delete-folder', selectedId)"><el-icon :size="14"><Delete /></el-icon></button>
             <button type="button" class="nav-action" data-test="navigator-close" title="收起资料库" aria-label="收起资料库" @click="$emit('close')"><el-icon :size="14"><ArrowLeft /></el-icon></button>
           </span>
         </div>
@@ -46,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Plus, PriceTag } from '@element-plus/icons-vue'
+import { ArrowLeft, Delete, EditPen, FolderAdd, FolderOpened, PriceTag } from '@element-plus/icons-vue'
 import KnowledgeFolderTree from './KnowledgeFolderTree.vue'
 import type { KnowledgeCategoryNode, KnowledgeTag } from '../../types/knowledge'
 
@@ -84,6 +87,9 @@ defineEmits<{
 .nav-head strong{font-size:12px;font-weight:650;color:var(--muted);letter-spacing:.04em;user-select:none}
 .nav-action{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:background .15s ease,color .15s ease}
 .nav-action:hover{background:var(--bg-hover);color:var(--ink)}
+.nav-action:disabled{opacity:.35;cursor:not-allowed}
+.nav-action:disabled:hover{background:transparent;color:var(--muted)}
+.nav-action.danger:hover{color:var(--danger);background:var(--danger-soft)}
 .tag-list{list-style:none;margin:0;padding:0 4px;display:flex;flex-direction:column;gap:1px}
 .tag-item{display:flex;align-items:center;gap:8px;height:30px;border:0;background:transparent;color:var(--ink);font-size:13.5px;text-align:left;padding:0 10px;border-radius:7px;cursor:pointer;width:100%;transition:background .12s ease,color .12s ease}
 .tag-icon{flex:none;color:var(--muted)}
