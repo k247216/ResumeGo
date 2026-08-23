@@ -57,7 +57,16 @@
               <button type="button" class="media-btn" data-test="media-zoom-in" @click="mediaZoom += 0.25">＋</button>
               <button type="button" class="media-btn" data-test="media-fit" @click="fitMedia">适应</button>
               <span class="media-sep" aria-hidden="true"></span>
-              <button type="button" class="media-btn" data-test="media-open-external" @click="openInExternal">在其他软件打开</button>
+              <button
+                type="button"
+                class="media-btn media-icon-btn"
+                title="在其他软件打开"
+                aria-label="在其他软件打开"
+                data-test="media-open-external"
+                @click="openInExternal"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </button>
               <span class="media-hint">{{ externalMessage || '按住拖拽平移 · Ctrl+滚轮缩放' }}</span>
             </div>
             <div
@@ -94,7 +103,17 @@
           <div v-else-if="sourceLoading" class="reading-state">正在读取文件…</div>
           <div v-else class="reading-state" data-test="metadata-only-notice">
             <strong>{{ metadataTitle }}</strong>
-            <span>文件已收录进知识库。该类型暂不支持在应用内预览，可在右侧"属性"中通过桌面端打开原文。</span>
+            <span>文件已收录进知识库，该类型暂不支持在应用内预览。</span>
+            <button
+              type="button"
+              class="notice-open"
+              data-test="notice-open-external"
+              @click="openInExternal"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span>在其他软件打开</span>
+            </button>
+            <span v-if="externalMessage" class="notice-message">{{ externalMessage }}</span>
           </div>
         </div>
 
@@ -554,7 +573,7 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .reading-meta{margin:8px 0 0;font-size:12px;color:var(--muted)}
 .title-error{margin:8px 0 0;font-size:12px;color:var(--danger)}
 .reading-body{flex:1;min-height:0;overflow:auto;padding:0}
-.reading-state{display:grid;gap:8px;align-content:center;justify-items:start;min-height:100%;padding:48px 34px;color:var(--muted);font-size:13px}
+.reading-state{display:grid;gap:8px;align-content:center;justify-items:start;min-height:100%;padding:48px 34px;color:var(--muted);font-size:13px;background:var(--surface-solid)}
 .reading-state strong{font-size:16px;color:var(--ink)}
 .reading-state.error{color:var(--danger)}
 .text-btn{border:0;background:transparent;color:var(--brand);font-size:13px;cursor:pointer;padding:0}
@@ -582,6 +601,12 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .media-zoom-label{min-width:48px;text-align:center;font-size:12px;color:var(--muted)}
 .media-hint{margin-left:auto;font-size:11px;color:var(--muted)}
 .media-sep{width:1px;height:14px;background:var(--border-subtle);margin:0 6px}
+.media-icon-btn{display:grid;place-items:center;min-width:28px;padding:0 6px}
+.media-icon-btn svg{width:14px;height:14px}
+.notice-open{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:7px 12px;border:1px solid var(--border-default);border-radius:8px;background:transparent;color:var(--copy);font-size:12.5px;cursor:pointer;font-family:inherit}
+.notice-open:hover{border-color:var(--brand);color:var(--brand)}
+.notice-open svg{width:13px;height:13px}
+.notice-message{font-size:12px;color:var(--brand)}
 .media-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-solid)}
 .media-viewport.panning{cursor:grabbing;user-select:none}
 .media-stage{position:relative}
