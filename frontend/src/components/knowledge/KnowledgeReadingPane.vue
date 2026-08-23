@@ -50,35 +50,44 @@
 
         <!-- 仅收录元数据（PDF/图片等）：文件内预览；无法预览的类型给出诚实提示 -->
         <div v-else-if="metadataOnly" class="source-preview" data-test="source-preview">
-          <div v-if="previewType === 'pdf'" class="pdf-viewer" data-test="pdf-viewer">
-            <div class="pdf-toolbar">
-              <button type="button" class="pdf-btn" data-test="pdf-zoom-out" @click="pdfZoom -= 0.25">−</button>
-              <span class="pdf-zoom-label" data-test="pdf-zoom-label">{{ Math.round(pdfZoom * 100) }}%</span>
-              <button type="button" class="pdf-btn" data-test="pdf-zoom-in" @click="pdfZoom += 0.25">＋</button>
-              <button type="button" class="pdf-btn" data-test="pdf-fit" @click="pdfFit">适应</button>
-              <span class="pdf-hint">按住拖拽平移 · Ctrl+滚轮缩放</span>
+          <div v-if="previewType === 'pdf' || previewType === 'image'" class="media-viewer" data-test="media-viewer">
+            <div class="media-toolbar">
+              <button type="button" class="media-btn" data-test="media-zoom-out" @click="mediaZoom -= 0.25">−</button>
+              <span class="media-zoom-label" data-test="media-zoom-label">{{ Math.round(mediaZoom * 100) }}%</span>
+              <button type="button" class="media-btn" data-test="media-zoom-in" @click="mediaZoom += 0.25">＋</button>
+              <button type="button" class="media-btn" data-test="media-fit" @click="fitMedia">适应</button>
+              <span class="media-hint">按住拖拽平移 · Ctrl+滚轮缩放</span>
             </div>
             <div
-              ref="pdfViewportEl"
-              class="pdf-viewport"
-              data-test="pdf-viewport"
-              @mousedown="pdfPanStart"
-              @mousemove="pdfPanMove"
-              @mouseup="pdfPanEnd"
-              @mouseleave="pdfPanEnd"
-              @wheel.prevent="pdfWheel"
+              ref="mediaViewportEl"
+              class="media-viewport"
+              data-test="media-viewport"
+              @mousedown="mediaPanStart"
+              @mousemove="mediaPanMove"
+              @mouseup="mediaPanEnd"
+              @mouseleave="mediaPanEnd"
+              @wheel.prevent="mediaWheel"
             >
-              <div class="pdf-stage" :style="{ transform: 'scale(' + pdfZoom + ')' }">
+              <div class="media-stage" :style="mediaStageStyle" :data-test="'media-stage-' + previewType">
                 <iframe
+                  v-if="previewType === 'pdf'"
                   :src="sourceUrl"
-                  class="preview-frame"
+                  class="media-frame"
                   data-test="source-preview-pdf"
                   title="PDF 预览"
                 ></iframe>
+                <img
+                  v-else
+                  :src="sourceUrl"
+                  class="media-frame"
+                  data-test="source-preview-image"
+                  alt="文件预览"
+                  @load="onMediaImageLoad"
+                />
               </div>
             </div>
           </div>
-          <img v-else-if="previewType === 'image'" :src="sourceUrl" class="preview-image" data-test="source-preview-image" alt="文件预览" />
+
           <div v-else-if="sourceLoading" class="reading-state">正在读取文件…</div>
           <div v-else class="reading-state" data-test="metadata-only-notice">
             <strong>{{ metadataTitle }}</strong>
@@ -192,47 +201,79 @@ const previewType = computed(() => {
 })
 const sourceUrl = ref('')
 const sourceLoading = ref(false)
-const pdfZoom = ref(1)
-const pdfViewportEl = ref<HTMLElement | null>(null)
-const pdfPan = { active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 }
+const mediaZoom = ref(1)
+const mediaViewportEl = ref<HTMLElement | null>(null)
+const mediaBase = ref<{ w: number; h: number } | null>(null)
+const mediaPan = { active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 }
 const BASE_PDF_W = 794
 const BASE_PDF_H = 1123
+const MIN_ZOOM = 0.2
+const MAX_ZOOM = 5
 
-function pdfFit() {
-  const el = pdfViewportEl.value
-  if (!el) return
-  const scale = Math.min(el.clientWidth / BASE_PDF_W, el.clientHeight / BASE_PDF_H)
-  pdfZoom.value = Math.max(0.4, Math.min(2, Number(scale.toFixed(2))))
+const mediaStageStyle = computed(() => {
+  const base = mediaBase.value
+  if (!base) return {}
+  return { width: Math.round(base.w * mediaZoom.value) + 'px', height: Math.round(base.h * mediaZoom.value) + 'px' }
+})
+
+/** 舞台尺寸随缩放变化（不用 CSS transform，滚动区与实际页面一致，放大后不丢图）。 */
+function ensureMediaBase() {
+  if (previewType.value === 'pdf') {
+    mediaBase.value = { w: BASE_PDF_W, h: BASE_PDF_H }
+    return
+  }
+  if (!mediaBase.value) {
+    // 图片自然尺寸由 onload 设置
+    mediaBase.value = { w: 800, h: 600 }
+  }
 }
 
-function pdfWheel(event: WheelEvent) {
+function onMediaImageLoad(event: Event) {
+  const img = event.target as HTMLImageElement
+  if (img.naturalWidth && img.naturalHeight) {
+    mediaBase.value = { w: img.naturalWidth, h: img.naturalHeight }
+    fitMedia()
+  }
+}
+
+function fitMedia() {
+  ensureMediaBase()
+  const el = mediaViewportEl.value
+  const base = mediaBase.value
+  if (!el || !base) return
+  // 同时适配宽与高（取两者较小比例），不再只贴竖直方向
+  const scale = Math.min(el.clientWidth / base.w, el.clientHeight / base.h)
+  mediaZoom.value = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(scale.toFixed(2))))
+}
+
+function mediaWheel(event: WheelEvent) {
   if (!event.ctrlKey) return
   const delta = event.deltaY < 0 ? 0.1 : -0.1
-  pdfZoom.value = Math.min(3, Math.max(0.4, Number((pdfZoom.value + delta).toFixed(2))))
+  mediaZoom.value = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number((mediaZoom.value + delta).toFixed(2))))
 }
 
-function pdfPanStart(event: MouseEvent) {
-  const el = pdfViewportEl.value
+function mediaPanStart(event: MouseEvent) {
+  const el = mediaViewportEl.value
   if (!el || event.button !== 0) return
-  pdfPan.active = true
-  pdfPan.startX = event.clientX
-  pdfPan.startY = event.clientY
-  pdfPan.scrollLeft = el.scrollLeft
-  pdfPan.scrollTop = el.scrollTop
+  mediaPan.active = true
+  mediaPan.startX = event.clientX
+  mediaPan.startY = event.clientY
+  mediaPan.scrollLeft = el.scrollLeft
+  mediaPan.scrollTop = el.scrollTop
   el.classList.add('panning')
 }
 
-function pdfPanMove(event: MouseEvent) {
-  if (!pdfPan.active) return
-  const el = pdfViewportEl.value
+function mediaPanMove(event: MouseEvent) {
+  if (!mediaPan.active) return
+  const el = mediaViewportEl.value
   if (!el) return
-  el.scrollLeft = pdfPan.scrollLeft - (event.clientX - pdfPan.startX)
-  el.scrollTop = pdfPan.scrollTop - (event.clientY - pdfPan.startY)
+  el.scrollLeft = mediaPan.scrollLeft - (event.clientX - mediaPan.startX)
+  el.scrollTop = mediaPan.scrollTop - (event.clientY - mediaPan.startY)
 }
 
-function pdfPanEnd() {
-  pdfPan.active = false
-  pdfViewportEl.value?.classList.remove('panning')
+function mediaPanEnd() {
+  mediaPan.active = false
+  mediaViewportEl.value?.classList.remove('panning')
 }
 const metadataTitle = computed(() => {
   const ext = props.document?.sourceExtension?.toLowerCase()
@@ -369,6 +410,9 @@ async function loadSourcePreview() {
     const url = await loadKnowledgeSourceBlob(props.document.id)
     if (sourceUrl.value) URL.revokeObjectURL(sourceUrl.value)
     sourceUrl.value = url
+    mediaZoom.value = 1
+    ensureMediaBase()
+    void nextTick(() => fitMedia())
   } catch {
     // 预览失败保留诚实提示
   } finally {
@@ -504,15 +548,14 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .editor-hint{margin:0 38px 12px;font-size:12.5px;color:var(--danger)}
 .editor-error{margin:0 38px 14px;font-size:12.5px;color:var(--danger)}
 .source-preview{display:flex;flex-direction:column;height:100%;min-height:0;padding:0}
-.pdf-viewer{display:flex;flex-direction:column;height:100%;min-height:0}
-.pdf-toolbar{flex:none;display:flex;align-items:center;gap:6px;padding:7px 34px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
-.pdf-btn{min-width:28px;height:24px;border:1px solid var(--border-default);border-radius:6px;background:transparent;color:var(--copy);font-size:13px;cursor:pointer;line-height:1}
-.pdf-btn:hover{border-color:var(--brand);color:var(--brand)}
-.pdf-zoom-label{min-width:48px;text-align:center;font-size:12px;color:var(--muted)}
-.pdf-hint{margin-left:auto;font-size:11px;color:var(--muted)}
-.pdf-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-subtle)}
-.pdf-viewport.panning{cursor:grabbing;user-select:none}
-.pdf-stage{transform-origin:top left;width:794px;height:1123px}
-.preview-frame{width:100%;height:100%;border:0;background:#fff;pointer-events:none}
-.preview-image{max-width:100%;max-height:100%;object-fit:contain;margin:0 auto;display:block}
+.media-viewer{display:flex;flex-direction:column;height:100%;min-height:0}
+.media-toolbar{flex:none;display:flex;align-items:center;gap:6px;padding:7px 34px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
+.media-btn{min-width:28px;height:24px;border:1px solid var(--border-default);border-radius:6px;background:transparent;color:var(--copy);font-size:13px;cursor:pointer;line-height:1}
+.media-btn:hover{border-color:var(--brand);color:var(--brand)}
+.media-zoom-label{min-width:48px;text-align:center;font-size:12px;color:var(--muted)}
+.media-hint{margin-left:auto;font-size:11px;color:var(--muted)}
+.media-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-subtle)}
+.media-viewport.panning{cursor:grabbing;user-select:none}
+.media-stage{position:relative}
+.media-frame{display:block;width:100%;height:100%;border:0;background:#fff;pointer-events:none;object-fit:contain}
 </style>
