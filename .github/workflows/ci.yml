@@ -119,7 +119,6 @@ jobs:
       - name: Read tag message for release notes
         shell: bash
         run: |
-          git fetch --depth=1 origin tag ${{ github.ref_name }}
           git tag -l --format='%(contents)' ${{ github.ref_name }} > release-notes.md
           echo "notes bytes: $(wc -c < release-notes.md)"
       - name: Create Release
