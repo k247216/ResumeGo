@@ -72,15 +72,31 @@
           </div>
           <div v-else class="edit-column" data-test="edit-column">
             <div class="md-toolbar" data-test="md-toolbar" role="toolbar" aria-label="Markdown 格式">
-              <button type="button" class="fmt-btn" title="加粗" aria-label="加粗" data-test="fmt-bold" @mousedown.prevent="applyFormat('**', '**', '加粗文字')">B</button>
-              <button type="button" class="fmt-btn italic" title="斜体" aria-label="斜体" data-test="fmt-italic" @mousedown.prevent="applyFormat('*', '*', '斜体文字')">I</button>
+              <span class="fmt-group" role="group">
+                <button type="button" class="fmt-btn" title="加粗" aria-label="加粗" data-test="fmt-bold" @mousedown.prevent="applyFormat('**', '**', '加粗文字')">B</button>
+                <button type="button" class="fmt-btn" title="斜体" aria-label="斜体" data-test="fmt-italic" @mousedown.prevent="applyFormat('*', '*', '斜体文字')">I</button>
+                <button type="button" class="fmt-btn" title="删除线" aria-label="删除线" data-test="fmt-strike" @mousedown.prevent="applyFormat('~~', '~~', '删除线文字')">S</button>
+              </span>
               <span class="fmt-sep" aria-hidden="true"></span>
-              <button type="button" class="fmt-btn" title="标题" aria-label="标题" data-test="fmt-heading" @mousedown.prevent="applyFormat('## ', '', '标题')">H</button>
-              <button type="button" class="fmt-btn" title="无序列表" aria-label="无序列表" data-test="fmt-list" @mousedown.prevent="applyFormat('- ', '', '列表项')">• 列表</button>
-              <button type="button" class="fmt-btn" title="引用" aria-label="引用" data-test="fmt-quote" @mousedown.prevent="applyFormat('> ', '', '引用文字')">❝ 引用</button>
+              <span class="fmt-group" role="group">
+                <button type="button" class="fmt-btn" title="一级标题" aria-label="一级标题" data-test="fmt-h1" @mousedown.prevent="applyFormat('# ', '', '标题')">H1</button>
+                <button type="button" class="fmt-btn" title="二级标题" aria-label="二级标题" data-test="fmt-h2" @mousedown.prevent="applyFormat('## ', '', '标题')">H2</button>
+                <button type="button" class="fmt-btn" title="三级标题" aria-label="三级标题" data-test="fmt-h3" @mousedown.prevent="applyFormat('### ', '', '标题')">H3</button>
+              </span>
               <span class="fmt-sep" aria-hidden="true"></span>
-              <button type="button" class="fmt-btn" title="行内代码" aria-label="行内代码" data-test="fmt-code" @mousedown.prevent="applyFormat('`', '`', '代码')">code</button>
-              <button type="button" class="fmt-btn" title="代码块" aria-label="代码块" data-test="fmt-codeblock" @mousedown.prevent="applyFormat('```\n', '\n```', '代码')">代码块</button>
+              <span class="fmt-group" role="group">
+                <button type="button" class="fmt-btn" title="无序列表" aria-label="无序列表" data-test="fmt-list" @mousedown.prevent="applyFormat('- ', '', '列表项')">•</button>
+                <button type="button" class="fmt-btn" title="有序列表" aria-label="有序列表" data-test="fmt-ol" @mousedown.prevent="applyFormat('1. ', '', '列表项')">1.</button>
+                <button type="button" class="fmt-btn" title="任务列表" aria-label="任务列表" data-test="fmt-task" @mousedown.prevent="applyFormat('- [ ] ', '', '任务')">☑</button>
+              </span>
+              <span class="fmt-sep" aria-hidden="true"></span>
+              <span class="fmt-group" role="group">
+                <button type="button" class="fmt-btn" title="引用" aria-label="引用" data-test="fmt-quote" @mousedown.prevent="applyFormat('> ', '', '引用文字')">❝</button>
+                <button type="button" class="fmt-btn" title="行内代码" aria-label="行内代码" data-test="fmt-code" @mousedown.prevent="applyFormat('`', '`', '代码')">&lt;/&gt;</button>
+                <button type="button" class="fmt-btn" title="代码块" aria-label="代码块" data-test="fmt-codeblock" @mousedown.prevent="applyFormat('```\n', '\n```', '代码')">代码块</button>
+                <button type="button" class="fmt-btn" title="链接" aria-label="链接" data-test="fmt-link" @mousedown.prevent="applyFormat('[', '](https://)', '链接文字')">🔗</button>
+                <button type="button" class="fmt-btn" title="分隔线" aria-label="分隔线" data-test="fmt-hr" @mousedown.prevent="applyFormat('\n---\n', '', '')">—</button>
+              </span>
             </div>
             <textarea
               v-model="draft"
@@ -413,12 +429,12 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .document-view{padding:26px 38px 60px;min-height:100%;box-sizing:border-box}
 /* 编辑阶段：源码 + 实时预览（Obsidian 式双阶段） */
 .edit-column{display:flex;flex-direction:column;height:100%;min-height:0}
-.md-toolbar{flex:none;display:flex;align-items:center;gap:2px;padding:8px 34px 6px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
-.fmt-btn{border:0;background:transparent;color:var(--copy);font-size:12.5px;font-weight:700;height:26px;padding:0 8px;border-radius:6px;cursor:pointer;font-family:inherit}
-.fmt-btn.italic{font-style:italic;font-weight:600}
+.md-toolbar{flex:none;display:flex;align-items:center;gap:0;padding:7px 34px 5px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
+.fmt-group{display:inline-flex;align-items:center;gap:1px}
+.fmt-btn{border:0;background:transparent;color:var(--muted);font-size:11.5px;font-weight:500;min-width:26px;height:24px;padding:0 6px;border-radius:5px;cursor:pointer;font-family:inherit;line-height:1;transition:background .12s ease,color .12s ease}
 .fmt-btn:hover{background:var(--bg-hover);color:var(--ink)}
 .fmt-btn:active{background:var(--brand-soft);color:var(--brand)}
-.fmt-sep{width:1px;height:14px;background:var(--border-subtle);margin:0 6px}
+.fmt-sep{width:1px;height:14px;background:var(--border-subtle);margin:0 7px;flex:none}
 .body-editor{box-sizing:border-box;display:block;width:100%;flex:1;min-height:0;padding:22px 38px 40px;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
 .body-editor:disabled{opacity:.7}
 .body-editor::placeholder{color:var(--muted);font-size:14px;font-weight:450}

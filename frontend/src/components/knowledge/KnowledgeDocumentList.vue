@@ -3,9 +3,16 @@
       <div class="list-head">
         <strong>{{ scopeLabel }}</strong>
         <span class="list-actions">
-          <button type="button" class="list-sort" data-test="doc-list-sort" @click="toggleSort">
-            更新时间 {{ sortDesc ? '↓' : '↑' }}
-          </button>
+          <template v-if="selectedDocIds.size">
+            <span class="bulk-count" data-test="bulk-count">已选 {{ selectedDocIds.size }} 项</span>
+            <button type="button" class="list-sort danger" data-test="bulk-delete" @click="$emit('bulk-delete')">删除</button>
+            <button type="button" class="list-sort" data-test="bulk-clear" @click="$emit('clear-selection')">取消</button>
+          </template>
+          <template v-else>
+            <button type="button" class="list-sort" data-test="doc-list-sort" @click="toggleSort">
+              更新时间 {{ sortDesc ? '↓' : '↑' }}
+            </button>
+          </template>
           <button type="button" class="list-collapse" data-test="doc-list-collapse" aria-label="收起资料列表" @click="$emit('close')"><el-icon><ArrowLeft /></el-icon></button>
         </span>
       </div>
@@ -33,10 +40,18 @@
           <button
             type="button"
             class="row"
-            :class="{ selected: item.document.id === selectedId }"
+            :class="{ selected: item.document.id === selectedId, checked: selectedDocIds.has(item.document.id) }"
             :data-test="'doc-row-' + item.document.id"
             @click="$emit('select', item.document.id)"
           >
+            <span
+              class="row-check"
+              :class="{ on: selectedDocIds.has(item.document.id) }"
+              :data-test="'doc-check-' + item.document.id"
+              role="checkbox"
+              :aria-checked="selectedDocIds.has(item.document.id)"
+              @click.stop="$emit('toggle-select', item.document.id)"
+            ><el-icon v-if="selectedDocIds.has(item.document.id)" :size="12"><Check /></el-icon></span>
             <span class="file-visual" :class="'type-' + iconType(item.document)">
               <el-icon class="row-icon" :data-type="iconType(item.document)">
                 <component :is="iconOf(item.document)" />
@@ -66,11 +81,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowLeft, Document, DocumentCopy, Notebook } from '@element-plus/icons-vue'
+import { ArrowLeft, Check, Document, DocumentCopy, Notebook } from '@element-plus/icons-vue'
 import { knowledgeStatusLabel } from './status'
 import type { KnowledgeDocument, KnowledgeSearchItem } from '../../types/knowledge'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   documents: KnowledgeDocument[]
   results: KnowledgeSearchItem[]
   hasSearch: boolean
@@ -81,7 +96,11 @@ const props = defineProps<{
   classificationByDocumentId: Record<number, { category: { id: number; name: string } | null; tags: { id: number; name: string }[] }>
   categoryPaths: Record<number, string>
   activeTagId?: number | null
-}>()
+  selectedDocIds?: Set<number>
+}>(), {
+  activeTagId: null,
+  selectedDocIds: () => new Set<number>(),
+})
 
 const sortDesc = ref(true)
 
@@ -95,6 +114,9 @@ defineEmits<{
   (e: 'retry'): void
   (e: 'retry-search'): void
   (e: 'retry-doc', id: number): void
+  (e: 'toggle-select', id: number): void
+  (e: 'clear-selection'): void
+  (e: 'bulk-delete'): void
 }>()
 
 const rows = computed(() => {
@@ -181,6 +203,14 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 .row-main{grid-column:2;grid-row:1}
 .row-location,.row-snippet{grid-column:2;grid-row:2;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-side{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.row{position:relative}
+.row-check{position:absolute;left:6px;top:50%;transform:translateY(-50%);display:grid;width:16px;height:16px;place-items:center;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface-solid);color:#fff;cursor:pointer;opacity:0;transition:opacity .12s ease;z-index:2}
+.row:hover .row-check,.row.checked .row-check{opacity:1}
+.row-check.on{opacity:1;background:var(--brand);border-color:var(--brand)}
+.bulk-count{font-size:11.5px;color:var(--brand);font-weight:600}
+.list-sort.danger{color:var(--danger)}
+.list-sort.danger:hover{color:var(--danger)}
+.row.checked{background:var(--brand-soft)}
 .row:hover{background:var(--bg-hover)}
 .row.selected{background:var(--bg-selected);box-shadow:inset 2px 0 0 var(--brand)}
 .file-visual{position:relative;display:grid;width:28px;height:30px;place-items:start center;color:var(--type-color,var(--copy))}

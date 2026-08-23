@@ -11,6 +11,15 @@
             <button type="button" class="nav-action" data-test="navigator-close" title="收起资料库" aria-label="收起资料库" @click="$emit('close')"><el-icon :size="14"><ArrowLeft /></el-icon></button>
           </span>
         </div>
+        <button
+          type="button"
+          class="all-docs"
+          :class="{ active: selectedId == null && activeTagId == null }"
+          data-test="navigator-all-docs"
+          @click="$emit('select-folder', null)"
+        >
+          <el-icon :size="15"><Files /></el-icon><span>全部资料</span>
+        </button>
         <p v-if="treeError" class="nav-error" data-test="navigator-tree-error">
           {{ treeError }}
           <button type="button" class="text-btn" data-test="navigator-tree-retry" @click="$emit('retry-tree')">重试</button>
@@ -50,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, Delete, EditPen, FolderAdd, FolderOpened, PriceTag } from '@element-plus/icons-vue'
+import { ArrowLeft, Delete, EditPen, Files, FolderAdd, FolderOpened, PriceTag } from '@element-plus/icons-vue'
 import KnowledgeFolderTree from './KnowledgeFolderTree.vue'
 import type { KnowledgeCategoryNode, KnowledgeTag } from '../../types/knowledge'
 
@@ -68,7 +77,7 @@ defineEmits<{
   (e: 'close'): void
   (e: 'new-folder'): void
   (e: 'toggle-folder', id: number): void
-  (e: 'select-folder', id: number): void
+  (e: 'select-folder', id: number | null): void
   (e: 'new-child', parentId: number | null): void
   (e: 'rename-folder', id: number): void
   (e: 'move-folder', id: number): void
@@ -94,8 +103,13 @@ defineEmits<{
 .nav-action:disabled{opacity:.35;cursor:not-allowed}
 .nav-action:disabled:hover{background:transparent;color:var(--muted)}
 .nav-action.danger:hover{color:var(--danger);background:var(--danger-soft)}
+.all-docs{display:flex;align-items:center;gap:8px;height:30px;margin:0 4px 6px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--ink);font-size:14px;font-weight:450;text-align:left;cursor:pointer;width:calc(100% - 8px);transition:background .12s ease,color .12s ease}
+.all-docs .el-icon{flex:none;color:var(--muted)}
+.all-docs:hover{background:var(--bg-hover)}
+.all-docs.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.all-docs.active .el-icon{color:var(--brand)}
 .tag-list{list-style:none;margin:0;padding:0 4px;display:flex;flex-direction:column;gap:1px}
-.tag-item{display:flex;align-items:center;gap:8px;height:30px;border:0;background:transparent;color:var(--ink);font-size:14px;text-align:left;padding:0 10px;border-radius:7px;cursor:pointer;width:100%;transition:background .12s ease,color .12s ease}
+.tag-item{display:flex;align-items:center;gap:8px;height:30px;border:0;background:transparent;color:var(--ink);font-size:14px;font-weight:450;text-align:left;padding:0 10px;border-radius:7px;cursor:pointer;width:100%;transition:background .12s ease,color .12s ease}
 .tag-icon{flex:none;color:var(--muted)}
 .tag-item:hover{background:var(--bg-hover)}
 .tag-item.active{background:var(--brand-soft);color:var(--brand);font-weight:600}

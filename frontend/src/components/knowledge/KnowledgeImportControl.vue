@@ -14,7 +14,6 @@
       ref="input"
       type="file"
       class="hidden-input"
-      accept=".md,.txt,text/plain,text/markdown"
       data-test="knowledge-file-input"
       @change="onChange"
     />

@@ -52,6 +52,10 @@
         :classification-by-document-id="store.classificationByDocumentId"
         :category-paths="categoryPaths"
         :active-tag-id="activeTagId"
+        :selected-doc-ids="selectedDocIds"
+        @toggle-select="toggleDocSelect"
+        @clear-selection="clearDocSelection"
+        @bulk-delete="openBatchDelete"
         @close="closeDocumentList"
         @select="handleSelectDocument"
         @retry="store.retry"
@@ -115,13 +119,15 @@
       @submit="handleFolderSubmit"
     />
     <KnowledgeDeleteDialog
-      v-if="deleteOpen"
-      :impact="selectedImpact"
-      :loading="impactLoading"
-      :deleting="store.deletingDocumentId != null"
-      :error="selectedDeleteError"
-      @close="deleteOpen = false"
-      @confirm="handleDeleteConfirm"
+      v-if="deleteOpen || bulkDeleteOpen"
+      :impact="bulkDeleteOpen ? null : selectedImpact"
+      :loading="bulkDeleteOpen ? bulkImpactLoading : impactLoading"
+      :deleting="bulkDeleteOpen ? bulkDeleting : store.deletingDocumentId != null"
+      :error="bulkDeleteOpen ? bulkDeleteError : selectedDeleteError"
+      :bulk="bulkDeleteOpen"
+      :bulk-count="selectedDocIds.size"
+      @close="bulkDeleteOpen ? (bulkDeleteOpen = false) : (deleteOpen = false)"
+      @confirm="onDeleteConfirm"
     />
   </section>
 </template>
@@ -184,6 +190,12 @@ const impactLoading = ref(false)
 const folderBusy = ref(false)
 const folderDialog = ref<{ kind: 'create'; id: number | null; name: string; parentId: number | null; excludedIds: number[] } | null>(null)
 const renamingFolderId = ref<number | null>(null)
+const selectedDocIds = ref<Set<number>>(new Set())
+const bulkDeleteOpen = ref(false)
+const bulkImpactLoading = ref(false)
+const bulkDeleting = ref(false)
+const bulkDeleteError = ref('')
+const bulkTokens = ref<Record<number, string>>({})
 const viewportWidth = ref(window.innerWidth)
 
 const hasSearch = computed(() => store.searchQuery.trim().length > 0)
@@ -323,9 +335,13 @@ function openInspector() {
   writePaneState()
 }
 
-function selectFolder(id: number) {
+function selectFolder(id: number | null) {
   selectedFolderId.value = id
   activeTagId.value = null
+  if (id == null) {
+    store.browseAll()
+    return
+  }
   if (hasSearch.value) {
     store.setSearchFilter('category', id)
   } else {
@@ -524,6 +540,14 @@ async function openDelete() {
   }
 }
 
+function onDeleteConfirm(token: string) {
+  if (bulkDeleteOpen.value) {
+    void confirmBatchDelete()
+  } else {
+    void handleDeleteConfirm(token)
+  }
+}
+
 async function handleDeleteConfirm(token: string) {
   const id = store.selectedDocumentId
   if (id == null) return
@@ -532,6 +556,67 @@ async function handleDeleteConfirm(token: string) {
     deleteOpen.value = false
   } catch {
     // 错误在 store.deleteErrorMessage；失败时文档保持列表
+  }
+}
+
+// ---- 多选 + 批量删除 ----
+
+function toggleDocSelect(id: number) {
+  const next = new Set(selectedDocIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedDocIds.value = next
+}
+
+function clearDocSelection() {
+  selectedDocIds.value = new Set()
+}
+
+async function openBatchDelete() {
+  const ids = [...selectedDocIds.value]
+  if (!ids.length) return
+  bulkDeleteError.value = ''
+  bulkDeleteOpen.value = true
+  bulkImpactLoading.value = true
+  try {
+    const tokens: Record<number, string> = {}
+    for (const id of ids) {
+      try {
+        const impact = await store.loadDeletionImpact(id)
+        tokens[id] = impact.confirmationToken
+      } catch {
+        // 单个影响读取失败：跳过该文档（真实错误会在删除时体现）
+      }
+    }
+    bulkTokens.value = tokens
+  } finally {
+    bulkImpactLoading.value = false
+  }
+}
+
+async function confirmBatchDelete() {
+  const ids = [...selectedDocIds.value]
+  bulkDeleting.value = true
+  bulkDeleteError.value = ''
+  const failed: number[] = []
+  for (const id of ids) {
+    const token = bulkTokens.value[id]
+    if (!token) {
+      failed.push(id)
+      continue
+    }
+    try {
+      await store.deleteDocument(id, token)
+    } catch {
+      failed.push(id)
+    }
+  }
+  bulkDeleting.value = false
+  selectedDocIds.value = new Set()
+  if (failed.length) {
+    bulkDeleteError.value = `${failed.length} 项删除失败，其余已删除`
+  } else {
+    bulkDeleteOpen.value = false
   }
 }
 

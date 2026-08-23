@@ -122,7 +122,7 @@ function cancelRename() {
 .tree-toggle{display:grid;place-items:center;border:0;background:transparent;color:var(--muted);width:16px;height:18px;padding:0;cursor:pointer;flex:none;border-radius:5px}
 .tree-toggle:hover{background:var(--bg-hover);color:var(--ink)}
 .tree-toggle-placeholder{cursor:default}
-.tree-name{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);flex:1;min-width:0;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap}
+.tree-name{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);flex:1;min-width:0;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;font-size:14px}
 .tree-name span{overflow:hidden;text-overflow:ellipsis}
 .tree-name-input{flex:1;min-width:0;height:22px;padding:0 6px;border:1px solid var(--brand);border-radius:6px;background:var(--surface-solid);color:var(--ink);font:inherit;font-size:13.5px;outline:0;box-shadow:0 0 0 2px var(--brand-soft)}
 .folder-icon{flex:none;color:var(--muted)}

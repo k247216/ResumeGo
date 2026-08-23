@@ -20,6 +20,15 @@ describe('KnowledgeMarkdownView', () => {
     expect(wrapper.text()).not.toContain('# 技术知识')
   })
 
+  it('shows a language label and syntax-colored tokens in fenced code', () => {
+    const fence = String.fromCharCode(96).repeat(3)
+    const wrapper = mountMd(fence + 'ts' + NL + 'const x = 1 // 注释' + NL + fence)
+    expect(wrapper.find('.md-code-head').text()).toBe('TypeScript')
+    expect(wrapper.find('.tok-keyword').text()).toBe('const')
+    expect(wrapper.find('.tok-number').text()).toBe('1')
+    expect(wrapper.find('.tok-comment').text()).toBe('// 注释')
+  })
+
   it('renders code blocks verbatim', () => {
     const fence = String.fromCharCode(96).repeat(3)
     const wrapper = mountMd('## 示例' + NL + NL + fence + NL + 'text' + NL + fence)

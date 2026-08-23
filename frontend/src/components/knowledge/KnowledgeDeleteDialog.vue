@@ -1,16 +1,24 @@
 <template>
   <div class="dialog-mask" data-test="knowledge-delete-dialog" @click.self="$emit('close')">
     <form class="dialog" @submit.prevent="confirm">
-      <h3>彻底删除「{{ impact?.title ?? '该资料' }}」？</h3>
-      <p class="impact" data-test="delete-impact">
-        将删除：
-        <span v-if="impact?.hasContent">已提取正文；</span>
-        <span v-if="impact?.hasSource">受管原文件；</span>
-        <span v-if="impact?.hasCategory">分类关联；</span>
-        <span v-if="impact?.hasTags">标签关联；</span>
-        <span v-if="!impact?.hasContent && !impact?.hasSource && !impact?.hasCategory && !impact?.hasTags">无关联派生数据；</span>
-        此操作不可恢复。
-      </p>
+      <template v-if="bulk">
+        <h3>彻底删除选中的 {{ bulkCount }} 个资料？</h3>
+        <p class="impact" data-test="delete-impact">
+          将删除选中的 {{ bulkCount }} 个资料及其受管副本、正文、分类与标签关联。此操作不可恢复。
+        </p>
+      </template>
+      <template v-else>
+        <h3>彻底删除「{{ impact?.title ?? '该资料' }}」？</h3>
+        <p class="impact" data-test="delete-impact">
+          将删除：
+          <span v-if="impact?.hasContent">已提取正文；</span>
+          <span v-if="impact?.hasSource">受管原文件；</span>
+          <span v-if="impact?.hasCategory">分类关联；</span>
+          <span v-if="impact?.hasTags">标签关联；</span>
+          <span v-if="!impact?.hasContent && !impact?.hasSource && !impact?.hasCategory && !impact?.hasTags">无关联派生数据；</span>
+          此操作不可恢复。
+        </p>
+      </template>
       <label class="field">
         <span>输入「删除」确认</span>
         <input v-model="confirmText" type="text" data-test="delete-confirm-input" :disabled="deleting" placeholder="删除" />
@@ -19,7 +27,7 @@
       <p v-if="error" class="error" data-test="delete-dialog-error">{{ error }}</p>
       <div class="actions">
         <button type="button" class="ghost" data-test="delete-cancel" :disabled="deleting" @click="$emit('close')">取消</button>
-        <button type="submit" class="primary danger" data-test="delete-confirm" :disabled="deleting || confirmText !== '删除' || !impact">
+        <button type="submit" class="primary danger" data-test="delete-confirm" :disabled="deleting || confirmText !== '删除' || (!impact && !bulk)">
           {{ deleting ? '删除中…' : '确认删除' }}
         </button>
       </div>
@@ -36,6 +44,8 @@ const props = defineProps<{
   loading: boolean
   deleting: boolean
   error: string
+  bulk?: boolean
+  bulkCount?: number
 }>()
 
 const emit = defineEmits<{ (e: 'close'): void; (e: 'confirm', token: string): void }>()
@@ -47,8 +57,8 @@ watch(() => props.impact?.confirmationToken, () => {
 })
 
 function confirm() {
-  if (!props.impact || confirmText.value !== '删除' || props.deleting) return
-  emit('confirm', props.impact.confirmationToken)
+  if ((!props.impact && !props.bulk) || confirmText.value !== '删除' || props.deleting) return
+  emit('confirm', props.impact?.confirmationToken ?? '')
 }
 </script>
 

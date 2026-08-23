@@ -62,6 +62,13 @@ describe('KnowledgeDocumentList', () => {
     expect(wrapper.get('[data-test="file-type-1"]').classes()).toContain('type-pdf')
   })
 
+  it('toggles row selection and shows the bulk bar', async () => {
+    const wrapper = mountList({ documents: [doc(1, 'COMPLETED'), doc(2, 'COMPLETED')] })
+    expect(wrapper.find('[data-test="bulk-count"]').exists()).toBe(false)
+    await wrapper.get('[data-test="doc-check-1"]').trigger('click')
+    expect(wrapper.emitted('toggle-select')).toEqual([[1]])
+  })
+
   it('selects a row', async () => {
     const wrapper = mountList({ documents: [doc(1, 'COMPLETED')] })
     await wrapper.get('[data-test="doc-row-1"]').trigger('click')
