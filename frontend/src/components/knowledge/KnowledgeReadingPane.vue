@@ -56,7 +56,9 @@
               <span class="media-zoom-label" data-test="media-zoom-label">{{ Math.round(mediaZoom * 100) }}%</span>
               <button type="button" class="media-btn" data-test="media-zoom-in" @click="mediaZoom += 0.25">＋</button>
               <button type="button" class="media-btn" data-test="media-fit" @click="fitMedia">适应</button>
-              <span class="media-hint">按住拖拽平移 · Ctrl+滚轮缩放</span>
+              <span class="media-sep" aria-hidden="true"></span>
+              <button type="button" class="media-btn" data-test="media-open-external" @click="openInExternal">在其他软件打开</button>
+              <span class="media-hint">{{ externalMessage || '按住拖拽平移 · Ctrl+滚轮缩放' }}</span>
             </div>
             <div
               ref="mediaViewportEl"
@@ -287,6 +289,18 @@ function mediaPanMove(event: MouseEvent) {
 function mediaPanEnd() {
   mediaPan.active = false
   mediaViewportEl.value?.classList.remove('panning')
+}
+
+const externalMessage = ref('')
+
+/** 在其他软件中打开受管副本（桌面端走默认应用；浏览器开发模式诚实提示不可用）。 */
+async function openInExternal() {
+  const id = props.document?.id
+  if (id == null) return
+  const { openKnowledgeSource } = await import('../../api/knowledgeDesktop')
+  const result = await openKnowledgeSource(id)
+  externalMessage.value = result.ok ? '已在其他软件中打开' : (result.message ?? '无法打开')
+  window.setTimeout(() => { externalMessage.value = '' }, 4000)
 }
 const metadataTitle = computed(() => {
   const ext = props.document?.sourceExtension?.toLowerCase()
@@ -567,7 +581,8 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .media-btn:hover{border-color:var(--brand);color:var(--brand)}
 .media-zoom-label{min-width:48px;text-align:center;font-size:12px;color:var(--muted)}
 .media-hint{margin-left:auto;font-size:11px;color:var(--muted)}
-.media-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-subtle)}
+.media-sep{width:1px;height:14px;background:var(--border-subtle);margin:0 6px}
+.media-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-solid)}
 .media-viewport.panning{cursor:grabbing;user-select:none}
 .media-stage{position:relative}
 .media-frame{display:block;width:100%;height:100%;border:0;background:#fff;pointer-events:none;object-fit:contain}
