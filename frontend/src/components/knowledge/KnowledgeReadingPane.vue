@@ -72,7 +72,8 @@
                 <iframe
                   v-if="previewType === 'pdf'"
                   :src="sourceUrl"
-                  class="media-frame"
+                  class="media-frame pdf-frame"
+                  :style="mediaFrameStyle"
                   data-test="source-preview-pdf"
                   title="PDF 预览"
                 ></iframe>
@@ -214,6 +215,18 @@ const mediaStageStyle = computed(() => {
   const base = mediaBase.value
   if (!base) return {}
   return { width: Math.round(base.w * mediaZoom.value) + 'px', height: Math.round(base.h * mediaZoom.value) + 'px' }
+})
+
+/** PDF：iframe 固定基础分辨率，缩放用 CSS transform（插件只渲染一次，缩放平滑且不重绘，与 PNG 一致）。 */
+const mediaFrameStyle = computed(() => {
+  const base = mediaBase.value
+  if (previewType.value !== 'pdf' || !base) return {}
+  return {
+    width: base.w + 'px',
+    height: base.h + 'px',
+    transform: 'scale(' + mediaZoom.value + ')',
+    transformOrigin: 'top left',
+  }
 })
 
 /** 舞台尺寸随缩放变化（不用 CSS transform，滚动区与实际页面一致，放大后不丢图）。 */
@@ -558,4 +571,5 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .media-viewport.panning{cursor:grabbing;user-select:none}
 .media-stage{position:relative}
 .media-frame{display:block;width:100%;height:100%;border:0;background:#fff;pointer-events:none;object-fit:contain}
+.pdf-frame{position:absolute;top:0;left:0}
 </style>
