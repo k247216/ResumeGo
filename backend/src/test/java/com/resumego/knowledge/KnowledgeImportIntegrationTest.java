@@ -227,6 +227,33 @@ class KnowledgeImportIntegrationTest {
         assertThat(sha).isNotBlank();
     }
 
+    @Test
+    void importsPptxExtractingSlideText() throws Exception {
+        byte[] pptx = pptxBytes(new String[]{"第一页标题", "第二页要点"});
+        KnowledgeImportResponse response = service.importFile(
+                new MockMultipartFile("file", "汇报.pptx",
+                        "application/vnd.openxmlformats-officedocument.presentationml.presentation", pptx));
+
+        assertThat(response.processingStatus()).isEqualTo("COMPLETED");
+        Map<String, Object> content = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_extracted_contents WHERE document_id = ?", response.documentId());
+        assertThat(String.valueOf(content.get("content"))).contains("第一页标题");
+        assertThat(String.valueOf(content.get("content"))).contains("第二页要点");
+    }
+
+    private static byte[] pptxBytes(String[] slides) throws java.io.IOException {
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+            for (int i = 0; i < slides.length; i++) {
+                zip.putNextEntry(new java.util.zip.ZipEntry("ppt/slides/slide" + (i + 1) + ".xml"));
+                zip.write(("<p:sld xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>"
+                        + slides[i] + "</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>").getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
     private static byte[] docxBytes(String[] paragraphs) throws java.io.IOException {
         var bytes = new java.io.ByteArrayOutputStream();
         try (var zip = new java.util.zip.ZipOutputStream(bytes)) {

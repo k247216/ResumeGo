@@ -50,13 +50,34 @@
 
         <!-- 仅收录元数据（PDF/图片等）：文件内预览；无法预览的类型给出诚实提示 -->
         <div v-else-if="metadataOnly" class="source-preview" data-test="source-preview">
-          <iframe
-            v-if="previewType === 'pdf'"
-            :src="sourceUrl"
-            class="preview-frame"
-            data-test="source-preview-pdf"
-            title="PDF 预览"
-          ></iframe>
+          <div v-if="previewType === 'pdf'" class="pdf-viewer" data-test="pdf-viewer">
+            <div class="pdf-toolbar">
+              <button type="button" class="pdf-btn" data-test="pdf-zoom-out" @click="pdfZoom -= 0.25">−</button>
+              <span class="pdf-zoom-label" data-test="pdf-zoom-label">{{ Math.round(pdfZoom * 100) }}%</span>
+              <button type="button" class="pdf-btn" data-test="pdf-zoom-in" @click="pdfZoom += 0.25">＋</button>
+              <button type="button" class="pdf-btn" data-test="pdf-fit" @click="pdfFit">适应</button>
+              <span class="pdf-hint">按住拖拽平移 · Ctrl+滚轮缩放</span>
+            </div>
+            <div
+              ref="pdfViewportEl"
+              class="pdf-viewport"
+              data-test="pdf-viewport"
+              @mousedown="pdfPanStart"
+              @mousemove="pdfPanMove"
+              @mouseup="pdfPanEnd"
+              @mouseleave="pdfPanEnd"
+              @wheel.prevent="pdfWheel"
+            >
+              <div class="pdf-stage" :style="{ transform: 'scale(' + pdfZoom + ')' }">
+                <iframe
+                  :src="sourceUrl"
+                  class="preview-frame"
+                  data-test="source-preview-pdf"
+                  title="PDF 预览"
+                ></iframe>
+              </div>
+            </div>
+          </div>
           <img v-else-if="previewType === 'image'" :src="sourceUrl" class="preview-image" data-test="source-preview-image" alt="文件预览" />
           <div v-else-if="sourceLoading" class="reading-state">正在读取文件…</div>
           <div v-else class="reading-state" data-test="metadata-only-notice">
@@ -171,6 +192,48 @@ const previewType = computed(() => {
 })
 const sourceUrl = ref('')
 const sourceLoading = ref(false)
+const pdfZoom = ref(1)
+const pdfViewportEl = ref<HTMLElement | null>(null)
+const pdfPan = { active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 }
+const BASE_PDF_W = 794
+const BASE_PDF_H = 1123
+
+function pdfFit() {
+  const el = pdfViewportEl.value
+  if (!el) return
+  const scale = Math.min(el.clientWidth / BASE_PDF_W, el.clientHeight / BASE_PDF_H)
+  pdfZoom.value = Math.max(0.4, Math.min(2, Number(scale.toFixed(2))))
+}
+
+function pdfWheel(event: WheelEvent) {
+  if (!event.ctrlKey) return
+  const delta = event.deltaY < 0 ? 0.1 : -0.1
+  pdfZoom.value = Math.min(3, Math.max(0.4, Number((pdfZoom.value + delta).toFixed(2))))
+}
+
+function pdfPanStart(event: MouseEvent) {
+  const el = pdfViewportEl.value
+  if (!el || event.button !== 0) return
+  pdfPan.active = true
+  pdfPan.startX = event.clientX
+  pdfPan.startY = event.clientY
+  pdfPan.scrollLeft = el.scrollLeft
+  pdfPan.scrollTop = el.scrollTop
+  el.classList.add('panning')
+}
+
+function pdfPanMove(event: MouseEvent) {
+  if (!pdfPan.active) return
+  const el = pdfViewportEl.value
+  if (!el) return
+  el.scrollLeft = pdfPan.scrollLeft - (event.clientX - pdfPan.startX)
+  el.scrollTop = pdfPan.scrollTop - (event.clientY - pdfPan.startY)
+}
+
+function pdfPanEnd() {
+  pdfPan.active = false
+  pdfViewportEl.value?.classList.remove('panning')
+}
 const metadataTitle = computed(() => {
   const ext = props.document?.sourceExtension?.toLowerCase()
   return ext === 'pdf' ? 'PDF 文档已收录' : ext === 'doc' ? 'Word 文档已收录' : '资料已收录'
@@ -441,6 +504,15 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .editor-hint{margin:0 38px 12px;font-size:12.5px;color:var(--danger)}
 .editor-error{margin:0 38px 14px;font-size:12.5px;color:var(--danger)}
 .source-preview{display:flex;flex-direction:column;height:100%;min-height:0;padding:0}
-.preview-frame{flex:1;min-height:0;width:100%;border:0;background:var(--surface-subtle)}
+.pdf-viewer{display:flex;flex-direction:column;height:100%;min-height:0}
+.pdf-toolbar{flex:none;display:flex;align-items:center;gap:6px;padding:7px 34px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid)}
+.pdf-btn{min-width:28px;height:24px;border:1px solid var(--border-default);border-radius:6px;background:transparent;color:var(--copy);font-size:13px;cursor:pointer;line-height:1}
+.pdf-btn:hover{border-color:var(--brand);color:var(--brand)}
+.pdf-zoom-label{min-width:48px;text-align:center;font-size:12px;color:var(--muted)}
+.pdf-hint{margin-left:auto;font-size:11px;color:var(--muted)}
+.pdf-viewport{flex:1;min-height:0;overflow:auto;cursor:grab;background:var(--surface-subtle)}
+.pdf-viewport.panning{cursor:grabbing;user-select:none}
+.pdf-stage{transform-origin:top left;width:794px;height:1123px}
+.preview-frame{width:100%;height:100%;border:0;background:#fff;pointer-events:none}
 .preview-image{max-width:100%;max-height:100%;object-fit:contain;margin:0 auto;display:block}
 </style>

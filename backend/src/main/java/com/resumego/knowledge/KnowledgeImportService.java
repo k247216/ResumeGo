@@ -91,9 +91,11 @@ public class KnowledgeImportService {
 
         if (parseable) {
             try {
-                String content = "docx".equals(parsed.extension())
-                        ? KnowledgeTextExtractor.extractDocx(bytes)
-                        : KnowledgeTextExtractor.decodeUtf8(bytes);
+                String content = switch (parsed.extension()) {
+                    case "docx" -> KnowledgeTextExtractor.extractDocx(bytes);
+                    case "pptx" -> KnowledgeTextExtractor.extractPptx(bytes);
+                    default -> KnowledgeTextExtractor.decodeUtf8(bytes);
+                };
                 repository.completeImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
                         userId(), content);
             } catch (KnowledgeImportException exception) {
