@@ -29,10 +29,6 @@ public final class KnowledgeFileTypes {
         return PARSEABLE.contains(extension);
     }
 
-    /** 已知但仅元数据的类型（当前不提取正文、不可编辑）。 */
-    public static boolean isMetadataOnly(String extension) {
-        return METADATA_ONLY.contains(extension);
-    }
 
     /** 服务端判定真实 mediaType（不信任客户端 MIME；常见类型映射，未知归 octet-stream）。 */
     public static String mediaTypeOf(String extension) {

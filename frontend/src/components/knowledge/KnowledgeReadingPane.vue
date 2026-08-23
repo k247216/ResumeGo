@@ -461,11 +461,6 @@ function flushPendingSave(): Promise<void> {
   })
 }
 
-function hasUnsavedChanges(): boolean {
-  if (!props.document) return false
-  return draft.value !== props.content || normalizedTitle() !== props.document.title
-}
-
 // 加载来源文件预览（METADATA_ONLY 的 PDF/图片），切换/卸载时回收
 async function loadSourcePreview() {
   if (!props.document || !metadataOnly.value || !previewType.value) return
@@ -568,7 +563,7 @@ async function scrollToLine(lineNumber: number | null) {
   bodyEl.value.scrollTop = ratio * (pre.scrollHeight - bodyEl.value.clientHeight)
 }
 
-defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedChanges })
+defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave })
 </script>
 <style scoped>
 .reading{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--surface-solid);overflow:hidden}

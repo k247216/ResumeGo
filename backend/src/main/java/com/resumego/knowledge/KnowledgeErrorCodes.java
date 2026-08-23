@@ -5,8 +5,6 @@ public final class KnowledgeErrorCodes {
 
     /** 文件名缺失或包含路径/控制字符。 */
     public static final String INVALID_FILENAME = "INVALID_FILENAME";
-    /** 扩展名缺失或无法识别。 */
-    public static final String UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
     /** 已识别但当前不支持解析/编辑的文件格式（如 pdf/doc/docx/unknown）。 */
     public static final String UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT";
     /** 文件超过 10 MiB。 */
