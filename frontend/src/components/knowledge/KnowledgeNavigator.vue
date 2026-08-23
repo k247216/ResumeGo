@@ -75,20 +75,22 @@ defineEmits<{
 </script>
 
 <style scoped>
-.navigator{box-sizing:border-box;width:184px;min-width:0;border-right:1px solid var(--border-subtle);overflow-y:auto;padding:10px 8px 18px;background:var(--bg-subtle)}
-.nav-section{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}
-.nav-head{display:flex;align-items:center;justify-content:space-between;height:32px;flex:none;margin-bottom:5px;padding:0 4px;border-bottom:1px solid var(--border-subtle)}
-.nav-head-actions{display:inline-flex;align-items:center;gap:2px}
-.nav-head strong{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.05em}
-.nav-action{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:var(--copy);cursor:pointer;transition:background .15s ease,color .15s ease}
-.nav-action:hover{background:var(--bg-hover);color:var(--brand)}
-.tag-list{list-style:none;margin:0;padding:0 2px;display:flex;flex-direction:column;gap:2px}
-.tag-item{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);font-size:13.5px;text-align:left;padding:6px 9px;border-radius:7px;cursor:pointer;width:100%}
-.tag-icon{flex:none;color:var(--copy)}
+.navigator{box-sizing:border-box;width:184px;min-width:0;border-right:1px solid var(--border-subtle);overflow-y:auto;padding:12px 8px 18px;background:var(--bg-subtle)}
+.nav-section{display:flex;flex-direction:column;gap:2px;margin-bottom:22px}
+.nav-section:last-child{margin-bottom:0}
+.nav-head{display:flex;align-items:center;justify-content:space-between;height:26px;flex:none;margin-bottom:6px;padding:0 6px}
+.nav-head-actions{display:inline-flex;align-items:center;gap:1px;opacity:.55;transition:opacity .15s ease}
+.nav-head:hover .nav-head-actions{opacity:1}
+.nav-head strong{font-size:12px;font-weight:650;color:var(--muted);letter-spacing:.04em;user-select:none}
+.nav-action{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:background .15s ease,color .15s ease}
+.nav-action:hover{background:var(--bg-hover);color:var(--ink)}
+.tag-list{list-style:none;margin:0;padding:0 4px;display:flex;flex-direction:column;gap:1px}
+.tag-item{display:flex;align-items:center;gap:8px;height:30px;border:0;background:transparent;color:var(--ink);font-size:13.5px;text-align:left;padding:0 10px;border-radius:7px;cursor:pointer;width:100%;transition:background .12s ease,color .12s ease}
+.tag-icon{flex:none;color:var(--muted)}
 .tag-item:hover{background:var(--bg-hover)}
-.tag-item.active{background:var(--bg-selected);color:var(--brand)}
+.tag-item.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
 .tag-item.active .tag-icon{color:var(--brand)}
-.tag-empty{color:var(--muted);font-size:13px;padding:6px 10px}
+.tag-empty{color:var(--muted);font-size:13px;padding:8px 10px}
 .nav-error{display:grid;gap:6px;padding:6px 8px;color:var(--danger);font-size:12px}
 .text-btn{border:0;background:transparent;color:var(--brand);font-size:12px;cursor:pointer;padding:0;justify-self:start}
 </style>

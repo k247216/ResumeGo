@@ -3,6 +3,8 @@ package com.resumego.knowledge;
 import com.resumego.common.CurrentUser;
 import com.resumego.knowledge.dto.KnowledgeDeletionImpactResponse;
 import com.resumego.knowledge.dto.KnowledgeDocumentResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -26,6 +28,8 @@ import java.util.NoSuchElementException;
  */
 @Service
 public class KnowledgeRecoveryService {
+
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeRecoveryService.class);
 
     private static final String SOURCE_FILE = "FILE";
     private static final String STATUS_FAILED = "FAILED";
@@ -195,12 +199,17 @@ public class KnowledgeRecoveryService {
                         continue;
                     }
                     try {
-                        if (job.sourceRelativePath() != null) {
-                            fileStore.deleteManaged(userId(), job.sourceRelativePath());
+                        try {
+                            if (job.sourceRelativePath() != null) {
+                                fileStore.deleteManaged(userId(), job.sourceRelativePath());
+                            }
+                            repository.completeCleanupJob(jobId);
+                        } catch (Exception exception) {
+                            repository.updateCleanupJobStatus(jobId, STATUS_FAILED, FILE_DELETE_FAILED);
                         }
-                        repository.completeCleanupJob(jobId);
-                    } catch (Exception exception) {
-                        repository.updateCleanupJobStatus(jobId, STATUS_FAILED, FILE_DELETE_FAILED);
+                    } catch (Exception unexpected) {
+                        // 事务已提交、文档已删除；清理状态回写失败不能反噬为删除失败（日志仅 code，不落路径）
+                        log.warn("删除后清理任务状态回写失败 jobId={} code={}", jobId, FILE_DELETE_FAILED);
                     }
                 }
             }

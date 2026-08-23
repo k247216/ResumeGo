@@ -21,9 +21,9 @@
       </button>
       <span class="tree-count">{{ node.descendantDocumentCount }}</span>
       <span class="tree-actions">
-        <button type="button" class="tree-action" data-test="folder-new-child" title="新建子文件夹" @click.stop="$emit('new-child', node.id)">＋</button>
-        <button type="button" class="tree-action" data-test="folder-rename" title="重命名/移动" @click.stop="$emit('rename', node.id)">✎</button>
-        <button type="button" class="tree-action danger" data-test="folder-delete" title="删除" aria-label="删除文件夹" @click.stop="$emit('delete', node.id)"><el-icon :size="12"><Close /></el-icon></button>
+        <button type="button" class="tree-action" data-test="folder-new-child" title="新建子文件夹" @click.stop="$emit('new-child', node.id)"><el-icon :size="13"><Plus /></el-icon></button>
+        <button type="button" class="tree-action" data-test="folder-rename" title="重命名/移动" @click.stop="$emit('rename', node.id)"><el-icon :size="13"><EditPen /></el-icon></button>
+        <button type="button" class="tree-action danger" data-test="folder-delete" title="删除" aria-label="删除文件夹" @click.stop="$emit('delete', node.id)"><el-icon :size="13"><Close /></el-icon></button>
       </span>
     </div>
     <ul v-if="expanded && children.length" class="tree-children">
@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CaretBottom, CaretRight, Close, Folder, FolderOpened } from '@element-plus/icons-vue'
+import { CaretBottom, CaretRight, Close, EditPen, Folder, FolderOpened, Plus } from '@element-plus/icons-vue'
 import KnowledgeFolderNode from './KnowledgeFolderNode.vue'
 import type { KnowledgeCategoryNode } from '../../types/knowledge'
 
@@ -79,21 +79,22 @@ function toggle() {
 
 <style scoped>
 .tree-node{list-style:none}
-.tree-row{display:flex;align-items:center;gap:4px;padding:5px 6px;border-radius:8px;font-size:14px}
+.tree-row{display:flex;align-items:center;gap:3px;height:30px;padding:0 6px;border-radius:7px;font-size:13.5px}
 .tree-row:hover{background:var(--bg-hover)}
-.tree-row.selected{background:var(--bg-selected)}
-.tree-toggle{display:grid;place-items:center;border:0;background:transparent;color:var(--copy);width:16px;padding:0;cursor:pointer;flex:none}
+.tree-row.selected{background:var(--brand-soft)}
+.tree-toggle{display:grid;place-items:center;border:0;background:transparent;color:var(--muted);width:16px;height:18px;padding:0;cursor:pointer;flex:none;border-radius:5px}
+.tree-toggle:hover{background:var(--bg-hover);color:var(--ink)}
 .tree-toggle-placeholder{cursor:default}
 .tree-name{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);flex:1;min-width:0;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap}
 .tree-name span{overflow:hidden;text-overflow:ellipsis}
-.folder-icon{flex:none;color:var(--copy)}
+.folder-icon{flex:none;color:var(--muted)}
 .tree-row.selected .folder-icon,.tree-name:hover .folder-icon{color:var(--brand)}
 .tree-name:hover{color:var(--brand)}
-.tree-count{color:var(--muted);font-size:11px;flex:none}
-.tree-actions{display:none;gap:2px}
+.tree-count{color:var(--muted);font-size:10.5px;flex:none;min-width:18px;text-align:right}
+.tree-actions{display:none;gap:1px}
 .tree-row:hover .tree-actions{display:inline-flex}
-.tree-action{border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;padding:0 3px}
-.tree-action:hover{color:var(--brand)}
-.tree-action.danger:hover{color:var(--danger)}
-.tree-children{margin:2px 0 0 14px;padding:0}
+.tree-action{display:grid;place-items:center;width:22px;height:22px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;padding:0}
+.tree-action:hover{background:var(--bg-hover);color:var(--brand)}
+.tree-action.danger:hover{color:var(--danger);background:var(--danger-soft)}
+.tree-children{margin:1px 0 0 11px;padding:1px 0 1px 8px;border-left:1px solid var(--border-subtle)}
 </style>

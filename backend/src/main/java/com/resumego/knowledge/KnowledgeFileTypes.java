@@ -3,11 +3,11 @@ package com.resumego.knowledge;
 import java.util.Locale;
 import java.util.Set;
 
-/** 统一文件类型识别：扩展名小写归一；md/txt 可解析，pdf/doc/docx 只读元数据，其余为 unknown（禁止伪装 NOTE）。 */
+/** 统一文件类型识别：扩展名小写归一；md/txt/docx 可解析提取正文，pdf/doc 仅收录元数据，其余为 unknown（禁止伪装 NOTE）。 */
 public final class KnowledgeFileTypes {
 
-    private static final Set<String> PARSEABLE = Set.of("md", "txt");
-    private static final Set<String> METADATA_ONLY = Set.of("pdf", "doc", "docx");
+    private static final Set<String> PARSEABLE = Set.of("md", "txt", "docx");
+    private static final Set<String> METADATA_ONLY = Set.of("pdf", "doc");
     public static final String UNKNOWN = "unknown";
 
     private KnowledgeFileTypes() {

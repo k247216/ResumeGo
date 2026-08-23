@@ -179,7 +179,7 @@ describe('KnowledgeLibraryView', () => {
     expect(wrapper.find('[data-test="stub-inspector"]').exists()).toBe(true)
   })
 
-  it('blocks document switching while the editor is dirty and only switches after discard', async () => {
+  it('switches documents immediately with autosave (no reminder dialog)', async () => {
     const note1 = { ...doc(1), sourceType: 'NOTE', title: '笔记一' }
     const note2 = { ...doc(2), sourceType: 'NOTE', title: '笔记二' }
     const store = storeStub({
@@ -190,14 +190,11 @@ describe('KnowledgeLibraryView', () => {
     const wrapper = mountView(store)
     await flushPromises()
 
-    await wrapper.get('[data-test="knowledge-body-editor"]').setValue('未保存正文')
     await wrapper.get('[data-test="stub-select-2"]').trigger('click')
+    await flushPromises()
 
-    expect(store.select).not.toHaveBeenCalledWith(2)
-    expect(wrapper.find('[data-test="knowledge-unsaved-dialog"]').exists()).toBe(true)
-
-    await wrapper.get('[data-test="knowledge-unsaved-discard"]').trigger('click')
     expect(store.select).toHaveBeenCalledWith(2)
+    expect(wrapper.find('[data-test="knowledge-unsaved-dialog"]').exists()).toBe(false)
   })
 
   it('recomputes inspector overlay mode after window resize', async () => {

@@ -164,20 +164,20 @@ class KnowledgeImportIntegrationTest {
     }
 
     @Test
-    void importsPdfAsMetadataOnlyFailedWithUnsupportedFormat() {
+    void importsPdfAsMetadataOnlyWithRealExtension() {
         byte[] bytes = "%PDF-1.4 fake pdf body".getBytes(StandardCharsets.UTF_8);
         String sha = sha(bytes);
 
         KnowledgeImportResponse response = service.importFile(
                 new MockMultipartFile("file", "doc.pdf", "application/pdf", bytes));
 
-        assertThat(response.processingStatus()).isEqualTo("FAILED");
-        assertThat(response.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        assertThat(response.processingStatus()).isEqualTo("METADATA_ONLY");
+        assertThat(response.errorCode()).isNull();
         assertThat(response.duplicate()).isFalse();
 
         Map<String, Object> doc = jdbcTemplate.queryForMap(
                 "SELECT * FROM knowledge_documents WHERE id = ?", response.documentId());
-        assertThat(String.valueOf(doc.get("processing_status"))).isEqualTo("FAILED");
+        assertThat(String.valueOf(doc.get("processing_status"))).isEqualTo("METADATA_ONLY");
         assertThat(String.valueOf(doc.get("source_type"))).isEqualTo("FILE");
 
         Map<String, Object> source = jdbcTemplate.queryForMap(
@@ -190,10 +190,9 @@ class KnowledgeImportIntegrationTest {
 
         Map<String, Object> job = jdbcTemplate.queryForMap(
                 "SELECT * FROM knowledge_import_jobs WHERE document_id = ?", response.documentId());
-        assertThat(String.valueOf(job.get("job_status"))).isEqualTo("FAILED");
-        assertThat(String.valueOf(job.get("error_code"))).isEqualTo("UNSUPPORTED_FORMAT");
+        assertThat(String.valueOf(job.get("job_status"))).isEqualTo("COMPLETED");
 
-        // 不提取正文：content 表无此行
+        // 不提取正文：content 表无此行（诚实：仅收录元数据）
         Integer contents = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM knowledge_extracted_contents WHERE document_id = ?",
                 Integer.class, response.documentId());
@@ -202,6 +201,48 @@ class KnowledgeImportIntegrationTest {
         Path stored = StoreConfig.dataDir.resolve(String.valueOf(source.get("stored_relative_path")));
         assertThat(stored).exists();
         assertThat(stored).hasBinaryContent(bytes);
+    }
+
+    @Test
+    void importsDocxExtractingParagraphText() throws Exception {
+        byte[] docx = docxBytes(new String[]{"第一段标题", "第二段：加粗正文", "第三段结束"});
+        String sha = sha(docx);
+
+        KnowledgeImportResponse response = service.importFile(
+                new MockMultipartFile("file", "文档.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docx));
+
+        assertThat(response.processingStatus()).isEqualTo("COMPLETED");
+
+        Map<String, Object> source = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_source_files WHERE document_id = ?", response.documentId());
+        assertThat(String.valueOf(source.get("extension"))).isEqualTo("docx");
+        assertThat(String.valueOf(source.get("mime_type")))
+                .isEqualTo("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+        Map<String, Object> content = jdbcTemplate.queryForMap(
+                "SELECT * FROM knowledge_extracted_contents WHERE document_id = ?", response.documentId());
+        assertThat(String.valueOf(content.get("content"))).contains("第一段标题");
+        assertThat(String.valueOf(content.get("content"))).contains("第二段：加粗正文");
+        assertThat(String.valueOf(content.get("content"))).contains("第三段结束");
+        assertThat(sha).isNotBlank();
+    }
+
+    private static byte[] docxBytes(String[] paragraphs) throws java.io.IOException {
+        var bytes = new java.io.ByteArrayOutputStream();
+        try (var zip = new java.util.zip.ZipOutputStream(bytes)) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("[Content_Types].xml"));
+            zip.write("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.putNextEntry(new java.util.zip.ZipEntry("word/document.xml"));
+            var xml = new StringBuilder("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>");
+            for (String p : paragraphs) {
+                xml.append("<w:p><w:r><w:t>").append(p).append("</w:t></w:r></w:p>");
+            }
+            xml.append("</w:body></w:document>");
+            zip.write(xml.toString().getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        return bytes.toByteArray();
     }
 
     @Test

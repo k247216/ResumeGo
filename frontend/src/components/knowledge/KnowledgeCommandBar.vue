@@ -1,7 +1,7 @@
 <template>
   <header class="command-bar" data-test="knowledge-command-bar">
     <div class="bar-identity">
-      <h1 class="bar-title"><span class="bar-title-icon" aria-hidden="true"><el-icon :size="16"><Notebook /></el-icon></span><span>知识库</span></h1>
+      <h1 class="bar-title"><span class="bar-title-icon" aria-hidden="true"><BookIcon :size="17" /></span><span>知识库</span></h1>
       <div v-if="showNavigatorRestore || showListRestore || showInspectorRestore" class="restore-actions" aria-label="恢复面板">
         <button v-if="showNavigatorRestore" type="button" data-test="knowledge-restore-navigator" aria-label="展开资料库导航" @click="$emit('restore-navigator')"><el-icon><Menu /></el-icon></button>
         <button v-if="showListRestore" type="button" data-test="knowledge-restore-list" aria-label="展开资料列表" @click="$emit('restore-list')"><el-icon><Tickets /></el-icon></button>
@@ -33,7 +33,8 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { EditPen, Menu, Notebook, Operation, Tickets } from '@element-plus/icons-vue'
+import { EditPen, Menu, Operation, Tickets } from '@element-plus/icons-vue'
+import BookIcon from '../BookIcon.vue'
 import KnowledgeImportControl from './KnowledgeImportControl.vue'
 
 defineProps<{

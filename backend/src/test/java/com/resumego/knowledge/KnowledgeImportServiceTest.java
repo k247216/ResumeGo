@@ -104,7 +104,7 @@ class KnowledgeImportServiceTest {
     }
 
     @Test
-    void importsPdfAsMetadataOnlyFailedWithUnsupportedFormat() {
+    void importsPdfAsMetadataOnlyWithRealExtension() {
         when(repository.findSourceFileBySha(1L, sha(MD_BYTES))).thenReturn(Optional.empty());
         when(repository.insertImportRecords(eq(1L), any(), any())).thenReturn(ids());
         MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", MD_BYTES);
@@ -113,15 +113,16 @@ class KnowledgeImportServiceTest {
 
         assertThat(response.documentId()).isEqualTo(10L);
         assertThat(response.duplicate()).isFalse();
-        assertThat(response.processingStatus()).isEqualTo("FAILED");
-        assertThat(response.errorCode()).isEqualTo("UNSUPPORTED_FORMAT");
+        assertThat(response.processingStatus()).isEqualTo("METADATA_ONLY");
+        assertThat(response.errorCode()).isNull();
         ArgumentCaptor<KnowledgeSourceFileDraft> draft = ArgumentCaptor.forClass(KnowledgeSourceFileDraft.class);
         verify(repository).insertImportRecords(eq(1L), eq("doc"), draft.capture());
         assertThat(draft.getValue().extension()).isEqualTo("pdf");
         assertThat(draft.getValue().mediaType()).isEqualTo("application/pdf");
-        verify(repository).failImport(eq(10L), eq(20L), eq(30L), eq("UNSUPPORTED_FORMAT"), eq(true));
+        verify(repository).completeMetadataOnlyImport(eq(10L), eq(20L), eq(30L));
         verify(repository, never()).completeImport(anyLong(), anyLong(), anyLong(), anyLong(), any());
-        // 副本已落位且可用（不假装可编辑，但保留安全副本）
+        verify(repository, never()).failImport(anyLong(), anyLong(), anyLong(), any(), anyBoolean());
+        // 副本已落位且可用（仅收录元数据，不假装可编辑）
         Path stored = fileStore.resolveStored(fileStore.sourceRelativePath(1L, sha(MD_BYTES), "pdf"));
         assertThat(stored).exists();
         assertThat(stored).hasBinaryContent(MD_BYTES);

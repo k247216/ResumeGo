@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import KnowledgeReadingPane from './KnowledgeReadingPane.vue'
 import type { KnowledgeDocument } from '../../types/knowledge'
 
@@ -41,57 +41,69 @@ function mountPane(overrides: Record<string, unknown> = {}) {
   })
 }
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 describe('KnowledgeReadingPane', () => {
-  it('directly edits local notes and real managed Markdown, keeps TXT read-only', () => {
+  it('renders Markdown in reading mode by default and offers edit mode for NOTE/md only', async () => {
     const note = mountPane()
-    expect(note.find('[data-test="knowledge-body-editor"]').exists()).toBe(true)
-    expect(note.find('[data-test="knowledge-title-input"]').exists()).toBe(true)
-    expect(note.find('[data-test="knowledge-edit-start"]').exists()).toBe(false)
+    expect(note.find('[data-test="document-view"]').exists()).toBe(true)
+    expect(note.get('[data-test="markdown-view"]').text()).toContain('# 原正文')
+    expect(note.find('[data-test="mode-edit"]').exists()).toBe(true)
+    expect(note.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
 
     const markdown = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'notes.md', sourceExtension: 'md' }) })
-    expect(markdown.find('[data-test="knowledge-body-editor"]').exists()).toBe(true)
-    expect(markdown.find('[data-test="knowledge-edit-start"]').exists()).toBe(false)
+    expect(markdown.find('[data-test="mode-edit"]').exists()).toBe(true)
 
     const text = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'notes.txt', sourceExtension: 'txt' }) })
+    expect(text.find('[data-test="mode-edit"]').exists()).toBe(false)
     expect(text.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
-    expect(text.find('[data-test="knowledge-edit-start"]').exists()).toBe(false)
-    expect(text.get('[data-test="markdown-view"]').text()).toContain('# 原正文')
   })
 
-  it('beginEdit focuses the inline title and body edits report dirty state', async () => {
+  it('edit mode shows source with live preview and autosaves after typing stops', async () => {
+    vi.useFakeTimers()
     const wrapper = mountPane()
-    await (wrapper.vm as unknown as { beginEdit: (options: { focusTitle: boolean }) => Promise<void> }).beginEdit({ focusTitle: true })
-
-    const title = wrapper.get<HTMLInputElement>('[data-test="knowledge-title-input"]')
-    expect(document.activeElement).toBe(title.element)
-    await wrapper.get('[data-test="knowledge-body-editor"]').setValue('# 新正文')
-    expect((wrapper.vm as unknown as { hasUnsavedChanges: () => boolean }).hasUnsavedChanges()).toBe(true)
-    expect(wrapper.find('[data-test="knowledge-editor-bar"]').exists()).toBe(true)
+    await wrapper.get('[data-test="mode-edit"]').trigger('click')
+    const editor = wrapper.get('[data-test="knowledge-body-editor"]')
+    expect(wrapper.find('[data-test="live-preview"]').exists()).toBe(true)
+    await editor.setValue('# 新正文\n\n**加粗**')
+    expect(wrapper.emitted('save-content')).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.emitted('save-content')).toEqual([['# 新正文\n\n**加粗**']])
+    expect(wrapper.get('[data-test="live-preview"]').text()).toContain('# 新正文')
   })
 
-  it('emits explicit body save and changed title rename without silently autosaving body', async () => {
+  it('autosaves an inline title change as an explicit rename', async () => {
+    vi.useFakeTimers()
     const wrapper = mountPane()
-    await wrapper.get('[data-test="knowledge-body-editor"]').setValue('更新正文')
     await wrapper.get('[data-test="knowledge-title-input"]').setValue('Redis 深入复习')
-    await wrapper.get('[data-test="knowledge-title-input"]').trigger('blur')
-
+    await vi.advanceTimersByTimeAsync(1000)
     expect(wrapper.emitted('rename-title')).toEqual([['Redis 深入复习']])
     expect(wrapper.emitted('save-content')).toBeUndefined()
-
-    await wrapper.get('[data-test="knowledge-edit-save"]').trigger('click')
-    expect(wrapper.emitted('save-content')).toEqual([['更新正文']])
   })
 
-  it('discards local draft and restores the persisted title and body', async () => {
+  it('shows an honest notice for metadata-only PDF/DOC without pretending content', () => {
+    const wrapper = mountPane({ document: doc({ sourceType: 'FILE', sourceFile: 'a.pdf', sourceExtension: 'pdf', processingStatus: 'METADATA_ONLY' }), content: '' })
+    expect(wrapper.find('[data-test="metadata-only-notice"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="mode-edit"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="knowledge-body-editor"]').exists()).toBe(false)
+  })
+
+  it('flushPendingSave persists pending edits before a document switch', async () => {
+    vi.useFakeTimers()
     const wrapper = mountPane()
-    await wrapper.get('[data-test="knowledge-title-input"]').setValue('临时标题')
-    await wrapper.get('[data-test="knowledge-body-editor"]').setValue('临时正文')
+    await wrapper.get('[data-test="mode-edit"]').trigger('click')
+    await wrapper.get('[data-test="knowledge-body-editor"]').setValue('未保存的正文')
+    await (wrapper.vm as unknown as { flushPendingSave: () => Promise<void> }).flushPendingSave()
+    expect(wrapper.emitted('save-content')).toEqual([['未保存的正文']])
+  })
 
-    ;(wrapper.vm as unknown as { discardChanges: () => void }).discardChanges()
-    await wrapper.vm.$nextTick()
-
-    expect((wrapper.vm as unknown as { hasUnsavedChanges: () => boolean }).hasUnsavedChanges()).toBe(false)
-    expect((wrapper.get('[data-test="knowledge-title-input"]').element as HTMLInputElement).value).toBe('Redis 笔记')
-    expect((wrapper.get('[data-test="knowledge-body-editor"]').element as HTMLTextAreaElement).value).toBe('# 原正文')
+  it('beginEdit focuses the inline title and enters edit stage for a new note', async () => {
+    const wrapper = mountPane()
+    await (wrapper.vm as unknown as { beginEdit: (options: { focusTitle: boolean }) => Promise<void> }).beginEdit({ focusTitle: true })
+    expect(wrapper.find('[data-test="knowledge-body-editor"]').exists()).toBe(true)
+    const title = wrapper.get<HTMLInputElement>('[data-test="knowledge-title-input"]')
+    expect(document.activeElement).toBe(title.element)
   })
 })

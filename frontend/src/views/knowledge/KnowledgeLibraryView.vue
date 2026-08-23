@@ -120,14 +120,6 @@
       @close="deleteOpen = false"
       @confirm="handleDeleteConfirm"
     />
-    <KnowledgeUnsavedDialog
-      v-if="unsavedOpen"
-      :saving="pendingSaveBusy"
-      :error="pendingSaveError"
-      @keep-editing="cancelPendingSelection"
-      @discard="discardAndSelect"
-      @save="saveAndSelect"
-    />
   </section>
 </template>
 
@@ -141,7 +133,6 @@ import KnowledgeSourceInspector from '../../components/knowledge/KnowledgeSource
 import KnowledgeNameDialog from '../../components/knowledge/KnowledgeNameDialog.vue'
 import KnowledgeFolderDialog from '../../components/knowledge/KnowledgeFolderDialog.vue'
 import KnowledgeDeleteDialog from '../../components/knowledge/KnowledgeDeleteDialog.vue'
-import KnowledgeUnsavedDialog from '../../components/knowledge/KnowledgeUnsavedDialog.vue'
 import { useKnowledgeStore } from '../../stores/knowledge'
 import type { KnowledgeDeletionImpact } from '../../types/knowledge'
 
@@ -190,10 +181,6 @@ const impactLoading = ref(false)
 const folderBusy = ref(false)
 const folderDialog = ref<{ kind: 'create' | 'edit'; id: number | null; name: string; parentId: number | null; excludedIds: number[] } | null>(null)
 const viewportWidth = ref(window.innerWidth)
-const unsavedOpen = ref(false)
-const pendingSelectionId = ref<number | null>(null)
-const pendingSaveBusy = ref(false)
-const pendingSaveError = ref('')
 
 const hasSearch = computed(() => store.searchQuery.trim().length > 0)
 
@@ -355,14 +342,10 @@ function handleTag(id: number | null) {
 
 const pendingScrollLine = ref<number | null>(null)
 
-function handleSelectDocument(id: number) {
+/** 自动保存模式下切换文档：先冲刷未保存改动（已自动落盘），再执行切换，不再弹窗。 */
+async function handleSelectDocument(id: number) {
   if (id === store.selectedDocumentId) return
-  if (readingPane.value?.hasUnsavedChanges()) {
-    pendingSelectionId.value = id
-    pendingSaveError.value = ''
-    unsavedOpen.value = true
-    return
-  }
+  await readingPane.value?.flushPendingSave()
   performSelectDocument(id)
 }
 
@@ -371,42 +354,6 @@ function performSelectDocument(id: number) {
   if (hasSearch.value) {
     const item = store.searchResults.find((r) => r.document.id === id)
     pendingScrollLine.value = item?.lineNumber ?? null
-  }
-}
-
-function cancelPendingSelection() {
-  unsavedOpen.value = false
-  pendingSelectionId.value = null
-  pendingSaveError.value = ''
-}
-
-function discardAndSelect() {
-  const id = pendingSelectionId.value
-  readingPane.value?.discardChanges()
-  cancelPendingSelection()
-  if (id != null) performSelectDocument(id)
-}
-
-async function saveAndSelect() {
-  const id = pendingSelectionId.value
-  const documentId = store.selectedDocumentId
-  const pending = readingPane.value?.pendingChanges()
-  if (id == null || documentId == null || !pending) {
-    cancelPendingSelection()
-    return
-  }
-  pendingSaveBusy.value = true
-  pendingSaveError.value = ''
-  try {
-    if (pending.titleChanged) await store.renameDocument(documentId, pending.title)
-    if (pending.contentChanged) await store.saveNoteContent(documentId, pending.content)
-    readingPane.value?.discardChanges()
-    cancelPendingSelection()
-    performSelectDocument(id)
-  } catch (error) {
-    pendingSaveError.value = error instanceof Error ? error.message : '保存失败，请重试'
-  } finally {
-    pendingSaveBusy.value = false
   }
 }
 

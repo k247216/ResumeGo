@@ -7,6 +7,7 @@ export const KNOWLEDGE_STATUS_LABEL: Record<KnowledgeProcessingStatus, string> =
   RUNNING: '处理中',
   COMPLETED: '已完成',
   FAILED: '失败',
+  METADATA_ONLY: '仅收录',
 }
 
 export function knowledgeStatusLabel(status: KnowledgeProcessingStatus): string {

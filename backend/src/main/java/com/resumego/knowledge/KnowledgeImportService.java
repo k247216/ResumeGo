@@ -27,6 +27,7 @@ public class KnowledgeImportService {
     private static final String SOURCE_FILE = "FILE";
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_FAILED = "FAILED";
+    private static final String STATUS_METADATA_ONLY = "METADATA_ONLY";
     private static final String JOB_RUNNING = "RUNNING";
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeImportService.class);
@@ -90,20 +91,29 @@ public class KnowledgeImportService {
 
         if (parseable) {
             try {
-                String content = KnowledgeTextExtractor.decodeUtf8(bytes);
+                String content = "docx".equals(parsed.extension())
+                        ? KnowledgeTextExtractor.extractDocx(bytes)
+                        : KnowledgeTextExtractor.decodeUtf8(bytes);
                 repository.completeImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
                         userId(), content);
             } catch (KnowledgeImportException exception) {
                 repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
                         exception.errorCode(), true);
-                log.warn("知识文件导入失败 code={}", exception.errorCode());
+                log.warn("知识文件导入失败 code={} msg={}", exception.errorCode(), exception.getMessage());
                 return failedResponse(ids.documentId(), exception.errorCode());
             }
             log.info("知识文件导入完成");
             return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_COMPLETED, false, null);
         }
 
-        // 已识别但不可解析（pdf/doc/docx/unknown）：只保存安全副本与元数据，FAILED + 稳定 code，不提取正文、禁止假装可编辑
+        if (KnowledgeFileTypes.isMetadataOnly(parsed.extension())) {
+            // PDF/DOC：安全副本与元数据入库，文档 METADATA_ONLY（真实状态，不伪造正文/可编辑），job COMPLETED
+            repository.completeMetadataOnlyImport(ids.documentId(), ids.sourceFileId(), ids.importJobId());
+            log.info("知识文件仅收录元数据 extension={}", parsed.extension());
+            return new KnowledgeImportResponse(ids.documentId(), SOURCE_FILE, STATUS_METADATA_ONLY, false, null);
+        }
+
+        // 未知类型：FAILED + 稳定 code，不提取正文、不假装可编辑
         repository.failImport(ids.documentId(), ids.sourceFileId(), ids.importJobId(),
                 KnowledgeErrorCodes.UNSUPPORTED_FORMAT, true);
         log.warn("知识文件导入不支持解析 code={}", KnowledgeErrorCodes.UNSUPPORTED_FORMAT);

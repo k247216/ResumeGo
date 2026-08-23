@@ -226,6 +226,14 @@ public class KnowledgeRepository {
         updateImportJobStatus(importJobId, JOB_COMPLETED, null);
     }
 
+    /** 仅收录元数据（PDF/DOC）：文档 METADATA_ONLY、job COMPLETED、source AVAILABLE，无提取正文。 */
+    @Transactional
+    public void completeMetadataOnlyImport(long documentId, long sourceFileId, long importJobId) {
+        updateSourceAvailability(sourceFileId, "AVAILABLE");
+        updateDocumentStatus(documentId, "METADATA_ONLY");
+        updateImportJobStatus(importJobId, JOB_COMPLETED, null);
+    }
+
     /** 提取失败：文档与任务 FAILED；副本已落位则 source 保持 AVAILABLE，否则保留 STAGED。 */
     @Transactional
     public void failImport(long documentId, long sourceFileId, long importJobId, String errorCode, boolean copyAvailable) {

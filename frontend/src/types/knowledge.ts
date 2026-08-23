@@ -2,7 +2,7 @@
 
 export type KnowledgeSourceType = 'NOTE' | 'FILE'
 
-export type KnowledgeProcessingStatus = 'NOT_STARTED' | 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+export type KnowledgeProcessingStatus = 'NOT_STARTED' | 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'METADATA_ONLY'
 
 /** 与现有 client 约定一致的成功包装（后端 ApiResponse） */
 export interface ApiResponse<T> {
