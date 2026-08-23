@@ -62,9 +62,13 @@ describe('KnowledgeDocumentList', () => {
     expect(wrapper.get('[data-test="file-type-1"]').classes()).toContain('type-pdf')
   })
 
-  it('toggles row selection and shows the bulk bar', async () => {
+  it('enters multi-select mode before selecting rows', async () => {
     const wrapper = mountList({ documents: [doc(1, 'COMPLETED'), doc(2, 'COMPLETED')] })
-    expect(wrapper.find('[data-test="bulk-count"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="doc-check-1"]').exists()).toBe(false)
+    await wrapper.get('[data-test="enter-multiselect"]').trigger('click')
+    expect(wrapper.emitted('enter-multiselect')).toHaveLength(1)
+    await wrapper.setProps({ selectionMode: true })
+    expect(wrapper.find('[data-test="doc-check-1"]').exists()).toBe(true)
     await wrapper.get('[data-test="doc-check-1"]').trigger('click')
     expect(wrapper.emitted('toggle-select')).toEqual([[1]])
   })

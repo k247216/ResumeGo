@@ -437,7 +437,7 @@ defineExpose({ scrollToLine, beginEdit, enterEdit, flushPendingSave, hasUnsavedC
 .fmt-sep{width:1px;height:14px;background:var(--border-subtle);margin:0 7px;flex:none}
 .body-editor{box-sizing:border-box;display:block;width:100%;flex:1;min-height:0;padding:22px 38px 40px;border:0;background:transparent;color:var(--ink);font-family:inherit;font-size:16px;line-height:1.85;resize:none;outline:0;caret-color:var(--brand)}
 .body-editor:disabled{opacity:.7}
-.body-editor::placeholder{color:var(--muted);font-size:14px;font-weight:450}
+.body-editor::placeholder{color:var(--muted)}
 .editor-hint{margin:0 38px 12px;font-size:12.5px;color:var(--danger)}
 .editor-error{margin:0 38px 14px;font-size:12.5px;color:var(--danger)}
 .source-preview{display:flex;flex-direction:column;height:100%;min-height:0;padding:0}

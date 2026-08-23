@@ -29,6 +29,14 @@ describe('KnowledgeMarkdownView', () => {
     expect(wrapper.find('.tok-comment').text()).toBe('// 注释')
   })
 
+  it('colors fenced code even without a language and marks function calls', () => {
+    const fence = String.fromCharCode(96).repeat(3)
+    const wrapper = mountMd(fence + NL + 'return sum(1, 2)' + NL + fence)
+    expect(wrapper.find('.tok-keyword').text()).toBe('return')
+    expect(wrapper.find('.tok-func').text()).toBe('sum')
+    expect(wrapper.find('.tok-number').text()).toBe('1')
+  })
+
   it('renders code blocks verbatim', () => {
     const fence = String.fromCharCode(96).repeat(3)
     const wrapper = mountMd('## 示例' + NL + NL + fence + NL + 'text' + NL + fence)

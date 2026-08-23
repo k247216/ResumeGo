@@ -53,9 +53,12 @@
         :category-paths="categoryPaths"
         :active-tag-id="activeTagId"
         :selected-doc-ids="selectedDocIds"
+        :selection-mode="selectionMode"
         @toggle-select="toggleDocSelect"
         @clear-selection="clearDocSelection"
         @bulk-delete="openBatchDelete"
+        @enter-multiselect="selectionMode = true"
+        @exit-multiselect="exitMultiSelect"
         @close="closeDocumentList"
         @select="handleSelectDocument"
         @retry="store.retry"
@@ -191,6 +194,7 @@ const folderBusy = ref(false)
 const folderDialog = ref<{ kind: 'create'; id: number | null; name: string; parentId: number | null; excludedIds: number[] } | null>(null)
 const renamingFolderId = ref<number | null>(null)
 const selectedDocIds = ref<Set<number>>(new Set())
+const selectionMode = ref(false)
 const bulkDeleteOpen = ref(false)
 const bulkImpactLoading = ref(false)
 const bulkDeleting = ref(false)
@@ -572,6 +576,11 @@ function clearDocSelection() {
   selectedDocIds.value = new Set()
 }
 
+function exitMultiSelect() {
+  selectionMode.value = false
+  selectedDocIds.value = new Set()
+}
+
 async function openBatchDelete() {
   const ids = [...selectedDocIds.value]
   if (!ids.length) return
@@ -613,6 +622,7 @@ async function confirmBatchDelete() {
   }
   bulkDeleting.value = false
   selectedDocIds.value = new Set()
+  selectionMode.value = false
   if (failed.length) {
     bulkDeleteError.value = `${failed.length} 项删除失败，其余已删除`
   } else {

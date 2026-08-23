@@ -3,12 +3,13 @@
       <div class="list-head">
         <strong>{{ scopeLabel }}</strong>
         <span class="list-actions">
-          <template v-if="selectedDocIds.size">
+          <template v-if="selectionMode">
             <span class="bulk-count" data-test="bulk-count">已选 {{ selectedDocIds.size }} 项</span>
             <button type="button" class="list-sort danger" data-test="bulk-delete" @click="$emit('bulk-delete')">删除</button>
-            <button type="button" class="list-sort" data-test="bulk-clear" @click="$emit('clear-selection')">取消</button>
+            <button type="button" class="list-sort" data-test="bulk-clear" @click="$emit('exit-multiselect')">退出多选</button>
           </template>
           <template v-else>
+            <button type="button" class="list-sort" data-test="enter-multiselect" @click="$emit('enter-multiselect')">多选</button>
             <button type="button" class="list-sort" data-test="doc-list-sort" @click="toggleSort">
               更新时间 {{ sortDesc ? '↓' : '↑' }}
             </button>
@@ -35,16 +36,17 @@
           搜索失败，以下为上一次结果
           <button type="button" class="text-btn" @click="$emit('retry-search')">重试</button>
         </div>
-        <ul class="list-rows">
+        <ul class="list-rows" :class="{ 'select-mode': selectionMode }">
           <li v-for="item in rows" :key="item.document.id">
           <button
             type="button"
             class="row"
             :class="{ selected: item.document.id === selectedId, checked: selectedDocIds.has(item.document.id) }"
             :data-test="'doc-row-' + item.document.id"
-            @click="$emit('select', item.document.id)"
+            @click="selectionMode ? $emit('toggle-select', item.document.id) : $emit('select', item.document.id)"
           >
             <span
+              v-if="selectionMode"
               class="row-check"
               :class="{ on: selectedDocIds.has(item.document.id) }"
               :data-test="'doc-check-' + item.document.id"
@@ -97,9 +99,11 @@ const props = withDefaults(defineProps<{
   categoryPaths: Record<number, string>
   activeTagId?: number | null
   selectedDocIds?: Set<number>
+  selectionMode?: boolean
 }>(), {
   activeTagId: null,
   selectedDocIds: () => new Set<number>(),
+  selectionMode: false,
 })
 
 const sortDesc = ref(true)
@@ -117,6 +121,8 @@ defineEmits<{
   (e: 'toggle-select', id: number): void
   (e: 'clear-selection'): void
   (e: 'bulk-delete'): void
+  (e: 'enter-multiselect'): void
+  (e: 'exit-multiselect'): void
 }>()
 
 const rows = computed(() => {
@@ -203,10 +209,14 @@ function statusTone(status: KnowledgeDocument['processingStatus']): string {
 .row-main{grid-column:2;grid-row:1}
 .row-location,.row-snippet{grid-column:2;grid-row:2;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-side{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.row{position:relative}
-.row-check{position:absolute;left:6px;top:50%;transform:translateY(-50%);display:grid;width:16px;height:16px;place-items:center;border:1px solid var(--border-strong);border-radius:4px;background:var(--surface-solid);color:#fff;cursor:pointer;opacity:0;transition:opacity .12s ease;z-index:2}
-.row:hover .row-check,.row.checked .row-check{opacity:1}
-.row-check.on{opacity:1;background:var(--brand);border-color:var(--brand)}
+.row-check{display:grid;grid-column:1;grid-row:1/3;align-self:center;width:18px;height:18px;place-items:center;border:1px solid var(--border-strong);border-radius:5px;background:var(--surface-solid);color:#fff;cursor:pointer;transition:background .12s ease,border-color .12s ease}
+.row-check:hover{border-color:var(--brand)}
+.row-check.on{background:var(--brand);border-color:var(--brand)}
+.list-rows.select-mode .row{grid-template-columns:28px 34px minmax(0,1fr) auto}
+.list-rows.select-mode .file-visual{grid-column:2}
+.list-rows.select-mode .row-main{grid-column:3}
+.list-rows.select-mode .row-location,.list-rows.select-mode .row-snippet{grid-column:3}
+.list-rows.select-mode .row-side{grid-column:4}
 .bulk-count{font-size:11.5px;color:var(--brand);font-weight:600}
 .list-sort.danger{color:var(--danger)}
 .list-sort.danger:hover{color:var(--danger)}

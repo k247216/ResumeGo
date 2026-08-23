@@ -80,6 +80,9 @@ const KEYWORDS: Record<string, string[]> = {
 }
 
 /** 轻量语法高亮：先转义 HTML；注释/字符串先保护为占位（无字面字符），再标色关键字与数字（XSS 安全）。 */
+/** 无语言围栏时的通用关键字（精选跨语言通用词，避免 SQL 聚合词被误判）。 */
+const GENERIC_KEYWORDS = 'const let var function return if else for while do class new import export async await default switch case break continue try catch throw extends static void null undefined true false def elif lambda None pass raise'.split(' ')
+
 function highlightCode(lang: string, code: string): string {
   const escaped = escapeHtml(code)
   const protectedTokens: string[] = []
@@ -91,11 +94,17 @@ function highlightCode(lang: string, code: string): string {
   let s = escaped
   s = s.replace(/(\/\/[^\n]*|#[^\n]*|--[^\n]*|\/\*[\s\S]*?\*\/)/g, (m) => protect('<span class="tok-comment">' + m + '</span>'))
   s = s.replace(/(&quot;.*?&quot;|&#39;.*?&#39;|`.*?`)/g, (m) => protect('<span class="tok-string">' + m + '</span>'))
-  const kws = KEYWORDS[lang] ?? []
+  const kws = KEYWORDS[lang] ?? GENERIC_KEYWORDS
+  // 函数调用优先（标识符紧跟左括号，且不是关键字）
+  const funcPattern = new RegExp('\\b(?!(?:' + kws.join('|') + ')\\b)([A-Za-z_$][\\w$]*)(?=\\()', 'g')
+  s = s.replace(funcPattern, (m) => protect('<span class="tok-func">' + m + '</span>'))
   if (kws.length) {
     const pattern = new RegExp('\\b(' + kws.join('|') + ')\\b', 'g')
     s = s.replace(pattern, (m) => protect('<span class="tok-keyword">' + m + '</span>'))
   }
+  // 类型/类名（大写开头的标识符）
+  s = s.replace(/\b([A-Z][\w$]*)\b/g, (m) => protect('<span class="tok-type">' + m + '</span>'))
+  // 数字
   s = s.replace(/\b(\d+(?:\.\d+)?)\b/g, (m) => protect('<span class="tok-number">' + m + '</span>'))
   return s.replace(new RegExp(MARK + '+', 'g'), (m) => protectedTokens[m.length - 1] ?? '')
 }
@@ -126,7 +135,7 @@ function parseBlocks(src: string): MdBlock[] {
       if (inCode) {
         const raw = codeBuf.join(NL)
         const lang = codeFenceLang
-        out.push({ type: 'code', text: raw, lang, html: lang ? highlightCode(lang, raw) : escapeHtml(raw) })
+        out.push({ type: 'code', text: raw, lang, html: highlightCode(lang, raw) })
         codeBuf = []; inCode = false; codeFenceLang = ''
       } else {
         inCode = true
@@ -170,7 +179,7 @@ function parseBlocks(src: string): MdBlock[] {
   flushList()
   if (inCode) {
     const raw = codeBuf.join(NL)
-    out.push({ type: 'code', text: raw, lang: codeFenceLang, html: codeFenceLang ? highlightCode(codeFenceLang, raw) : escapeHtml(raw) })
+    out.push({ type: 'code', text: raw, lang: codeFenceLang, html: highlightCode(codeFenceLang, raw) })
   }
   return out
 }
@@ -193,13 +202,19 @@ const blocks = computed(() => parseBlocks(props.source))
 .md-code{margin:0 0 14px;padding:12px 16px 14px;border-radius:10px;background:var(--bg-subtle);color:var(--ink);font-size:13.5px;line-height:1.6;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .md-code code{white-space:pre-wrap;display:block}
 .md-code-head{display:inline-flex;align-items:center;margin:-12px 0 8px -16px;padding:4px 12px;border-radius:10px 0 10px 0;background:var(--border-subtle);color:var(--muted);font-size:10.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;font-family:inherit}
-.tok-comment{color:var(--muted);font-style:italic}
-.tok-string{color:#2f9e6e}
-.tok-keyword{color:var(--brand);font-weight:600}
-.tok-number{color:#c4772f}
 .md-table{margin:0 0 14px;border-collapse:collapse;font-size:14px;line-height:1.6;width:100%}
 .md-table th,.md-table td{padding:7px 12px;border:1px solid var(--border-default);text-align:left}
 .md-table thead th{background:var(--bg-subtle);font-weight:600;color:var(--ink)}
 .md-table tbody tr:nth-child(even){background:var(--surface-subtle)}
 .md-hr{margin:18px 0;border:0;border-top:1px solid var(--border-default)}
+</style>
+
+<style>
+/* v-html 注入的 token 无 scoped 属性，必须非 scoped 才生效 */
+.tok-comment{color:#8b8b86;font-style:italic}
+.tok-string{color:#2f9e6e}
+.tok-keyword{color:#3b82f6;font-weight:600}
+.tok-func{color:#8b5cf6}
+.tok-type{color:#0e7490}
+.tok-number{color:#d97706}
 </style>
