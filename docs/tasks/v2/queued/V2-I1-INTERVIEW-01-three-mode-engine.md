@@ -8,7 +8,7 @@
 - Base commit: 由 Core Controller 在 Resume System 集成后冻结
 - Spec: `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`
 - Execution plan: `docs/superpowers/plans/2026-08-25-interview-engine-v2.md`
-- Depends on: `V2-R1-RESUME-01` 集成；当前 Pipeline/Schedule 契约修复集成
+- Depends on: `V2-R1-RESUME-01` 集成
 - Acceptance owner: Core Controller
 
 ## User result
@@ -17,7 +17,7 @@
 
 ## Why queued
 
-本任务需要新数据库迁移号、Resume Version 稳定引用和当前正在修复的 Pipeline/Schedule 契约。Core Controller 更新 Base commit 和迁移号后才可开始；不得从占位基线自行推断。
+Pipeline/Schedule 契约修复已在 `f4877b1` 集成。本任务仍需要 Resume Version 稳定引用以及新的数据库迁移号；Core Controller 在 Resume 任务集成后更新 Base commit 和迁移号，届时才可开始。
 
 ## Frozen contracts
 

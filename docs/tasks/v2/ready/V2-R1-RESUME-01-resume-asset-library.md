@@ -5,7 +5,7 @@
 - Status: `READY`
 - Owner: External Feature Agent
 - Branch: `codex/v2-r1-resume-asset-library`
-- Base commit: `6a93f8e`（或 Core Controller 在当前 Pipeline/Schedule 契约修复集成后指定的后继提交）
+- Base commit: `f4877b1`
 - Spec: `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`
 - Execution plan: `docs/superpowers/plans/2026-08-25-resume-system-v2.md`
 - Acceptance owner: Core Controller
