@@ -122,7 +122,7 @@
       :editing="editingEvent"
       :submitting="submitting"
       :error-message="dialogError"
-      :jobs="jobOptions"
+      :plans="planOptions"
       :default-date="dialogDefaultDate"
       @close="closeDialog"
       @save="handleSave"
@@ -209,6 +209,7 @@ function ownDisplay(event: ScheduleEvent): DisplayCalendarEvent {
     eventType: event.eventType,
     notes: event.notes,
     jobDescriptionId: event.jobDescriptionId,
+    jobProjectId: event.jobProjectId,
   }
 }
 
@@ -360,19 +361,19 @@ const panelSubtitle = computed(() => (panelMode.value === 'day'
   ? `${selectedDisplayEvents.value.length} 场安排`
   : `未来 7 天 · ${upcomingTotal.value} 场安排`))
 
-// 弹窗的关联岗位候选：来自带 JD 的求职目标（同一 JD 只列一次）；
-// 编辑中的事件若关联了已不在候选里的岗位（如目标已删），保留原关联避免静默清空。
-const jobOptions = computed(() => {
-  const seen = new Set<number>()
-  const options: Array<{ id: number; label: string }> = []
-  for (const target of targetsStore.targets) {
-    if (target.jobDescriptionId == null || seen.has(target.jobDescriptionId)) continue
-    seen.add(target.jobDescriptionId)
-    options.push({ id: target.jobDescriptionId, label: target.name || '求职目标' })
-  }
-  const currentId = editingEvent.value?.jobDescriptionId
-  if (currentId != null && !seen.has(currentId)) {
-    options.push({ id: currentId, label: '当前关联的岗位' })
+// 弹窗的关联求职计划候选：全部进行中的计划（无论是否已录入 JD）。
+// 编辑中的事件若关联了已不在候选里的计划，保留原关联避免静默清空。
+const planOptions = computed(() => {
+  const options = targetsStore.targets
+    .filter((target) => target.status === 'active')
+    .map((target) => ({
+      id: target.id,
+      label: target.name || '求职目标',
+      jobDescriptionId: target.jobDescriptionId ?? null,
+    }))
+  const currentProjectId = editingEvent.value?.jobProjectId
+  if (currentProjectId != null && !options.some((option) => option.id === currentProjectId)) {
+    options.push({ id: currentProjectId, label: '当前关联的计划', jobDescriptionId: editingEvent.value?.jobDescriptionId ?? null })
   }
   return options
 })
@@ -439,6 +440,7 @@ function openDisplayEdit(item: DisplayCalendarEvent) {
       endTime: item.endTime,
       notes: item.notes ?? null,
       jobDescriptionId: item.jobDescriptionId ?? null,
+      jobProjectId: item.jobProjectId ?? null,
       createdAt: '',
       updatedAt: '',
     }

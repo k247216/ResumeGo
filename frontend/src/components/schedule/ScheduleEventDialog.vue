@@ -23,10 +23,10 @@
         </div>
         <div class="field-row">
           <label>结束时间<input v-model="form.endTime" data-test="event-end-time" type="time" placeholder="可选"></label>
-          <label>关联岗位
-            <select v-model="form.jobId" data-test="event-job">
+          <label>关联求职计划
+            <select v-model="form.planId" data-test="event-plan">
               <option value="">不关联</option>
-              <option v-for="job in jobs" :key="job.id" :value="String(job.id)">{{ job.label }}</option>
+              <option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.label }}</option>
             </select>
           </label>
         </div>
@@ -48,9 +48,11 @@ import { computed, reactive, watch } from 'vue'
 import type { ScheduleEvent, ScheduleEventFormPayload, ScheduleEventType } from '../../types/schedule'
 import { SCHEDULE_EVENT_TYPE_COLORS, SCHEDULE_EVENT_TYPE_LABELS } from '../../types/schedule'
 
-export interface ScheduleJobOption {
+export interface SchedulePlanOption {
   id: number
   label: string
+  /** 计划当前关联的岗位（若有），随计划一起写入以兼容旧展示路径 */
+  jobDescriptionId?: number | null
 }
 
 const props = defineProps<{
@@ -58,8 +60,8 @@ const props = defineProps<{
   editing: ScheduleEvent | null
   submitting?: boolean
   errorMessage?: string
-  /** 可选的关联岗位候选（来自求职目标），id 即 jobDescriptionId */
-  jobs?: ScheduleJobOption[]
+  /** 可关联的求职计划候选（全部计划，无论是否已录入 JD） */
+  plans?: SchedulePlanOption[]
   /** 新建时的默认日期；为空时兜底当前时刻 */
   defaultDate?: Date | null
 }>()
@@ -81,7 +83,7 @@ const form = reactive({
   date: '',
   time: '10:00',
   endTime: '',
-  jobId: '',
+  planId: '',
   notes: '',
 })
 
@@ -94,7 +96,12 @@ watch(() => [props.open, props.editing] as const, ([open, editing]) => {
   form.date = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`
   form.time = `${pad(base.getHours())}:${pad(base.getMinutes())}`
   form.endTime = editing?.endTime ? `${pad(new Date(editing.endTime).getHours())}:${pad(new Date(editing.endTime).getMinutes())}` : ''
-  form.jobId = editing?.jobDescriptionId != null ? String(editing.jobDescriptionId) : ''
+  // 新契约按计划 ID 关联；旧的仅含 JD 的日程回退匹配到对应计划，避免显示为未关联
+  const currentPlanId = editing?.jobProjectId
+    ?? (editing?.jobDescriptionId != null
+      ? (props.plans ?? []).find((plan) => plan.jobDescriptionId === editing.jobDescriptionId)?.id
+      : undefined)
+  form.planId = currentPlanId != null ? String(currentPlanId) : ''
   form.notes = editing?.notes ?? ''
 }, { immediate: true })
 
@@ -110,6 +117,7 @@ function padSeconds(value: string): string {
 function submit() {
   const title = form.title.trim()
   if (!title || validationError.value) return
+  const plan = (props.plans ?? []).find((item) => String(item.id) === form.planId)
   emit('save', {
     title,
     eventType: form.eventType,
@@ -117,8 +125,9 @@ function submit() {
     // 结束时间与开始时间同一天；不填表示未定时长
     endTime: form.endTime ? `${form.date}T${padSeconds(form.endTime)}` : null,
     notes: form.notes.trim() || null,
-    // 空字符串表示用户主动清除关联；后端 SET NULL 会同步解除目标侧展示
-    jobDescriptionId: form.jobId ? Number(form.jobId) : null,
+    // 主键为求职计划 ID；JD 仅作为兼容字段随计划写入（计划可能尚未录入 JD）
+    jobDescriptionId: plan?.jobDescriptionId ?? null,
+    jobProjectId: form.planId ? Number(form.planId) : null,
   })
 }
 

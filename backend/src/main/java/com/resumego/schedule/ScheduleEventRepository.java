@@ -18,7 +18,7 @@ public class ScheduleEventRepository {
 
     private static final String SELECT_COLUMNS = """
             SELECT id, user_id, title, event_type, start_time, end_time, notes,
-                   job_description_id, created_at, updated_at
+                   job_description_id, job_project_id, created_at, updated_at
             FROM schedule_events
             """;
 
@@ -54,14 +54,14 @@ public class ScheduleEventRepository {
     }
 
     public long create(long userId, String title, String eventType, LocalDateTime startTime,
-                       LocalDateTime endTime, String notes, Long jobDescriptionId) {
+                       LocalDateTime endTime, String notes, Long jobDescriptionId, Long jobProjectId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
                     """
                             INSERT INTO schedule_events
-                                (user_id, title, event_type, start_time, end_time, notes, job_description_id)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                                (user_id, title, event_type, start_time, end_time, notes, job_description_id, job_project_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                             """,
                     new String[]{"id"}
             );
@@ -76,6 +76,7 @@ public class ScheduleEventRepository {
             }
             statement.setString(6, notes);
             statement.setObject(7, jobDescriptionId);
+            statement.setObject(8, jobProjectId);
             return statement;
         }, keyHolder);
         Number key = keyHolder.getKey();
@@ -86,17 +87,17 @@ public class ScheduleEventRepository {
     }
 
     public int update(long userId, long eventId, String title, String eventType, LocalDateTime startTime,
-                      LocalDateTime endTime, String notes, Long jobDescriptionId) {
+                      LocalDateTime endTime, String notes, Long jobDescriptionId, Long jobProjectId) {
         return jdbcTemplate.update(
                 """
                         UPDATE schedule_events
                         SET title = ?, event_type = ?, start_time = ?, end_time = ?, notes = ?,
-                            job_description_id = ?, updated_at = CURRENT_TIMESTAMP
+                            job_description_id = ?, job_project_id = ?, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ? AND user_id = ? AND deleted_at IS NULL
                         """,
                 title, eventType, Timestamp.valueOf(startTime),
                 endTime == null ? null : Timestamp.valueOf(endTime),
-                notes, jobDescriptionId, eventId, userId
+                notes, jobDescriptionId, jobProjectId, eventId, userId
         );
     }
 
@@ -118,6 +119,19 @@ public class ScheduleEventRepository {
         return count != null && count > 0;
     }
 
+    public boolean ownsJobProject(long userId, long jobProjectId) {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM job_projects WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                Long.class, jobProjectId, userId);
+        return count != null && count > 0;
+    }
+
+    public Long findJobDescriptionIdForProject(long userId, long jobProjectId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT job_description_id FROM job_projects WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                Long.class, jobProjectId, userId);
+    }
+
     private RowMapper<ScheduleEvent> rowMapper() {
         return (rs, rowNum) -> new ScheduleEvent(
                 rs.getLong("id"),
@@ -128,6 +142,7 @@ public class ScheduleEventRepository {
                 rs.getTimestamp("end_time") == null ? null : rs.getTimestamp("end_time").toLocalDateTime(),
                 rs.getString("notes"),
                 rs.getObject("job_description_id", Long.class),
+                rs.getObject("job_project_id", Long.class),
                 rs.getTimestamp("created_at").toLocalDateTime(),
                 rs.getTimestamp("updated_at").toLocalDateTime()
         );

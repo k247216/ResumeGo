@@ -22,6 +22,7 @@ const baseEvent = {
   endTime: null,
   notes: null,
   jobDescriptionId: null,
+  jobProjectId: null,
   createdAt: '',
   updatedAt: '',
 }

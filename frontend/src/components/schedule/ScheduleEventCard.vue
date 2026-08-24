@@ -68,10 +68,16 @@ const metaLabel = computed(() => {
   return SCHEDULE_EVENT_TYPE_LABELS[(props.event.eventType ?? 'other') as ScheduleEventType]
 })
 
-// 已关联目标的事件在卡片下方给出目标上下文；目标已删除则如实不显示。
+// 已关联计划的事件在卡片下方给出计划上下文；旧的仅含 JD 的日程按 JD 回退匹配。均找不到则如实不显示。
 const linkedTarget = computed(() => {
-  if (props.event.jobDescriptionId == null) return null
-  return targetsStore.targets.find((target) => target.jobDescriptionId === props.event.jobDescriptionId) ?? null
+  const targets = targetsStore.targets
+  if (props.event.jobProjectId != null) {
+    return targets.find((target) => target.id === props.event.jobProjectId) ?? null
+  }
+  if (props.event.jobDescriptionId != null) {
+    return targets.find((target) => target.jobDescriptionId === props.event.jobDescriptionId) ?? null
+  }
+  return null
 })
 
 function openTarget() {

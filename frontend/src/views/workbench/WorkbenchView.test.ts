@@ -190,6 +190,31 @@ describe('WorkbenchView', () => {
     expect(wrapper.get('[data-test="agenda-pane"]').text()).toContain('行测')
   })
 
+  it('does not relink an explicitly associated event to another target through the legacy JD fallback', async () => {
+    targetStore.targets = [target()]
+    primeJobs({ 6: job() })
+    mocks.listScheduleEvents.mockResolvedValue({
+      success: true,
+      data: [{
+        id: 13,
+        title: '已归档计划的技术面',
+        eventType: 'interview',
+        startTime: tomorrowTime(),
+        endTime: null,
+        notes: null,
+        jobDescriptionId: 6,
+        jobProjectId: 999,
+        createdAt: '',
+        updatedAt: '',
+      }],
+    })
+    const wrapper = mountWorkspace()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="detail-unlinked"]').text()).toContain('未关联求职目标')
+    expect(wrapper.find('[data-test="detail-linked-target"]').exists()).toBe(false)
+  })
+
   it('links an unlinked event to a chosen target from the detail pane', async () => {
     targetStore.targets = [target()]
     primeJobs({ 6: job() })

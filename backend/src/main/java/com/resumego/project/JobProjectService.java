@@ -47,6 +47,8 @@ public class JobProjectService {
         String name = normalizeName(request.name());
         validateLinks(request.jobDescriptionId(), request.resumeVersionId());
         long id = repository.create(userId(), name, request.jobDescriptionId(), request.resumeVersionId());
+        // 初始「投递中」同样计入阶段历史，保证时间轴从创建时刻完整可追溯
+        repository.insertStageEvent(userId(), id, "applied");
         return get(id);
     }
 

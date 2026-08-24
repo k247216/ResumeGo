@@ -8,6 +8,7 @@ export interface ScheduleEvent {
   endTime: string | null
   notes: string | null
   jobDescriptionId: number | null
+  jobProjectId: number | null
   createdAt: string
   updatedAt: string
 }
@@ -19,6 +20,7 @@ export interface CreateScheduleEventRequest {
   endTime?: string | null
   notes?: string | null
   jobDescriptionId?: number | null
+  jobProjectId?: number | null
 }
 
 export interface UpdateScheduleEventRequest extends CreateScheduleEventRequest {}
@@ -31,6 +33,7 @@ export interface ScheduleEventFormPayload {
   endTime: string | null
   notes: string | null
   jobDescriptionId: number | null
+  jobProjectId: number | null
 }
 
 /** 从 .ics 等外部日历导入的只读来源（原始文本保存在本地，不上传） */
@@ -54,6 +57,7 @@ export interface DisplayCalendarEvent {
   eventType?: ScheduleEventType
   notes?: string | null
   jobDescriptionId?: number | null
+  jobProjectId?: number | null
   /** kind === 'external' 时有效 */
   sourceId?: number
   sourceName?: string

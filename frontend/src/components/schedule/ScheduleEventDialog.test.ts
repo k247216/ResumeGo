@@ -12,13 +12,14 @@ const editingEvent: ScheduleEvent = {
   endTime: '2026-08-25T15:30:00',
   notes: '带上作品集',
   jobDescriptionId: 6,
+  jobProjectId: null,
   createdAt: '',
   updatedAt: '',
 }
 
-const jobs = [
-  { id: 6, label: '腾讯 · 后端' },
-  { id: 9, label: '字节 · 前端' },
+const plans = [
+  { id: 3, label: '腾讯 · 后端', jobDescriptionId: 6 },
+  { id: 5, label: '字节 · 前端', jobDescriptionId: 9 },
 ]
 
 function mountDialog(props: Record<string, unknown> = {}) {
@@ -28,7 +29,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
       editing: null,
       submitting: false,
       errorMessage: '',
-      jobs,
+      plans,
       defaultDate: new Date(2026, 7, 25, 10, 0),
       ...props,
     },
@@ -48,7 +49,8 @@ describe('ScheduleEventDialog', () => {
     expect(inputValue(wrapper, '[data-test="event-date"]')).toBe('2026-08-25')
     expect(inputValue(wrapper, '[data-test="event-time"]')).toBe('14:00')
     expect(inputValue(wrapper, '[data-test="event-end-time"]')).toBe('15:30')
-    expect(inputValue(wrapper, '[data-test="event-job"]')).toBe('6')
+    // 旧日程仅含 JD：回退匹配到对应计划
+    expect(inputValue(wrapper, '[data-test="event-plan"]')).toBe('3')
     expect(inputValue(wrapper, '[data-test="event-notes"]')).toBe('带上作品集')
   })
 
@@ -59,7 +61,7 @@ describe('ScheduleEventDialog', () => {
     expect(inputValue(wrapper, '[data-test="event-date"]')).toBe('2026-08-25')
     expect(inputValue(wrapper, '[data-test="event-time"]')).toBe('10:00')
     expect(inputValue(wrapper, '[data-test="event-end-time"]')).toBe('')
-    expect(inputValue(wrapper, '[data-test="event-job"]')).toBe('')
+    expect(inputValue(wrapper, '[data-test="event-plan"]')).toBe('')
   })
 
   it('emits the full payload including endTime and job association', async () => {
@@ -75,7 +77,9 @@ describe('ScheduleEventDialog', () => {
       startTime: '2026-08-25T14:00:00',
       endTime: '2026-08-25T15:30:00',
       notes: '带上作品集',
+      // 编辑回退匹配到计划 3：JD 随计划写入，主键为计划 ID
       jobDescriptionId: 6,
+      jobProjectId: 3,
     })
   })
 
@@ -83,11 +87,12 @@ describe('ScheduleEventDialog', () => {
     const wrapper = mountDialog({ editing: editingEvent })
     await flushPromises()
 
-    await wrapper.get('[data-test="event-job"]').setValue('')
+    await wrapper.get('[data-test="event-plan"]').setValue('')
     await wrapper.find('form').trigger('submit')
 
     const [payload] = wrapper.emitted('save')!.at(-1)!
     expect((payload as { jobDescriptionId: number | null }).jobDescriptionId).toBeNull()
+    expect((payload as { jobProjectId: number | null }).jobProjectId).toBeNull()
   })
 
   it('blocks submission while endTime is not after startTime', async () => {
@@ -112,7 +117,7 @@ describe('ScheduleEventDialog', () => {
     const wrapper = mountDialog({ editing: editingEvent, submitting: true })
     await flushPromises()
 
-    const options = wrapper.findAll('[data-test="event-job"] option')
+    const options = wrapper.findAll('[data-test="event-plan"] option')
     expect(options.map((option) => option.text())).toEqual(['不关联', '腾讯 · 后端', '字节 · 前端'])
 
     const save = wrapper.get('[data-test="event-save"]')

@@ -14,6 +14,7 @@ public record UpdateScheduleEventRequest(
         LocalDateTime endTime,
         @Size(max = 1000, message = "备注不能超过 1000 个字符")
         String notes,
-        Long jobDescriptionId
+        Long jobDescriptionId,
+        Long jobProjectId
 ) {
 }

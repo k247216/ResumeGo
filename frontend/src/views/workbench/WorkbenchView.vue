@@ -164,6 +164,9 @@ watch(agendaEvents, (events) => {
 const selectedEvent = computed(() => agendaEvents.value.find((event) => event.id === selectedEventId.value) ?? agendaEvents.value[0] ?? null)
 
 function resolveEventTarget(event: ScheduleEvent): JobProject | null {
+  if (event.jobProjectId != null) {
+    return targetsStore.targets.find((target) => target.id === event.jobProjectId) ?? null
+  }
   if (event.jobDescriptionId === null) return null
   return targetsStore.targets.find((target) => target.jobDescriptionId === event.jobDescriptionId) ?? null
 }
@@ -180,6 +183,9 @@ const detailTarget = computed<JobProject | null>(() => {
   const event = selectedEvent.value
   if (event) {
     const source = scheduleEvents.value.find((item) => String(item.id) === event.id)
+    if (source?.jobProjectId != null) {
+      return targetsStore.targets.find((item) => item.id === source.jobProjectId) ?? null
+    }
     if (source?.jobDescriptionId != null) {
       return targetsStore.targets.find((item) => item.jobDescriptionId === source.jobDescriptionId) ?? null
     }
@@ -409,8 +415,8 @@ function handleTargetAction(action: TargetDashboardAction, targetId?: number) {
   if (action === 'link-target') { openLinkDialog(targetId); return }
 }
 
-// ── 未关联事件的「关联目标 →」：选择已有目标，PATCH 事件的 jobDescriptionId 后刷新 ──
-const linkableTargets = computed(() => targetsStore.targets.filter((target) => target.jobDescriptionId != null))
+// ── 未关联事件的「关联目标 →」：选择已有求职计划，PATCH 事件的 jobProjectId（兼容字段 jobDescriptionId 随计划写入）后刷新 ──
+const linkableTargets = computed(() => targetsStore.targets.filter((target) => target.status === 'active'))
 
 function openLinkDialog(eventId?: number) {
   linkError.value = ''
@@ -430,7 +436,7 @@ function openLinkJob() {
 async function linkEventToTarget(targetId: number) {
   const event = scheduleEvents.value.find((item) => String(item.id) === String(pendingLinkEventId.value))
   const target = targetsStore.targets.find((item) => item.id === targetId)
-  if (!event || !target?.jobDescriptionId || linkSubmitting.value) return
+  if (!event || !target || linkSubmitting.value) return
   linkSubmitting.value = true
   linkError.value = ''
   try {
@@ -440,7 +446,8 @@ async function linkEventToTarget(targetId: number) {
       startTime: event.startTime,
       endTime: event.endTime,
       notes: event.notes,
-      jobDescriptionId: target.jobDescriptionId,
+      jobDescriptionId: target.jobDescriptionId ?? null,
+      jobProjectId: target.id,
     })
     await loadUpcomingSchedule()
     linkDialogOpen.value = false

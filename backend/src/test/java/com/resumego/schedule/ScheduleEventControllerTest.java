@@ -28,7 +28,7 @@ class ScheduleEventControllerTest {
 
     private ScheduleEventResponse sample() {
         return new ScheduleEventResponse(7L, "腾讯技术面", "interview",
-                LocalDateTime.of(2026, 8, 25, 14, 0), null, "第一轮", 10L,
+                LocalDateTime.of(2026, 8, 25, 14, 0), null, "第一轮", 10L, 100L,
                 LocalDateTime.now(), LocalDateTime.now());
     }
 

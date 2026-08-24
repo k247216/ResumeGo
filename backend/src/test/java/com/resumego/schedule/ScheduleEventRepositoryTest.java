@@ -46,14 +46,14 @@ class ScheduleEventRepositoryTest {
     @Test
     void createsAndUpdatesLifecycle() {
         long id = repository.create(1L, "线下二面", "interview",
-                LocalDateTime.of(2026, 9, 1, 10, 0), null, "带简历", null);
+                LocalDateTime.of(2026, 9, 1, 10, 0), null, "带简历", null, 100L);
 
         assertThat(repository.findById(1L, id)).get()
-                .extracting(ScheduleEvent::title, ScheduleEvent::eventType, ScheduleEvent::notes)
-                .containsExactly("线下二面", "interview", "带简历");
+                .extracting(ScheduleEvent::title, ScheduleEvent::eventType, ScheduleEvent::notes, ScheduleEvent::jobProjectId)
+                .containsExactly("线下二面", "interview", "带简历", 100L);
 
         assertThat(repository.update(1L, id, "线下二面（改期）", "interview",
-                LocalDateTime.of(2026, 9, 2, 10, 0), null, null, null)).isOne();
+                LocalDateTime.of(2026, 9, 2, 10, 0), null, null, null, 100L)).isOne();
         assertThat(repository.findById(1L, id)).get()
                 .extracting(ScheduleEvent::title, ScheduleEvent::startTime)
                 .containsExactly("线下二面（改期）", LocalDateTime.of(2026, 9, 2, 10, 0));
@@ -66,5 +66,6 @@ class ScheduleEventRepositoryTest {
     void ownsJobDescriptionChecksUser() {
         assertThat(repository.ownsJobDescription(1L, 10L)).isTrue();
         assertThat(repository.ownsJobDescription(1L, 20L)).isFalse();
+        assertThat(repository.findJobDescriptionIdForProject(1L, 100L)).isEqualTo(10L);
     }
 }

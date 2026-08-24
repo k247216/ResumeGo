@@ -10,6 +10,7 @@ public record ScheduleEventResponse(
         LocalDateTime endTime,
         String notes,
         Long jobDescriptionId,
+        Long jobProjectId,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

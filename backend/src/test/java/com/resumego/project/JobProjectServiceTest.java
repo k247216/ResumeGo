@@ -37,6 +37,8 @@ class JobProjectServiceTest {
 
         assertThat(result.id()).isEqualTo(7L);
         verify(repository).create(1L, "Java 实习", 10L, 31L);
+        // 契约：创建即写入初始「投递中」阶段历史，时间轴从创建时刻完整
+        verify(repository).insertStageEvent(1L, 7L, "applied");
     }
 
     @Test

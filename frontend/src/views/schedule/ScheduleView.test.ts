@@ -74,6 +74,7 @@ function makeEvent(partial: Partial<ScheduleEvent>): ScheduleEvent {
     endTime: null,
     notes: null,
     jobDescriptionId: null,
+    jobProjectId: null,
     createdAt: '',
     updatedAt: '',
     ...partial,
@@ -273,7 +274,8 @@ describe('ScheduleView', () => {
     await flushPromises()
 
     expect(inputValue(wrapper, '[data-test="event-end-time"]')).toBe('18:00')
-    expect(inputValue(wrapper, '[data-test="event-job"]')).toBe('6')
+    // 编辑回退：旧日程仅含 JD，自动匹配到对应计划
+    expect(inputValue(wrapper, '[data-test="event-plan"]')).toBe('3')
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -285,6 +287,7 @@ describe('ScheduleView', () => {
       endTime: timeAt(0, 18),
       notes: null,
       jobDescriptionId: 6,
+      jobProjectId: 3,
     })
     expect(elMessageSuccess).toHaveBeenCalledWith('日程已更新')
   })
@@ -352,7 +355,7 @@ describe('ScheduleView', () => {
 
     await wrapper.get('[data-test="event-title"]').setValue('复试')
     await wrapper.get('[data-test="event-end-time"]').setValue('17:00')
-    await wrapper.get('[data-test="event-job"]').setValue('12')
+    await wrapper.get('[data-test="event-plan"]').setValue('5')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -363,6 +366,7 @@ describe('ScheduleView', () => {
       endTime: `${dayKey(0)}T17:00:00`,
       notes: null,
       jobDescriptionId: 12,
+      jobProjectId: 5,
     })
   })
 })

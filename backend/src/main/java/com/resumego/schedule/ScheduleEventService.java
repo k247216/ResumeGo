@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -33,18 +34,22 @@ public class ScheduleEventService {
 
     @Transactional
     public ScheduleEventResponse create(CreateScheduleEventRequest request) {
-        validate(request.title(), request.eventType(), request.startTime(), request.endTime(), request.jobDescriptionId());
+        ResolvedLink link = validate(request.title(), request.eventType(), request.startTime(), request.endTime(),
+                request.jobDescriptionId(), request.jobProjectId());
         long id = repository.create(userId(), normalizeTitle(request.title()), request.eventType(),
-                request.startTime(), request.endTime(), request.notes(), request.jobDescriptionId());
+                request.startTime(), request.endTime(), request.notes(), link.jobDescriptionId(),
+                link.jobProjectId());
         return get(id);
     }
 
     @Transactional
     public ScheduleEventResponse update(long eventId, UpdateScheduleEventRequest request) {
         requireEvent(eventId);
-        validate(request.title(), request.eventType(), request.startTime(), request.endTime(), request.jobDescriptionId());
+        ResolvedLink link = validate(request.title(), request.eventType(), request.startTime(), request.endTime(),
+                request.jobDescriptionId(), request.jobProjectId());
         repository.update(userId(), eventId, normalizeTitle(request.title()), request.eventType(),
-                request.startTime(), request.endTime(), request.notes(), request.jobDescriptionId());
+                request.startTime(), request.endTime(), request.notes(), link.jobDescriptionId(),
+                link.jobProjectId());
         return get(eventId);
     }
 
@@ -53,8 +58,8 @@ public class ScheduleEventService {
         return repository.softDelete(userId(), eventId) > 0;
     }
 
-    private void validate(String title, String eventType, LocalDateTime startTime,
-                          LocalDateTime endTime, Long jobDescriptionId) {
+    private ResolvedLink validate(String title, String eventType, LocalDateTime startTime,
+                                  LocalDateTime endTime, Long jobDescriptionId, Long jobProjectId) {
         if (title == null || title.strip().isEmpty()) {
             throw new IllegalArgumentException("日程标题不能为空");
         }
@@ -67,9 +72,20 @@ public class ScheduleEventService {
         if (endTime != null && endTime.isBefore(startTime)) {
             throw new IllegalArgumentException("结束时间不能早于开始时间");
         }
+        if (jobProjectId != null) {
+            if (!repository.ownsJobProject(userId(), jobProjectId)) {
+                throw new IllegalArgumentException("所选求职计划不可用");
+            }
+            Long projectJobDescriptionId = repository.findJobDescriptionIdForProject(userId(), jobProjectId);
+            if (jobDescriptionId != null && !Objects.equals(jobDescriptionId, projectJobDescriptionId)) {
+                throw new IllegalArgumentException("岗位与求职计划不一致");
+            }
+            return new ResolvedLink(projectJobDescriptionId, jobProjectId);
+        }
         if (jobDescriptionId != null && !repository.ownsJobDescription(userId(), jobDescriptionId)) {
             throw new IllegalArgumentException("所选目标岗位不可用");
         }
+        return new ResolvedLink(jobDescriptionId, null);
     }
 
     private String normalizeTitle(String value) {
@@ -92,6 +108,9 @@ public class ScheduleEventService {
     private ScheduleEventResponse toResponse(ScheduleEvent event) {
         return new ScheduleEventResponse(event.id(), event.title(), event.eventType(),
                 event.startTime(), event.endTime(), event.notes(), event.jobDescriptionId(),
-                event.createdAt(), event.updatedAt());
+                event.jobProjectId(), event.createdAt(), event.updatedAt());
+    }
+
+    private record ResolvedLink(Long jobDescriptionId, Long jobProjectId) {
     }
 }
