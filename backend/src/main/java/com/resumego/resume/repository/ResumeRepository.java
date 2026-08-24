@@ -40,28 +40,98 @@ public class ResumeRepository {
     }
 
     public List<Long> findIdsByUserId(long userId) {
-        return jdbcTemplate.query(
-                "SELECT id FROM resumes WHERE user_id = ? AND deleted_at IS NULL ORDER BY id",
-                (rs, rowNum) -> rs.getLong("id"),
-                userId
-        );
+        return findIdsByUserId(userId, null, false);
+    }
+
+    public List<Long> findIdsByUserId(long userId, String kind, boolean archived) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT id FROM resumes WHERE user_id = ? AND deleted_at IS NULL AND archived_at IS ");
+        sql.append(archived ? "NOT NULL" : "NULL");
+        Object[] args = kind != null
+                ? new Object[]{userId, kind}
+                : new Object[]{userId};
+        if (kind != null) sql.append(" AND kind = ?");
+        sql.append(" ORDER BY id");
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> rs.getLong("id"), args);
     }
 
     public long insertResume(long userId, String title, Long targetJobDescriptionId) {
+        return insertResume(userId, title, targetJobDescriptionId, "GENERAL", null);
+    }
+
+    public long insertResume(long userId, String title, Long targetJobDescriptionId,
+                             String kind, Long forkedFromVersionId) {
         jdbcTemplate.update(
-                "INSERT INTO resumes (user_id, title, target_job_description_id) VALUES (?, ?, ?)",
-                userId, title, targetJobDescriptionId
+                "INSERT INTO resumes (user_id, title, target_job_description_id, kind, forked_from_version_id) VALUES (?, ?, ?, ?, ?)",
+                userId, title, targetJobDescriptionId, kind, forkedFromVersionId
         );
         Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         return id != null ? id : 0L;
     }
 
-    public String findTitleById(long id) {
+    public String findTitleById(long userId, long id) {
         return jdbcTemplate.queryForObject(
-                "SELECT title FROM resumes WHERE id = ? AND deleted_at IS NULL",
+                "SELECT title FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
                 String.class,
-                id
+                id, userId
         );
+    }
+
+    public String findKindById(long userId, long id) {
+        return jdbcTemplate.queryForObject(
+                "SELECT kind FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                String.class,
+                id, userId
+        );
+    }
+
+    public Long findForkedFromVersionIdById(long userId, long id) {
+        return jdbcTemplate.queryForObject(
+                "SELECT forked_from_version_id FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                Long.class,
+                id, userId
+        );
+    }
+
+    public java.time.LocalDateTime findArchivedAtById(long userId, long id) {
+        return jdbcTemplate.queryForObject(
+                "SELECT archived_at FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                java.time.LocalDateTime.class,
+                id, userId
+        );
+    }
+
+    public void updateTitle(long userId, long resumeId, String title) {
+        jdbcTemplate.update(
+                "UPDATE resumes SET title = ?, updated_at = NOW(3) WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                title, resumeId, userId
+        );
+    }
+
+    public void updateArchivedAt(long userId, long resumeId, java.time.LocalDateTime archivedAt) {
+        jdbcTemplate.update(
+                "UPDATE resumes SET archived_at = ?, updated_at = NOW(3) WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                archivedAt, resumeId, userId
+        );
+    }
+
+    /**
+     * 原子创建岗位表达副本：读取到的源正文由调用方传入（服务端复制，renderer 不提交正文）。
+     * 创建 JOB_EXPRESSION 资产 + fork V1 + 更新 current_version_id，需在事务内调用。
+     */
+    public long createForkedAsset(long userId, String title, long sourceVersionId,
+                                  int sourceVersionNo, String contentJson) {
+        long resumeId = insertResume(userId, title, null, "JOB_EXPRESSION", sourceVersionId);
+        long v1Id = insertVersion(
+                resumeId,
+                null,
+                1,
+                contentJson,
+                "从源版本 V" + sourceVersionNo + " 创建岗位表达副本",
+                "fork"
+        );
+        updateCurrentVersionId(resumeId, v1Id);
+        return resumeId;
     }
 
     public Long findCurrentVersionId(long resumeId) {
@@ -72,11 +142,11 @@ public class ResumeRepository {
         );
     }
 
-    public Long findTargetJobDescriptionIdById(long id) {
+    public Long findTargetJobDescriptionIdById(long userId, long id) {
         return jdbcTemplate.queryForObject(
-                "SELECT target_job_description_id FROM resumes WHERE id = ? AND deleted_at IS NULL",
+                "SELECT target_job_description_id FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
                 Long.class,
-                id
+                id, userId
         );
     }
 
@@ -99,6 +169,31 @@ public class ResumeRepository {
                 versionId
         );
         return rows.stream().findFirst().orElse(null);
+    }
+
+    /** 按用户读取版本：跨用户按不存在处理（JOIN resumes 校验归属）。 */
+    public ResumeVersionDTO findVersionByIdForUser(long userId, long versionId) {
+        List<ResumeVersionDTO> rows = jdbcTemplate.query(
+                """
+                        SELECT rv.id, rv.resume_id, rv.parent_version_id, rv.version_no, rv.content_json,
+                               rv.change_summary, rv.created_by_type, rv.created_at
+                        FROM resume_versions rv
+                        JOIN resumes r ON r.id = rv.resume_id
+                        WHERE rv.id = ? AND r.user_id = ? AND r.deleted_at IS NULL
+                        """,
+                versionRowMapper(),
+                versionId, userId
+        );
+        return rows.stream().findFirst().orElse(null);
+    }
+
+    /** 读取版本原始正文 JSON（用于 fork 服务端复制），需在归属校验后调用。 */
+    public String findContentJsonById(long versionId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT content_json FROM resume_versions WHERE id = ?",
+                String.class,
+                versionId
+        );
     }
 
     public List<ResumeVersionDTO> findVersionsByResumeId(long resumeId) {

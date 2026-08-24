@@ -20,12 +20,19 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @Service
 public class ResumeService {
 
     /** 简历内容最大长度（字符数），防止超长文本导致 AI Token 超额 */
     private static final int MAX_RESUME_CONTENT_LENGTH = 50_000;
+
+    /** 简历资产种类（冻结契约：只有 GENERAL 与 JOB_EXPRESSION） */
+    public static final String KIND_GENERAL = "GENERAL";
+    public static final String KIND_JOB_EXPRESSION = "JOB_EXPRESSION";
+
+    private static final int MAX_TITLE_LENGTH = 120;
 
     private final ResumeRepository resumeRepository;
     private final ObjectMapper objectMapper;
@@ -36,10 +43,19 @@ public class ResumeService {
     }
 
     public List<ResumeDTO> listByDemoUser() {
-        List<Long> resumeIds = resumeRepository.findIdsByUserId(CurrentUser.DEMO_USER_ID);
+        return listAssets(null, false);
+    }
+
+    /** 资产列表：kind 过滤（null=全部），archived 缺省 false。 */
+    public List<ResumeDTO> listAssets(String kind, Boolean archived) {
+        if (kind != null && !KIND_GENERAL.equals(kind) && !KIND_JOB_EXPRESSION.equals(kind)) {
+            throw new IllegalArgumentException("未知的简历种类");
+        }
+        boolean archivedFlag = archived != null && archived;
+        List<Long> resumeIds = resumeRepository.findIdsByUserId(CurrentUser.DEMO_USER_ID, kind, archivedFlag);
         List<ResumeDTO> result = new ArrayList<>();
         for (Long id : resumeIds) {
-            result.add(buildResumeResponse(id));
+            result.add(buildResumeResponse(CurrentUser.DEMO_USER_ID, id));
         }
         return result;
     }
@@ -82,12 +98,12 @@ public class ResumeService {
                 extractProjectEvidenceRefs(content)
         );
         resumeRepository.updateCurrentVersionId(resumeId, versionId);
-        return buildResumeResponse(resumeId);
+        return buildResumeResponse(CurrentUser.DEMO_USER_ID, resumeId);
     }
 
     @Transactional
     public ResumeDTO updateTargetJob(long resumeId, UpdateResumeTargetJobRequest request) {
-        String title = resumeRepository.findTitleById(resumeId);
+        String title = resumeRepository.findTitleById(CurrentUser.DEMO_USER_ID, resumeId);
         if (title == null) {
             throw new IllegalArgumentException("简历不存在");
         }
@@ -96,22 +112,89 @@ public class ResumeService {
                 resumeId,
                 request == null ? null : request.targetJobDescriptionId()
         );
-        return buildResumeResponse(resumeId);
+        return buildResumeResponse(CurrentUser.DEMO_USER_ID, resumeId);
     }
 
-    private ResumeDTO buildResumeResponse(long resumeId) {
-        String title = resumeRepository.findTitleById(resumeId);
-        Long targetJobDescriptionId = resumeRepository.findTargetJobDescriptionIdById(resumeId);
+    /** 创建岗位表达副本：服务端读取源版本正文复制，renderer 只提交新标题。 */
+    @Transactional
+    public ResumeDTO forkVersion(long sourceVersionId, com.resumego.resume.dto.ForkResumeVersionRequest request) {
+        String title = normalizeTitle(request == null ? null : request.title());
+
+        ResumeVersionDTO source = resumeRepository.findVersionByIdForUser(CurrentUser.DEMO_USER_ID, sourceVersionId);
+        if (source == null) {
+            throw new NoSuchElementException("简历版本不存在");
+        }
+        String contentJson = resumeRepository.findContentJsonById(sourceVersionId);
+        if (contentJson == null || contentJson.isBlank()) {
+            throw new IllegalArgumentException("源版本内容为空，无法创建副本");
+        }
+
+        long newResumeId = resumeRepository.createForkedAsset(
+                CurrentUser.DEMO_USER_ID, title, sourceVersionId, source.versionNo(), contentJson);
+        return buildResumeResponse(CurrentUser.DEMO_USER_ID, newResumeId);
+    }
+
+    /** 简历资产改名。 */
+    @Transactional
+    public ResumeDTO renameResume(long resumeId, com.resumego.resume.dto.UpdateResumeAssetRequest request) {
+        String title = normalizeTitle(request == null ? null : request.title());
+        if (resumeRepository.findTitleById(CurrentUser.DEMO_USER_ID, resumeId) == null) {
+            throw new NoSuchElementException("简历不存在");
+        }
+        resumeRepository.updateTitle(CurrentUser.DEMO_USER_ID, resumeId, title);
+        return buildResumeResponse(CurrentUser.DEMO_USER_ID, resumeId);
+    }
+
+    /** 归档：不删除历史与关联；重复归档无副作用。 */
+    @Transactional
+    public ResumeDTO archiveResume(long resumeId) {
+        requireExistingResume(resumeId);
+        resumeRepository.updateArchivedAt(CurrentUser.DEMO_USER_ID, resumeId, java.time.LocalDateTime.now());
+        return buildResumeResponse(CurrentUser.DEMO_USER_ID, resumeId);
+    }
+
+    /** 恢复归档资产；未归档资产恢复无副作用。 */
+    @Transactional
+    public ResumeDTO restoreResume(long resumeId) {
+        requireExistingResume(resumeId);
+        resumeRepository.updateArchivedAt(CurrentUser.DEMO_USER_ID, resumeId, null);
+        return buildResumeResponse(CurrentUser.DEMO_USER_ID, resumeId);
+    }
+
+    private void requireExistingResume(long resumeId) {
+        if (resumeRepository.findTitleById(CurrentUser.DEMO_USER_ID, resumeId) == null) {
+            throw new NoSuchElementException("简历不存在");
+        }
+    }
+
+    private String normalizeTitle(String rawTitle) {
+        String title = rawTitle == null ? "" : rawTitle.trim();
+        if (title.isEmpty()) {
+            throw new IllegalArgumentException("简历名称不能为空");
+        }
+        if (title.length() > MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("简历名称过长，最大 " + MAX_TITLE_LENGTH + " 字符");
+        }
+        return title;
+    }
+
+    private ResumeDTO buildResumeResponse(long userId, long resumeId) {
+        String title = resumeRepository.findTitleById(userId, resumeId);
+        String kind = resumeRepository.findKindById(userId, resumeId);
+        Long forkedFromVersionId = resumeRepository.findForkedFromVersionIdById(userId, resumeId);
+        java.time.LocalDateTime archivedAt = resumeRepository.findArchivedAtById(userId, resumeId);
+        Long targetJobDescriptionId = resumeRepository.findTargetJobDescriptionIdById(userId, resumeId);
         Long versionId = resumeRepository.findCurrentVersionId(resumeId);
         ResumeVersionDTO currentVersion = null;
         if (versionId != null) {
             currentVersion = resumeRepository.findVersionById(versionId);
         }
-        return new ResumeDTO(resumeId, title, targetJobDescriptionId, currentVersion, null, null);
+        return new ResumeDTO(resumeId, title, kind, forkedFromVersionId, archivedAt,
+                targetJobDescriptionId, currentVersion, null, null);
     }
 
     public ResumeVersionDTO getVersion(long versionId) {
-        ResumeVersionDTO version = resumeRepository.findVersionById(versionId);
+        ResumeVersionDTO version = resumeRepository.findVersionByIdForUser(CurrentUser.DEMO_USER_ID, versionId);
         if (version == null) {
             throw new IllegalArgumentException("简历版本不存在");
         }
@@ -119,7 +202,7 @@ public class ResumeService {
     }
 
     public List<ResumeVersionDTO> getVersions(long resumeId) {
-        String title = resumeRepository.findTitleById(resumeId);
+        String title = resumeRepository.findTitleById(CurrentUser.DEMO_USER_ID, resumeId);
         if (title == null) {
             throw new IllegalArgumentException("简历不存在");
         }
@@ -132,7 +215,7 @@ public class ResumeService {
             throw new IllegalArgumentException("简历内容不能为空");
         }
 
-        String title = resumeRepository.findTitleById(resumeId);
+        String title = resumeRepository.findTitleById(CurrentUser.DEMO_USER_ID, resumeId);
         if (title == null) {
             throw new IllegalArgumentException("简历不存在");
         }

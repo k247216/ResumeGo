@@ -36,17 +36,17 @@ class ResumeRepositoryTest {
     @Test
     void shouldQueryResumeIdsAndBasicColumns() {
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), anyLong())).thenReturn(List.of(2L, 5L));
-        when(jdbcTemplate.queryForObject(anyString(), org.mockito.ArgumentMatchers.eq(String.class), anyLong()))
+        when(jdbcTemplate.queryForObject(anyString(), org.mockito.ArgumentMatchers.eq(String.class), anyLong(), anyLong()))
                 .thenReturn("后端求职简历");
         when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("current_version_id"),
                 org.mockito.ArgumentMatchers.eq(Long.class), anyLong())).thenReturn(12L);
         when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("target_job_description_id"),
-                org.mockito.ArgumentMatchers.eq(Long.class), anyLong())).thenReturn(30L);
+                org.mockito.ArgumentMatchers.eq(Long.class), anyLong(), anyLong())).thenReturn(30L);
 
         assertThat(repository.findIdsByUserId(1L)).containsExactly(2L, 5L);
-        assertThat(repository.findTitleById(2L)).isEqualTo("后端求职简历");
+        assertThat(repository.findTitleById(1L, 2L)).isEqualTo("后端求职简历");
         assertThat(repository.findCurrentVersionId(2L)).isEqualTo(12L);
-        assertThat(repository.findTargetJobDescriptionIdById(2L)).isEqualTo(30L);
+        assertThat(repository.findTargetJobDescriptionIdById(1L, 2L)).isEqualTo(30L);
     }
 
     @Test
@@ -83,19 +83,39 @@ class ResumeRepositoryTest {
     }
 
     @Test
+    @DisplayName("createForkedAsset: 原子创建 JOB_EXPRESSION 资产 + fork V1 + 更新当前版本")
+    void shouldCreateForkedAssetAtomically() {
+        when(jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class)).thenReturn(30L, 31L);
+
+        long newId = repository.createForkedAsset(1L, "岗位表达副本", 77L, 3, "{\"from\":\"source\"}");
+
+        assertThat(newId).isEqualTo(30L);
+        verify(jdbcTemplate).update(org.mockito.ArgumentMatchers.contains("forked_from_version_id"),
+                org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("岗位表达副本"),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("JOB_EXPRESSION"),
+                org.mockito.ArgumentMatchers.eq(77L));
+        verify(jdbcTemplate).update(org.mockito.ArgumentMatchers.contains("INSERT INTO resume_versions"),
+                org.mockito.ArgumentMatchers.eq(30L), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq("{\"from\":\"source\"}"),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("fork"));
+        verify(jdbcTemplate).update(org.mockito.ArgumentMatchers.contains("current_version_id"),
+                org.mockito.ArgumentMatchers.eq(31L), org.mockito.ArgumentMatchers.eq(30L));
+    }
+
+    @Test
     @DisplayName("kind、forked_from_version_id、archived_at 可读回")
     void shouldReadBackAssetKindForkSourceAndArchivedAt() {
         when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("kind"),
-                org.mockito.ArgumentMatchers.eq(String.class), anyLong())).thenReturn("JOB_EXPRESSION");
+                org.mockito.ArgumentMatchers.eq(String.class), anyLong(), anyLong())).thenReturn("JOB_EXPRESSION");
         when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("forked_from_version_id"),
-                org.mockito.ArgumentMatchers.eq(Long.class), anyLong())).thenReturn(77L);
+                org.mockito.ArgumentMatchers.eq(Long.class), anyLong(), anyLong())).thenReturn(77L);
         when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("archived_at"),
-                org.mockito.ArgumentMatchers.eq(LocalDateTime.class), anyLong()))
+                org.mockito.ArgumentMatchers.eq(LocalDateTime.class), anyLong(), anyLong()))
                 .thenReturn(LocalDateTime.of(2026, 8, 25, 10, 0));
 
-        assertThat(repository.findKindById(2L)).isEqualTo("JOB_EXPRESSION");
-        assertThat(repository.findForkedFromVersionIdById(2L)).isEqualTo(77L);
-        assertThat(repository.findArchivedAtById(2L)).isEqualTo(LocalDateTime.of(2026, 8, 25, 10, 0));
+        assertThat(repository.findKindById(1L, 2L)).isEqualTo("JOB_EXPRESSION");
+        assertThat(repository.findForkedFromVersionIdById(1L, 2L)).isEqualTo(77L);
+        assertThat(repository.findArchivedAtById(1L, 2L)).isEqualTo(LocalDateTime.of(2026, 8, 25, 10, 0));
     }
 
     @Test

@@ -3,8 +3,10 @@ package com.resumego.resume.controller;
 import com.resumego.common.ApiResponse;
 import com.resumego.resume.dto.CreateResumeRequest;
 import com.resumego.resume.dto.CreateResumeVersionRequest;
+import com.resumego.resume.dto.ForkResumeVersionRequest;
 import com.resumego.resume.dto.ResumeDTO;
 import com.resumego.resume.dto.ResumeVersionDTO;
+import com.resumego.resume.dto.UpdateResumeAssetRequest;
 import com.resumego.resume.dto.UpdateResumeTargetJobRequest;
 import com.resumego.resume.service.ResumeService;
 import jakarta.validation.Valid;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -41,8 +44,14 @@ public class ResumeController {
     }
 
     @GetMapping("/resumes")
-    public ResponseEntity<ApiResponse<List<ResumeDTO>>> list() {
-        return ResponseEntity.ok(ApiResponse.ok(resumeService.listByDemoUser()));
+    public ResponseEntity<ApiResponse<List<ResumeDTO>>> list(
+            @RequestParam(required = false) String kind,
+            @RequestParam(required = false) Boolean archived) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(resumeService.listAssets(kind, archived)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
     }
 
     @PostMapping("/resumes")
@@ -100,6 +109,55 @@ public class ResumeController {
             return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(version));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /** 从任意版本创建岗位表达副本：只接受新标题，正文由服务端复制。 */
+    @PostMapping("/resume-versions/{versionId}/fork")
+    public ResponseEntity<ApiResponse<ResumeDTO>> forkVersion(
+            @PathVariable Long versionId,
+            @Valid @RequestBody ForkResumeVersionRequest request) {
+        try {
+            ResumeDTO forked = resumeService.forkVersion(versionId, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(forked));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /** 简历资产改名。 */
+    @PatchMapping("/resumes/{resumeId}")
+    public ResponseEntity<ApiResponse<ResumeDTO>> rename(
+            @PathVariable Long resumeId,
+            @Valid @RequestBody UpdateResumeAssetRequest request) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(resumeService.renameResume(resumeId, request)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /** 归档简历资产（不删除历史与关联）。 */
+    @PostMapping("/resumes/{resumeId}/archive")
+    public ResponseEntity<ApiResponse<ResumeDTO>> archive(@PathVariable Long resumeId) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(resumeService.archiveResume(resumeId)));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /** 恢复归档的简历资产。 */
+    @PostMapping("/resumes/{resumeId}/restore")
+    public ResponseEntity<ApiResponse<ResumeDTO>> restore(@PathVariable Long resumeId) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(resumeService.restoreResume(resumeId)));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
         }
     }
 }

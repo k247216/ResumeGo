@@ -3,8 +3,10 @@ package com.resumego.resume;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resumego.resume.dto.CreateResumeRequest;
 import com.resumego.resume.dto.CreateResumeVersionRequest;
+import com.resumego.resume.dto.ForkResumeVersionRequest;
 import com.resumego.resume.dto.ResumeDTO;
 import com.resumego.resume.dto.ResumeVersionDTO;
+import com.resumego.resume.dto.UpdateResumeAssetRequest;
 import com.resumego.resume.dto.UpdateResumeTargetJobRequest;
 import com.resumego.resume.repository.ResumeRepository;
 import com.resumego.resume.service.ResumeService;
@@ -14,8 +16,10 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -276,6 +280,115 @@ class ResumeServiceTest {
                 .hasMessageContaining("简历版本不存在");
     }
 
+    @Test
+    @DisplayName("fork: 服务端读取源正文，创建 JOB_EXPRESSION 资产与 V1，谱系只记录 forkedFromVersionId")
+    void shouldForkVersionIntoIndependentAsset() {
+        ResumeDTO forked = resumeService.forkVersion(10L, new ForkResumeVersionRequest("腾讯岗位表达"));
+
+        assertThat(resumeRepository.forkCalls).isEqualTo(1);
+        assertThat(resumeRepository.forkedSourceVersionId).isEqualTo(10L);
+        assertThat(resumeRepository.forkedTitle).isEqualTo("腾讯岗位表达");
+        assertThat(resumeRepository.forkedContentJson).contains("old-content");
+        assertThat(resumeRepository.forkCreatedByType).isEqualTo("fork");
+        assertThat(resumeRepository.forkParentVersionId).isNull();
+        assertThat(forked.id()).isEqualTo(30L);
+        assertThat(forked.kind()).isEqualTo("JOB_EXPRESSION");
+        assertThat(forked.forkedFromVersionId()).isEqualTo(10L);
+        assertThat(forked.archivedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("fork: 源与副本后续保存互不影响，版本号各自独立")
+    void shouldKeepSourceAndForkIndependent() {
+        resumeService.forkVersion(10L, new ForkResumeVersionRequest("副本"));
+
+        resumeService.createManualVersion(
+                1L, new CreateResumeVersionRequest(Map.of("basicInfo", Map.of("name", "源更新")), "源修改"));
+        resumeService.createManualVersion(
+                30L, new CreateResumeVersionRequest(Map.of("basicInfo", Map.of("name", "副本更新")), "副本修改"));
+
+        assertThat(resumeRepository.maxVersionNoByResume.get(1L)).isEqualTo(3);
+        assertThat(resumeRepository.maxVersionNoByResume.get(30L)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("fork: 跨用户版本按不存在处理且无副作用")
+    void shouldRejectForkForCrossUserVersion() {
+        assertThatThrownBy(() -> resumeService.forkVersion(999L, new ForkResumeVersionRequest("副本")))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("简历版本不存在");
+        assertThat(resumeRepository.forkCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("fork: 空白或超长标题拒绝且不写库")
+    void shouldRejectInvalidForkTitle() {
+        assertThatThrownBy(() -> resumeService.forkVersion(10L, new ForkResumeVersionRequest("  ")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("简历名称");
+        StringBuilder longTitle = new StringBuilder();
+        for (int i = 0; i < 121; i++) longTitle.append('名');
+        assertThatThrownBy(() -> resumeService.forkVersion(10L, new ForkResumeVersionRequest(longTitle.toString())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("简历名称");
+        assertThat(resumeRepository.forkCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("archive/restore: 归档可读回、恢复清空、重复归档无副作用")
+    void shouldArchiveAndRestoreWithoutSideEffects() {
+        resumeService.archiveResume(1L);
+        LocalDateTime firstArchiveAt = resumeRepository.archivedAtByResumeId.get(1L);
+        assertThat(firstArchiveAt).isNotNull();
+
+        resumeService.archiveResume(1L);
+        assertThat(resumeRepository.archivedAtByResumeId.get(1L)).isEqualTo(firstArchiveAt);
+
+        resumeService.restoreResume(1L);
+        assertThat(resumeRepository.archivedAtByResumeId.get(1L)).isNull();
+    }
+
+    @Test
+    @DisplayName("archive/restore: 跨用户按不存在处理")
+    void shouldRejectArchiveForMissingResume() {
+        assertThatThrownBy(() -> resumeService.archiveResume(999L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("简历不存在");
+        assertThatThrownBy(() -> resumeService.restoreResume(999L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("简历不存在");
+    }
+
+    @Test
+    @DisplayName("listAssets: kind 与 archived 过滤，archived 缺省为 false，未知 kind 拒绝")
+    void shouldListAssetsWithFilters() {
+        resumeService.listAssets("JOB_EXPRESSION", null);
+        assertThat(resumeRepository.listQueryKind).isEqualTo("JOB_EXPRESSION");
+        assertThat(resumeRepository.listQueryArchived).isFalse();
+
+        resumeService.listAssets(null, true);
+        assertThat(resumeRepository.listQueryKind).isNull();
+        assertThat(resumeRepository.listQueryArchived).isTrue();
+
+        assertThatThrownBy(() -> resumeService.listAssets("UNKNOWN", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("简历种类");
+    }
+
+    @Test
+    @DisplayName("rename: 更新标题；跨用户按不存在处理")
+    void shouldRenameResumeAndRejectMissing() {
+        ResumeDTO renamed = resumeService.renameResume(1L, new UpdateResumeAssetRequest("新名字"));
+
+        assertThat(resumeRepository.renamedResumeId).isEqualTo(1L);
+        assertThat(resumeRepository.renamedTitle).isEqualTo("新名字");
+        assertThat(renamed.title()).isEqualTo("新名字");
+
+        assertThatThrownBy(() -> resumeService.renameResume(999L, new UpdateResumeAssetRequest("任意")))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("简历不存在");
+    }
+
     private static class FakeResumeRepository extends ResumeRepository {
         private String insertedContentJson;
         private Long updatedResumeId;
@@ -293,22 +406,102 @@ class ResumeServiceTest {
         private List<ResumeRepository.ProjectEvidenceDraft> createdProjectEvidenceDrafts = new ArrayList<>();
         private Set<Long> validEvidenceIds = Set.of(1L, 3L, 5L);
 
+        // 资产谱系状态
+        final Map<Long, Integer> maxVersionNoByResume = new HashMap<>(Map.of(1L, 2));
+        final Map<Long, LocalDateTime> archivedAtByResumeId = new HashMap<>();
+        int forkCalls;
+        Long forkedSourceVersionId;
+        String forkedTitle;
+        String forkedContentJson;
+        String forkCreatedByType;
+        Long forkParentVersionId;
+        String listQueryKind;
+        Boolean listQueryArchived;
+        Long renamedResumeId;
+        String renamedTitle;
+
         FakeResumeRepository() {
             super(null, new ObjectMapper());
         }
 
         @Override
-        public String findTitleById(long id) {
+        public String findTitleById(long userId, long id) {
+            if (renamedResumeId != null && id == renamedResumeId && renamedTitle != null) return renamedTitle;
             if (id == 1L) return "我的简历";
             if (id == 3L) return "后端实习简历";
+            if (id == 30L) return "副本";
             return null;
         }
 
         @Override
-        public Long findTargetJobDescriptionIdById(long id) {
+        public Long findTargetJobDescriptionIdById(long userId, long id) {
             if (id == 3L) return insertedResumeTargetJobId;
             if (id == 1L) return updatedTargetJobId;
             return null;
+        }
+
+        @Override
+        public String findKindById(long userId, long id) {
+            return id == 30L ? "JOB_EXPRESSION" : "GENERAL";
+        }
+
+        @Override
+        public Long findForkedFromVersionIdById(long userId, long id) {
+            return id == 30L ? 10L : null;
+        }
+
+        @Override
+        public LocalDateTime findArchivedAtById(long userId, long id) {
+            return archivedAtByResumeId.get(id);
+        }
+
+        @Override
+        public List<Long> findIdsByUserId(long userId, String kind, boolean archived) {
+            this.listQueryKind = kind;
+            this.listQueryArchived = archived;
+            return List.of(1L, 30L);
+        }
+
+        @Override
+        public long createForkedAsset(long userId, String title, long sourceVersionId,
+                                      int sourceVersionNo, String contentJson) {
+            this.forkCalls++;
+            this.forkedSourceVersionId = sourceVersionId;
+            this.forkedTitle = title;
+            this.forkedContentJson = contentJson;
+            this.forkCreatedByType = "fork";
+            this.forkParentVersionId = null;
+            this.maxVersionNoByResume.put(30L, 1);
+            return 30L;
+        }
+
+        @Override
+        public ResumeVersionDTO findVersionByIdForUser(long userId, long versionId) {
+            if (versionId == 10L) {
+                return new ResumeVersionDTO(10L, 1L, null, 2,
+                        Map.of("saved", "old-content"), "源版本", "user", LocalDateTime.now());
+            }
+            return null;
+        }
+
+        @Override
+        public String findContentJsonById(long versionId) {
+            return versionId == 10L ? "{\"saved\":\"old-content\"}" : null;
+        }
+
+        @Override
+        public void updateTitle(long userId, long resumeId, String title) {
+            this.renamedResumeId = resumeId;
+            this.renamedTitle = title;
+        }
+
+        @Override
+        public void updateArchivedAt(long userId, long resumeId, LocalDateTime archivedAt) {
+            if (archivedAt == null) {
+                this.archivedAtByResumeId.remove(resumeId);
+            } else {
+                this.archivedAtByResumeId.put(resumeId, archivedAt);
+            }
         }
 
         @Override
@@ -325,7 +518,7 @@ class ResumeServiceTest {
 
         @Override
         public int findMaxVersionNo(long resumeId) {
-            return 2;
+            return maxVersionNoByResume.getOrDefault(resumeId, 0);
         }
 
         @Override
@@ -344,6 +537,7 @@ class ResumeServiceTest {
                     createdByType,
                     LocalDateTime.now()
             );
+            this.maxVersionNoByResume.merge(resumeId, versionNo, Math::max);
             return 12L;
         }
 
