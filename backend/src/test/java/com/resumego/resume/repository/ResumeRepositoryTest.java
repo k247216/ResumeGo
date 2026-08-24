@@ -53,13 +53,49 @@ class ResumeRepositoryTest {
     void shouldInsertResumeAndVersionAndReturnGeneratedIds() {
         when(jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class)).thenReturn(9L, 10L);
 
-        assertThat(repository.insertResume(1L, "新简历", 20L)).isEqualTo(9L);
+        assertThat(repository.insertResume(1L, "新简历", 20L, "GENERAL", null)).isEqualTo(9L);
         assertThat(repository.insertVersion(9L, null, 1, "{}", "创建", "user")).isEqualTo(10L);
         verify(jdbcTemplate).update(org.mockito.ArgumentMatchers.contains("INSERT INTO resumes"),
-                org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("新简历"), org.mockito.ArgumentMatchers.eq(20L));
+                org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("新简历"), org.mockito.ArgumentMatchers.eq(20L),
+                org.mockito.ArgumentMatchers.eq("GENERAL"), org.mockito.ArgumentMatchers.isNull());
         verify(jdbcTemplate).update(org.mockito.ArgumentMatchers.contains("INSERT INTO resume_versions"),
                 org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(1),
                 org.mockito.ArgumentMatchers.eq("{}"), org.mockito.ArgumentMatchers.eq("创建"), org.mockito.ArgumentMatchers.eq("user"));
+    }
+
+    @Test
+    @DisplayName("岗位表达资产保存来源版本；默认资产为 GENERAL")
+    void shouldInsertResumeWithAssetLineageFields() {
+        when(jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class)).thenReturn(9L);
+
+        assertThat(repository.insertResume(1L, "岗位表达副本", 20L, "JOB_EXPRESSION", 77L)).isEqualTo(9L);
+        verify(jdbcTemplate).update(
+                org.mockito.ArgumentMatchers.contains("forked_from_version_id"),
+                org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("岗位表达副本"),
+                org.mockito.ArgumentMatchers.eq(20L), org.mockito.ArgumentMatchers.eq("JOB_EXPRESSION"),
+                org.mockito.ArgumentMatchers.eq(77L));
+
+        repository.insertResume(1L, "通用简历", null);
+        verify(jdbcTemplate).update(anyString(),
+                org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq("通用简历"),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("GENERAL"),
+                org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
+    @DisplayName("kind、forked_from_version_id、archived_at 可读回")
+    void shouldReadBackAssetKindForkSourceAndArchivedAt() {
+        when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("kind"),
+                org.mockito.ArgumentMatchers.eq(String.class), anyLong())).thenReturn("JOB_EXPRESSION");
+        when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("forked_from_version_id"),
+                org.mockito.ArgumentMatchers.eq(Long.class), anyLong())).thenReturn(77L);
+        when(jdbcTemplate.queryForObject(org.mockito.ArgumentMatchers.contains("archived_at"),
+                org.mockito.ArgumentMatchers.eq(LocalDateTime.class), anyLong()))
+                .thenReturn(LocalDateTime.of(2026, 8, 25, 10, 0));
+
+        assertThat(repository.findKindById(2L)).isEqualTo("JOB_EXPRESSION");
+        assertThat(repository.findForkedFromVersionIdById(2L)).isEqualTo(77L);
+        assertThat(repository.findArchivedAtById(2L)).isEqualTo(LocalDateTime.of(2026, 8, 25, 10, 0));
     }
 
     @Test
