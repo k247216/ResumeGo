@@ -28,7 +28,7 @@ class H2FileWorkspaceMigrationTest {
                 .load();
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("16");
 
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");
              var statement = connection.createStatement()) {
@@ -58,7 +58,7 @@ class H2FileWorkspaceMigrationTest {
                 .dataSource(jdbcUrl, "sa", "")
                 .locations("classpath:db/migration-h2")
                 .load()
-                .info().current().getVersion().getVersion()).isEqualTo("11");
+                .info().current().getVersion().getVersion()).isEqualTo("16");
     }
 
     @Test
