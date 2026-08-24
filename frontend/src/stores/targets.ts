@@ -1,7 +1,23 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { archiveProject, createProject, deleteProject, listProjects, renameProject, restoreProject, updateProjectLinks } from '../api/project'
-import type { CreateJobProjectRequest, JobProject, UpdateJobProjectLinksRequest } from '../types/project'
+import {
+  archiveProject,
+  createProject,
+  deleteProject,
+  listProjects,
+  renameProject,
+  restoreProject,
+  updateProjectApplication,
+  updateProjectLinks,
+  updateProjectStage,
+} from '../api/project'
+import type {
+  CreateJobProjectRequest,
+  JobProject,
+  TargetStage,
+  UpdateJobProjectApplicationRequest,
+  UpdateJobProjectLinksRequest,
+} from '../types/project'
 
 const activeTargetStorageKey = 'resumego:activeTargetId'
 
@@ -74,6 +90,14 @@ export const useTargetsStore = defineStore('targets', () => {
     return mutateTarget(id, () => renameProject(id, name), '重命名求职目标失败')
   }
 
+  async function setStage(id: number, stage: TargetStage) {
+    return mutateTarget(id, () => updateProjectStage(id, { stage }), '更新求职阶段失败')
+  }
+
+  async function saveApplication(id: number, payload: UpdateJobProjectApplicationRequest) {
+    return mutateTarget(id, () => updateProjectApplication(id, payload), '保存投递信息失败')
+  }
+
   async function archive(id: number) {
     const target = await mutateTarget(id, () => archiveProject(id), '归档求职目标失败')
     chooseValidTarget()
@@ -129,6 +153,8 @@ export const useTargetsStore = defineStore('targets', () => {
     create,
     updateLinks,
     rename,
+    setStage,
+    saveApplication,
     archive,
     restore,
     remove,

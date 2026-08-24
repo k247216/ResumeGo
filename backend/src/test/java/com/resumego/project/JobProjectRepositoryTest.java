@@ -56,6 +56,17 @@ class JobProjectRepositoryTest {
     }
 
     @Test
+    void updatesStageAndTimestamp() {
+        assertThat(repository.updateStage(1L, 100L, "hr")).isOne();
+        assertThat(repository.findById(1L, 100L)).get()
+                .extracting(JobProject::stage)
+                .isEqualTo("hr");
+        assertThat(repository.findById(1L, 100L)).get()
+                .extracting(JobProject::stageUpdatedAt)
+                .isNotNull();
+    }
+
+    @Test
     void validatesOwnershipAndPreservesLinkedAssetsAfterSoftDelete() {
         assertThat(repository.ownsJobDescription(1L, 10L)).isTrue();
         assertThat(repository.ownsJobDescription(1L, 20L)).isFalse();

@@ -27,8 +27,8 @@ class JobProjectControllerTest {
     @MockBean JobProjectService service;
 
     private JobProjectResponse sample() {
-        return new JobProjectResponse(7L, "Java 实习", "active", 10L, 31L,
-                null, LocalDateTime.now(), LocalDateTime.now());
+        return new JobProjectResponse(7L, "Java 实习", "active", "applied", 10L, 31L,
+                null, null, null, null, null, null, LocalDateTime.now(), LocalDateTime.now());
     }
 
     @Test
@@ -54,6 +54,8 @@ class JobProjectControllerTest {
     void exposesRenameLinksArchiveRestoreAndDelete() throws Exception {
         when(service.rename(anyLong(), any())).thenReturn(sample());
         when(service.updateLinks(anyLong(), any())).thenReturn(sample());
+        when(service.updateStage(anyLong(), any())).thenReturn(sample());
+        when(service.updateApplicationInfo(anyLong(), any())).thenReturn(sample());
         when(service.archive(7L)).thenReturn(sample());
         when(service.restore(7L)).thenReturn(sample());
         when(service.delete(7L)).thenReturn(true);
@@ -62,8 +64,22 @@ class JobProjectControllerTest {
                         .content("{\"name\":\"新名称\"}")) .andExpect(status().isOk());
         mockMvc.perform(patch("/api/v1/projects/7/links").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"jobDescriptionId\":null,\"resumeVersionId\":null}")) .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/v1/projects/7/stage").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"stage\":\"interview\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.stage").value("applied"));
+        mockMvc.perform(patch("/api/v1/projects/7/application").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"industry\":\"互联网\",\"location\":\"深圳\",\"notes\":\"内推\"}"))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/projects/7/archive")).andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/projects/7/restore")).andExpect(status().isOk());
         mockMvc.perform(delete("/api/v1/projects/7")).andExpect(status().isOk());
+    }
+
+    @Test
+    void rejectsBlankStage() throws Exception {
+        mockMvc.perform(patch("/api/v1/projects/7/stage").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"stage\":\"   \"}"))
+                .andExpect(status().isBadRequest());
     }
 }

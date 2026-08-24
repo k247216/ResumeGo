@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import TargetDeleteDialog from './TargetDeleteDialog.vue'
 
-const target = { id: 3, name: '腾讯后端目标', status: 'active' as const, jobDescriptionId: 4, resumeVersionId: 5, archivedAt: null, createdAt: '', updatedAt: '' }
+const target = { id: 3, name: '腾讯后端目标', status: 'active' as const, stage: 'applied' as const, stageUpdatedAt: null, industry: null, targetRole: null, location: null, notes: null, jobDescriptionId: 4, resumeVersionId: 5, archivedAt: null, createdAt: '', updatedAt: '' }
 
 describe('TargetDeleteDialog', () => {
   it('explains that linked local materials are preserved', () => {

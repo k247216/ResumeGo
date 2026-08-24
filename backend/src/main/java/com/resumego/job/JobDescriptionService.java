@@ -123,7 +123,8 @@ public class JobDescriptionService {
     public List<JobDescriptionDTO> findAllByUser() {
         QueryWrapper<JobDescription> query = new QueryWrapper<>();
         query.eq("user_id", CurrentUser.DEMO_USER_ID)
-             .orderByDesc("created_at");
+             .orderByDesc("created_at")
+             .orderByDesc("id");
         return jobDescriptionMapper.selectList(query).stream()
                 .map(this::toDTO)
                 .toList();

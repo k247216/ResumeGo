@@ -3,7 +3,10 @@ import type {
   ApiResponse,
   CreateJobProjectRequest,
   JobProject,
+  StageEvent,
+  UpdateJobProjectApplicationRequest,
   UpdateJobProjectLinksRequest,
+  UpdateJobProjectStageRequest,
 } from '../types/project'
 
 const BASE = '/api/v1/projects'
@@ -31,6 +34,12 @@ export const renameProject = (id: number, name: string) =>
   request<JobProject>(`/${id}/name`, jsonRequest('PATCH', { name }), '重命名求职项目失败')
 export const updateProjectLinks = (id: number, payload: UpdateJobProjectLinksRequest) =>
   request<JobProject>(`/${id}/links`, jsonRequest('PATCH', payload), '更新求职项目关联失败')
+export const updateProjectStage = (id: number, payload: UpdateJobProjectStageRequest) =>
+  request<JobProject>(`/${id}/stage`, jsonRequest('PATCH', payload), '更新求职阶段失败')
+export const updateProjectApplication = (id: number, payload: UpdateJobProjectApplicationRequest) =>
+  request<JobProject>(`/${id}/application`, jsonRequest('PATCH', payload), '保存投递信息失败')
+export const listStageEvents = (id: number) =>
+  request<StageEvent[]>(`/${id}/stage-events`, {}, '获取阶段记录失败')
 export const archiveProject = (id: number) =>
   request<JobProject>(`/${id}/archive`, { method: 'POST' }, '归档求职项目失败')
 export const restoreProject = (id: number) =>

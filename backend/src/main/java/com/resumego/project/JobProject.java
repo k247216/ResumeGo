@@ -7,9 +7,15 @@ public record JobProject(
         Long userId,
         String name,
         String status,
+        String stage,
         Long jobDescriptionId,
         Long resumeVersionId,
         LocalDateTime archivedAt,
+        LocalDateTime stageUpdatedAt,
+        String industry,
+        String targetRole,
+        String location,
+        String notes,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

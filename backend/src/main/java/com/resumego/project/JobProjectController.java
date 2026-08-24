@@ -4,7 +4,10 @@ import com.resumego.common.ApiResponse;
 import com.resumego.project.dto.CreateJobProjectRequest;
 import com.resumego.project.dto.JobProjectResponse;
 import com.resumego.project.dto.RenameJobProjectRequest;
+import com.resumego.project.dto.StageEventResponse;
+import com.resumego.project.dto.UpdateJobProjectApplicationRequest;
 import com.resumego.project.dto.UpdateJobProjectLinksRequest;
+import com.resumego.project.dto.UpdateJobProjectStageRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +51,23 @@ public class JobProjectController {
     public ApiResponse<JobProjectResponse> updateLinks(@PathVariable long id,
                                                         @RequestBody UpdateJobProjectLinksRequest request) {
         return ApiResponse.ok(service.updateLinks(id, request));
+    }
+
+    @PatchMapping("/{id}/stage")
+    public ApiResponse<JobProjectResponse> updateStage(@PathVariable long id,
+                                                       @Valid @RequestBody UpdateJobProjectStageRequest request) {
+        return ApiResponse.ok(service.updateStage(id, request));
+    }
+
+    @GetMapping("/{id}/stage-events")
+    public ApiResponse<List<StageEventResponse>> stageEvents(@PathVariable long id) {
+        return ApiResponse.ok(service.listStageEvents(id));
+    }
+
+    @PatchMapping("/{id}/application")
+    public ApiResponse<JobProjectResponse> updateApplicationInfo(@PathVariable long id,
+                                                                 @Valid @RequestBody UpdateJobProjectApplicationRequest request) {
+        return ApiResponse.ok(service.updateApplicationInfo(id, request));
     }
 
     @PostMapping("/{id}/archive")

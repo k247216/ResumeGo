@@ -1,0 +1,4 @@
+ALTER TABLE job_projects ADD COLUMN industry VARCHAR(60) NULL;
+ALTER TABLE job_projects ADD COLUMN target_role VARCHAR(120) NULL;
+ALTER TABLE job_projects ADD COLUMN location VARCHAR(120) NULL;
+ALTER TABLE job_projects ADD COLUMN notes VARCHAR(500) NULL;

@@ -14,8 +14,8 @@ import java.util.Optional;
 public class JobProjectRepository {
 
     private static final String SELECT_COLUMNS = """
-            SELECT id, user_id, name, status, job_description_id, resume_version_id,
-                   archived_at, created_at, updated_at
+            SELECT id, user_id, name, status, stage, job_description_id, resume_version_id,
+                   archived_at, stage_updated_at, industry, target_role, location, notes, created_at, updated_at
             FROM job_projects
             """;
 
@@ -50,9 +50,9 @@ public class JobProjectRepository {
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
                     """
-                            INSERT INTO job_projects
-                                (user_id, name, status, job_description_id, resume_version_id)
-                            VALUES (?, ?, 'active', ?, ?)
+                    INSERT INTO job_projects
+                        (user_id, name, status, stage, job_description_id, resume_version_id)
+                    VALUES (?, ?, 'active', 'applied', ?, ?)
                             """,
                     new String[]{"id"}
             );
@@ -88,6 +88,58 @@ public class JobProjectRepository {
                         WHERE id = ? AND user_id = ? AND deleted_at IS NULL
                         """,
                 jobDescriptionId, resumeVersionId, projectId, userId
+        );
+    }
+
+    public int updateStage(long userId, long projectId, String stage) {
+        return jdbcTemplate.update(
+                """
+                        UPDATE job_projects
+                        SET stage = ?, stage_updated_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+                        """,
+                stage, projectId, userId
+        );
+    }
+
+    public int updateApplicationInfo(long userId, long projectId, String industry, String targetRole, String location, String notes) {
+        return jdbcTemplate.update(
+                """
+                        UPDATE job_projects
+                        SET industry = ?, target_role = ?, location = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+                        """,
+                industry, targetRole, location, notes, projectId, userId
+        );
+    }
+
+    public void insertStageEvent(long userId, long projectId, String stage) {
+        jdbcTemplate.update(
+                """
+                        INSERT INTO job_stage_events (user_id, project_id, stage)
+                        VALUES (?, ?, ?)
+                        """,
+                userId, projectId, stage
+        );
+    }
+
+    public record StageEvent(long id, String stage, java.time.LocalDateTime occurredAt) {
+    }
+
+    public List<StageEvent> findStageEvents(long userId, long projectId) {
+        return jdbcTemplate.query(
+                """
+                        SELECT id, stage, occurred_at
+                        FROM job_stage_events
+                        WHERE user_id = ? AND project_id = ?
+                        ORDER BY occurred_at DESC, id DESC
+                        """,
+                (rs, rowNum) -> new StageEvent(
+                        rs.getLong("id"),
+                        rs.getString("stage"),
+                        rs.getTimestamp("occurred_at").toLocalDateTime()
+                ),
+                userId, projectId
         );
     }
 
@@ -156,9 +208,15 @@ public class JobProjectRepository {
                 rs.getLong("user_id"),
                 rs.getString("name"),
                 rs.getString("status"),
+                rs.getString("stage"),
                 rs.getObject("job_description_id", Long.class),
                 rs.getObject("resume_version_id", Long.class),
                 rs.getTimestamp("archived_at") == null ? null : rs.getTimestamp("archived_at").toLocalDateTime(),
+                rs.getTimestamp("stage_updated_at") == null ? null : rs.getTimestamp("stage_updated_at").toLocalDateTime(),
+                rs.getString("industry"),
+                rs.getString("target_role"),
+                rs.getString("location"),
+                rs.getString("notes"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
                 rs.getTimestamp("updated_at").toLocalDateTime()
         );

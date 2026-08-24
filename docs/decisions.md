@@ -231,3 +231,41 @@ Career Pipeline（管理目标）→ Resume Version（管理表达）→ Knowled
 - 后续开发按 V2 阶段推进：V1.0 Core（Pipeline/Resume/Interview/Calendar）→ V1.5 知识增强（Knowledge Base/RAG/复盘/成长）→ V2.0 Agent（Skill/MCP、Career Agent）；
 - 数据诚实、证据驱动、AI 受约束、本地优先等既有原则全部保留并继续适用；
 - 仓库公开名与产品名统一为 ResumeGo，中文名职达；远端仓库迁移至 `github.com/k247216/ResumeGo`。
+
+## 2026-08-22｜Career Pipeline 阶段追踪：求职目标新增用户维护的阶段字段
+
+**决定**
+
+在 `job_projects` 上新增 `stage` 字段（默认 `preparing`），取值为固定的六阶段集合：`preparing 准备中 / applied 已投递 / exam 笔试 / interviewing 面试中 / offer 已拿 Offer / closed 已结束`，并记录 `stage_updated_at`。阶段由用户手动推进，是用户声明的事实记录；AI 不推断、不自动流转。API 为 `PATCH /api/v1/projects/{id}/stage`，后端白名单校验；前端目标页详情新增「求职阶段」步进条（点击任一阶段直接切换），左列行与 identity 状态行展示当前阶段。数据库通过 Flyway 双基线迁移（MySQL V24 / H2 V4）落地，含 CHECK 约束。
+
+**原因**
+
+Career OS V1.0 Core 的 Career Pipeline 完成标准是「用户可以同时管理多个求职目标，并清晰了解每个目标当前状态」。此前 `status` 只有 active/archived（项目生命周期），无法表达求职进展。阶段模型保持最小可信：只记录用户主动声明的状态，不做投递平台集成，不引入自动推断，与「不得编造事实」「模型输出不控制流程状态」的长期约束一致。
+
+**影响**
+
+- `JobProjectStatus` 与 `TargetStage` 是两个正交概念，前者管理生命周期，后者表达求职进展；
+- 前端类型新增 `TargetStage`/`TARGET_STAGE_LABELS`/`normalizeTargetStage`（缺失值回退 `preparing`），store 新增 `setStage`；
+- 后续如需阶段历史（每次流转的时间线），应另立事件表而不是扩展本字段；
+- 测试基准更新：后端 449 项、前端 138+ 项（本机 localStorage 环境性失败 13 项为存量问题，CI 全绿）。
+
+## 2026-08-23｜求职计划页重构为「公司计划卡」视图，阶段集合按真实流程修订
+
+**决定**
+
+根据产品反馈对 2026-08-22 的阶段模型做一次修订，并重设计求职计划页（不动其他页面）：
+
+1. 阶段集合改为贴近真实校招流程的六段：`applied 投递中 / exam 笔试 / interview 面试 / hr HR面 / offer 已拿 Offer / closed 已结束`（原 preparing/interviewing 经迁移 V25/V5 映射合并），管线展示前五段、已结束以中性态呈现；
+2. 求职目标页从 master-detail 改为公司计划卡网格：每张卡片包含本地品牌色公司标识、可点击推进的阶段管线、「{公司}修改版 · V{n}」简历徽章、近三次面试记录（点击弹窗查看逐题题目与评分）、创建时间与最近动态；页面不再提供模拟面试入口；
+3. 创建目标弹窗升级为四要素录入：公司 / 岗位 / JD 原文 / 绑定简历，公司信息驱动品牌标识与后续修改版命名；
+4. 页面画布为纯白底色，卡片含 hover 浮起、入场 stagger、当前阶段呼吸环等克制动效，并尊重 `prefers-reduced-motion`。
+
+**原因**
+
+用户反馈原六阶段（准备中/已投递/…）与真实招聘流程不匹配（缺 HR 面），且 master-detail 视图信息密度不足；成熟求职管理工具（Huntr/Teal 类）均以公司为单位组织进度。公司真实 logo 属于外部资源，违反本地优先约束，故采用本地品牌色映射 + 字母标识的方案离线渲染。
+
+**影响**
+
+- 数据库新增 Flyway 双基线迁移 MySQL V25 / H2 V5（旧值自动映射，CHECK 约束同步替换）；
+- 前端 `PIPELINE_STAGES` 与阶段标签成为该页单一事实来源；面试记录弹窗复用既有 `getSessionHistory` 接口，无新增后端面；
+- 「修改版」当前为展示层语义（绑定版本即该公司修改版）；简历 fork 工作流仍归 Resume Version System 阶段实现。
