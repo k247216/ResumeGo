@@ -7,9 +7,9 @@ Status: Approved architecture direction (V2, current development line)
 
 ## Current implementation boundary
 
-The V2 backend boundary is `/api/v2/pipelines`, implemented by the isolated `com.resumego.pipeline` module. It uses additive H2 V4-V5 and MySQL V24-V25 migrations for `career_pipelines`, `pipeline_stages`, append-only `pipeline_stage_transitions` and explicit Pipeline asset links.
+As of 2026-08-25, the active `main` line uses the local `job_projects` aggregate and `/api/v1/projects`; the former experimental `/api/v2/pipelines` and `career_pipelines` implementation is no longer the current repository boundary. Pipeline stages are user-maintained facts, and Schedule/Interview/Resume relations must use explicit owned identifiers.
 
-The legacy `/api/v1/projects` API and `job_projects` table remain unchanged and serve only V1 maintenance and future explicit migration. Current V2 API support covers creation, reads, initial custom stages, post-creation stage add/rename/reorder, deterministic stage transitions, archive and restore. Stage reordering is an all-stage atomic operation so persisted positions remain unique. Schedule events and complete interview plans are linked through additive association tables; ownership is checked through module ports rather than cross-module writes, and rebinding is transactional. V1 import and the Pipeline UI remain later F1 slices.
+For the Resume System, Interview Engine and Workspace Action work, the normative contract is `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`. Where older sections in this architecture document conflict with that contract, the dated contract takes precedence until this document is fully consolidated.
 
 
 # 1. Architecture Overview
@@ -325,7 +325,7 @@ Answer
 Feedback
 
 
-支持四种模式。
+支持三种且仅三种模式。
 
 
 ---
@@ -391,7 +391,7 @@ Evaluation
 
 ---
 
-## Mode 4
+## Interview Review（结果工作区，不是第四种模式）
 
 Interview Review
 

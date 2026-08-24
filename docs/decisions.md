@@ -355,3 +355,25 @@ Knowledge Library 保持全局黑色工具栏常驻，只允许资料库导航�
 - 全局工具栏不新增收起功能，避免影响其他 V2 页面；
 - 详细边界与验收见 `docs/superpowers/specs/2026-08-23-v2-knowledge-library-editor-redesign.md`。
 
+## 2026-08-25｜Resume 混合版本模型、Interview 三模式与 Workspace 后置集成
+
+**决定**
+
+Career OS 的简历采用混合模型：简历是独立资产，每份资产内部为不可变线性版本；切换 Pipeline 不自动切换或修改简历。用户需要岗位化表达时，从任意版本手动创建独立的 `JOB_EXPRESSION` 副本，副本记录来源版本但此后与源资产独立演进。Pipeline 只显式绑定具体 `resumeVersionId`，新版本产生后不自动改绑。
+
+Interview Engine 只支持三种正式模式：岗位模拟、知识训练和面经模拟。三种模式共享会话状态机，但使用不同必需输入、来源契约和评价约束；计划创建时保存不可变开始上下文快照。面经原题、AI 练习题和 AI 追问必须可区分。
+
+Workspace 的重构后置到 Resume、Interview、Pipeline、Knowledge 和 Schedule 契约稳定之后，由 Core Controller 负责确定性行动投影、跨模块集成和最终验收。外部 Feature Agent 先按独立任务卡交付 Resume System，再交付 Interview Engine，不直接修改 Workspace 或合并 `main`。
+
+**原因**
+
+真实用户通常维护少量相近方向简历，不会为每个岗位强制分叉；自动联动会污染版本并让历史不可解释。三种面试的来源不同，继续使用一个强制 Resume+JD 的请求会制造伪上下文。首页只有在各模块能够提供稳定事实和反馈后，才能可靠回答“现在最应该做什么”。
+
+**影响**
+
+- `resumes.target_job_description_id` 退化为历史兼容字段，不再作为 V2 关系真值；
+- Resume 需要资产 kind、fork 来源和归档语义；
+- Interview Plan 需要 mode、开始快照和题目来源；
+- 当前大体量 InterviewView 必须按用户任务拆分；
+- Workspace 不与外部功能任务并行修改，由 Core Controller 最后统一实现和验收；
+- 详细契约见 `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`。

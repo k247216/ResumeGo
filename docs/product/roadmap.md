@@ -105,7 +105,7 @@ Updated: 2026-08-22
 
 ## V2-P1
 
-- Resume Version 分支、对比与长期演进；
+- Resume System 混合版本模型、岗位表达副本、对比与长期演进（已冻结契约，进入 R1）；
 - Growth Feedback 趋势与薄弱点；
 - 用户授权的 Calendar Sync；
 - V2 正式原位升级评估。
@@ -131,6 +131,10 @@ Updated: 2026-08-22
 ## 2026-08-23 进度记录
 
 - **求职计划页重构为公司计划卡视图 + 阶段集合修订（按产品反馈）**：阶段改为 `投递中/笔试/面试/HR面/已拿Offer/已结束`（迁移 MySQL V25 / H2 V5，旧值自动映射）；目标页从 master-detail 改为白底公司卡网格——本地品牌色公司标识、可点击推进的阶段管线、「{公司}修改版 · Vn」简历徽章、近三次面试记录（点击弹窗逐题查看，无模拟面试入口）、创建时间与最近动态、hover 浮起/入场 stagger/当前阶段呼吸环动效；创建弹窗升级为公司/岗位/JD 原文/绑定简历四要素。详见 decisions.md 2026-08-23 条目。验证：后端 449 全绿、前端 build 通过、目标页 7/7。
+
+## 2026-08-25 进度记录
+
+- **Resume/Interview/Workspace 契约冻结**：简历采用“独立资产 + 同资产线性版本 + 用户手动岗位表达副本”的混合模型；Pipeline 只显式绑定具体版本且不自动改绑。Interview 固定为岗位、知识、面经三模式并保存不可变开始上下文。Workspace 后置，由 Core Controller 在前述模块稳定后实现确定性行动投影。Resume 任务卡已进入 `READY`，Interview 任务卡等待 Resume 与当前 Pipeline/Schedule 契约修复集成后激活。详见 `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`。
 
 ## 2026-08-22 进度记录
 
