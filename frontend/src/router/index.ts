@@ -16,7 +16,7 @@ const router = createRouter({
     {
       path: '/targets',
       name: 'targets',
-      component: () => import('../views/pipelines/PipelineView.vue'),
+      component: () => import('../views/targets/TargetListView.vue'),
       meta: { fill: true },
     },
     {

@@ -33,11 +33,8 @@ class H2FileWorkspaceMigrationTest {
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");
              var statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO resumes (user_id, title) VALUES (1, '本地简历')");
-            assertThat(tableExists(connection, "career_pipelines")).isTrue();
-            assertThat(tableExists(connection, "pipeline_stages")).isTrue();
-            assertThat(tableExists(connection, "pipeline_stage_transitions")).isTrue();
-            assertThat(tableExists(connection, "pipeline_schedule_events")).isTrue();
-            assertThat(tableExists(connection, "pipeline_interview_plans")).isTrue();
+            assertThat(tableExists(connection, "job_projects")).isTrue();
+            assertThat(tableExists(connection, "job_stage_events")).isTrue();
         }
 
         try (var connection = DriverManager.getConnection(jdbcUrl, "sa", "");

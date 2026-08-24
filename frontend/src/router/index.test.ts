@@ -16,17 +16,17 @@ describe('product routes', () => {
     expect(router.resolve({ name: 'resume-editor' }).path).toBe('/editor')
   })
 
-  it('routes /targets to the V2 PipelineView', () => {
+  it('routes /targets to the local TargetListView', () => {
     const resolved = router.resolve({ name: 'targets' })
     expect(resolved.path).toBe('/targets')
-    expect(String(resolved.matched[0]?.components?.default ?? '')).toContain('PipelineView')
+    expect(String(resolved.matched[0]?.components?.default ?? '')).toContain('TargetListView')
   })
 
-  it('does not reference legacy targets view or store', () => {
+  it('does not reference the removed pipeline module', () => {
     const source = router.getRoutes().map((r) => r.components)
     const serialized = JSON.stringify(source)
-    expect(serialized).not.toContain('TargetListView')
-    expect(serialized).not.toContain('useTargetsStore')
+    expect(serialized).not.toContain('PipelineView')
+    expect(serialized).not.toContain('pipelines')
   })
 
   it('routes /knowledge to the V2 KnowledgeLibraryView with fill meta', () => {
