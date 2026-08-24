@@ -85,4 +85,17 @@ describe('useSchedule', () => {
     const now = new Date()
     expect(schedule.visibleMonth.value).toEqual({ year: now.getFullYear(), month: now.getMonth() })
   })
+
+  it('always keeps the next 7 days inside the loaded window', async () => {
+    // 「即将到来」面板固定展示未来 7 天：即使可见月远离当前月，查询起点也不能晚于今天
+    vi.mocked(listScheduleEvents).mockResolvedValue({ success: true, data: [], message: null })
+    const schedule = useSchedule()
+    const now = new Date()
+    schedule.visibleMonth.value = { year: now.getFullYear() + 1, month: now.getMonth() }
+    await schedule.load()
+
+    const [from] = vi.mocked(listScheduleEvents).mock.lastCall!
+    const pad = (value: number) => String(value).padStart(2, '0')
+    expect(from).toBe(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00:00`)
+  })
 })

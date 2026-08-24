@@ -23,6 +23,42 @@ export interface CreateScheduleEventRequest {
 
 export interface UpdateScheduleEventRequest extends CreateScheduleEventRequest {}
 
+/** 日程编辑弹窗提交的完整表单载荷（含结束时间与岗位关联） */
+export interface ScheduleEventFormPayload {
+  title: string
+  eventType: ScheduleEventType
+  startTime: string
+  endTime: string | null
+  notes: string | null
+  jobDescriptionId: number | null
+}
+
+/** 从 .ics 等外部日历导入的只读来源（原始文本保存在本地，不上传） */
+export interface ExternalCalendarSource {
+  id: number
+  name: string
+  importedAt: string
+  raw: string
+}
+
+/** 日历视图统一展示模型：自有日程 + 外部只读日程 */
+export interface DisplayCalendarEvent {
+  key: string
+  title: string
+  startTime: string
+  endTime: string | null
+  allDay: boolean
+  kind: 'own' | 'external'
+  /** kind === 'own' 时有效 */
+  id?: number
+  eventType?: ScheduleEventType
+  notes?: string | null
+  jobDescriptionId?: number | null
+  /** kind === 'external' 时有效 */
+  sourceId?: number
+  sourceName?: string
+}
+
 export interface ApiResponse<T> {
   success: boolean
   data: T
