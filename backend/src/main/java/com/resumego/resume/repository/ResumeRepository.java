@@ -328,4 +328,15 @@ public class ResumeRepository {
             throw new IllegalStateException("简历版本 content_json 解析失败", e);
         }
     }
+
+    public int softDelete(long userId, long resumeId) {
+        return jdbcTemplate.update(
+                """
+                UPDATE resumes
+                SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+                """,
+                resumeId, userId
+        );
+    }
 }

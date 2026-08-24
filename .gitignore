@@ -17,6 +17,7 @@ frontend/runtime/
 # Backend
 target/
 *.log
+backend/data/
 
 # Local generated artifacts
 outputs/
@@ -25,3 +26,4 @@ outputs/
 .zcode/
 .agent/
 .claude/
+.worktrees/

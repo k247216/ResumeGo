@@ -1,8 +1,8 @@
 {
-  "name": "resumego",
+  "name": "zhida-career-os-preview",
   "private": true,
-  "version": "0.0.0",
-  "description": "本地优先的简历优化与面试准备工作台",
+  "version": "1.2.0",
+  "description": "本地优先的个人职业资产与求职成长操作系统",
   "author": "ResumeGo contributors",
   "type": "module",
   "main": "electron-dist/main.js",
@@ -11,8 +11,8 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run --environment happy-dom",
-    "build:backend": "cd ../backend && mvn -DskipTests package",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:backend": "cd ../backend && mvn -DskipTests package && node ../frontend/scripts/copy-backend-jar.mjs",
+    "build:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.preload.json",
     "build:runtime": "node scripts/build-runtime.mjs",
     "desktop:prepare": "npm run build:backend && npm run build && npm run build:electron",
     "desktop:start": "npm run desktop:prepare && electron .",
@@ -42,8 +42,8 @@
     "vue-tsc": "^3.3.5"
   },
   "build": {
-    "appId": "com.resumego.desktop",
-    "productName": "ResumeGo",
+    "appId": "com.resumego.careeros.preview",
+    "productName": "职达 Career OS Preview",
     "asar": true,
     "directories": {
       "output": "../output/desktop"
@@ -58,7 +58,7 @@
         "to": "frontend"
       },
       {
-        "from": "../backend/target/resume-go-0.0.1-SNAPSHOT.jar",
+        "from": "../backend/target/resume-go.jar",
         "to": "backend/resume-go.jar"
       },
       {

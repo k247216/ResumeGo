@@ -52,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -132,6 +133,7 @@ class InterviewServiceTest {
         promptBuilder = new InterviewPromptBuilder(objectMapper);
         outputValidator = new AiOutputValidator(objectMapper);
         when(aiClientSelector.getClient()).thenReturn(aiClient);
+        lenient().when(aiClientSelector.isConfigured()).thenReturn(true);
 
         interviewService = new InterviewService(
                 sessionMapper, questionMapper, answerMapper, evaluationMapper,

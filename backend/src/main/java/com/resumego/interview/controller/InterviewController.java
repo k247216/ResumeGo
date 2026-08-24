@@ -78,9 +78,13 @@ public class InterviewController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.fail("会话不存在"));
         } catch (IllegalStateException e) {
-            log.warn("开始面试状态校验失败: sessionId={}, message={}", sessionId, e.getMessage());
+            // 透传面向用户的提示（如 AI 未配置），状态错误保留通用文案
+            log.warn("开始面试失败: sessionId={}, message={}", sessionId, e.getMessage());
+            String message = e.getMessage() != null && e.getMessage().contains("AI 模型服务")
+                    ? e.getMessage()
+                    : "当前状态不允许开始面试";
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.fail("当前状态不允许开始面试"));
+                    .body(ApiResponse.fail(message));
         } catch (Exception e) {
             log.error("开始面试时发生未预期错误: sessionId={}", sessionId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

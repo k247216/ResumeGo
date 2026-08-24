@@ -1,25 +1,28 @@
 import { randomBytes } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { createReadStream } from 'node:fs'
+import { closeSync, createReadStream, openSync, readFileSync } from 'node:fs'
 import { mkdir, stat } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import net from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
 import { buildBackendLaunchSpec } from './backendProcess.js'
 import { DesktopKeyStore } from './keyStore.js'
 import { isTrustedRendererUrl } from './security.js'
 import { createBeforeQuitHandler, terminateChildProcess } from './processLifecycle.js'
+import { V2_PREVIEW_IDENTITY, resolveV2PreviewUserDataPath } from './productIdentity.js'
 import {
   createColdWorkspaceBackup,
   exportWorkspaceBackup,
   listWorkspaceBackups,
   restoreWorkspaceBackup,
 } from './workspaceBackup.js'
+import { openManagedKnowledgeSource } from './managedKnowledgeSource.js'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-app.setName('ResumeGo')
+app.setName(V2_PREVIEW_IDENTITY.appName)
+app.setPath('userData', resolveV2PreviewUserDataPath(app.getPath('appData')))
 let backendProcess: ChildProcess | null = null
 let frontendServer: Server | null = null
 let runtimeConfig = { backendOrigin: '', workspaceToken: '' }
@@ -27,6 +30,7 @@ let internalToken = ''
 let keyStore: DesktopKeyStore | null = null
 let trustedFrontendOrigin = ''
 let dataDir = ''
+let backendLogFd: number | null = null
 
 function findOpenPort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -45,9 +49,13 @@ function findOpenPort(): Promise<number> {
 }
 
 async function waitForBackend(origin: string, child: ChildProcess): Promise<void> {
-  const deadline = Date.now() + 30_000
+  const deadline = Date.now() + 45_000
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error('本地服务提前退出')
+    if (child.exitCode !== null) {
+      throw new Error(
+        '本地服务提前退出（退出码 ' + child.exitCode + '）。请查看日志文件 backend.log 了解详情；原始本地数据和启动前备份均未删除。',
+      )
+    }
     try {
       const response = await fetch(`${origin}/actuator/health`)
       if (response.ok) return
@@ -56,7 +64,7 @@ async function waitForBackend(origin: string, child: ChildProcess): Promise<void
     }
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
-  throw new Error('本地服务启动超时')
+  throw new Error('本地服务启动超时（45 秒）。请查看日志文件 backend.log 了解详情。')
 }
 
 function contentType(filePath: string): string {
@@ -101,6 +109,91 @@ async function startFrontendServer(distDir: string): Promise<string> {
   return `http://127.0.0.1:${port}`
 }
 
+ipcMain.on('resumego:runtime-config', (event) => {
+  assertTrustedIpc(event)
+  event.returnValue = runtimeConfig
+})
+ipcMain.handle('resumego:key-save', async (event, profileId: number, apiKey: string) => {
+  assertTrustedIpc(event)
+  if (!keyStore) throw new Error('安全存储尚未就绪')
+  await keyStore.save(profileId, apiKey)
+  await applyStoredProvider(profileId)
+  return true
+})
+ipcMain.handle('resumego:key-delete', async (event, profileId: number) => {
+  assertTrustedIpc(event)
+  if (!keyStore) throw new Error('安全存储尚未就绪')
+  await keyStore.delete(profileId)
+  await providerRequest(`/api/ai/runtime/${profileId}`, { method: 'DELETE' })
+  return true
+})
+ipcMain.handle('resumego:key-has', async (event, profileId: number) => {
+  assertTrustedIpc(event)
+  return keyStore?.has(profileId) ?? false
+})
+ipcMain.handle('resumego:key-apply', async (event, profileId: number) => {
+  assertTrustedIpc(event)
+  return applyStoredProvider(profileId)
+})
+ipcMain.handle('resumego:key-storage-mode', async (event) => {
+  assertTrustedIpc(event)
+  return keyStore?.mode() ?? 'session'
+})
+
+ipcMain.handle('resumego:backup-list', async (event) => {
+  assertTrustedIpc(event)
+  return listWorkspaceBackups(dataDir)
+})
+ipcMain.handle('resumego:backup-create', async (event) => {
+  assertTrustedIpc(event)
+  return createColdWorkspaceBackup(dataDir)
+})
+ipcMain.handle('resumego:backup-restore', async (event, backupId: string) => {
+  assertTrustedIpc(event)
+  const result = await restoreWorkspaceBackup(dataDir, backupId)
+  if (result.restored) {
+    // A restored database requires the local backend to reload its file; simplest
+    // safe path is to tell the renderer to restart the workspace via app reload.
+    return result
+  }
+  return result
+})
+ipcMain.handle('resumego:backup-export', async (event, backupId: string | null) => {
+  assertTrustedIpc(event)
+  const choice = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: '选择备份保存位置',
+  })
+  if (choice.canceled || choice.filePaths.length === 0) {
+    return { canceled: true }
+  }
+  const result = await exportWorkspaceBackup(dataDir, backupId, choice.filePaths[0])
+  return { canceled: false, ...result }
+})
+
+// 受管原文：renderer 只传正整数 documentId；路径与 internal token 绝不离开 main
+ipcMain.handle('resumego:knowledge-open-source', (event, documentId: unknown) => {
+  assertTrustedIpc(event)
+  return openManagedKnowledgeSource(documentId, 'open', {
+    backendOrigin: runtimeConfig.backendOrigin,
+    workspaceToken: runtimeConfig.workspaceToken,
+    internalToken,
+    dataDir,
+    shell,
+  })
+})
+ipcMain.handle('resumego:knowledge-reveal-source', (event, documentId: unknown) => {
+  assertTrustedIpc(event)
+  return openManagedKnowledgeSource(documentId, 'reveal', {
+    backendOrigin: runtimeConfig.backendOrigin,
+    workspaceToken: runtimeConfig.workspaceToken,
+    internalToken,
+    dataDir,
+    shell,
+  })
+})
+
+
 async function startApplication(): Promise<void> {
   const projectRoot = path.resolve(currentDir, '..', '..')
   dataDir = path.join(app.getPath('userData'), 'workspace')
@@ -126,10 +219,12 @@ async function startApplication(): Promise<void> {
     internalToken,
     platform: process.platform,
   })
+  backendLogFd = openSync(path.join(app.getPath('userData'), 'backend.log'), 'a')
   backendProcess = spawn(spec.command, spec.args, {
     cwd: app.isPackaged ? process.resourcesPath : projectRoot,
     env: spec.env,
-    stdio: 'ignore',
+    stdio: ['ignore', backendLogFd, backendLogFd],
+    windowsHide: true,
   })
   runtimeConfig = {
     backendOrigin: `http://127.0.0.1:${backendPort}`,
@@ -206,6 +301,10 @@ async function stopChildren(): Promise<void> {
     await new Promise<void>((resolve) => server.close(() => resolve()))
   }
   if (child) await terminateChildProcess(child)
+  if (backendLogFd !== null) {
+    try { closeSync(backendLogFd) } catch { /* already closed */ }
+    backendLogFd = null
+  }
 }
 
 function assertTrustedIpc(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): void {
@@ -214,74 +313,23 @@ function assertTrustedIpc(event: Electron.IpcMainEvent | Electron.IpcMainInvokeE
   }
 }
 
-ipcMain.on('resumego:runtime-config', (event) => {
-  assertTrustedIpc(event)
-  event.returnValue = runtimeConfig
-})
-ipcMain.handle('resumego:key-save', async (event, profileId: number, apiKey: string) => {
-  assertTrustedIpc(event)
-  if (!keyStore) throw new Error('安全存储尚未就绪')
-  await keyStore.save(profileId, apiKey)
-  await applyStoredProvider(profileId)
-  return true
-})
-ipcMain.handle('resumego:key-delete', async (event, profileId: number) => {
-  assertTrustedIpc(event)
-  if (!keyStore) throw new Error('安全存储尚未就绪')
-  await keyStore.delete(profileId)
-  await providerRequest(`/api/ai/runtime/${profileId}`, { method: 'DELETE' })
-  return true
-})
-ipcMain.handle('resumego:key-has', async (event, profileId: number) => {
-  assertTrustedIpc(event)
-  return keyStore?.has(profileId) ?? false
-})
-ipcMain.handle('resumego:key-apply', async (event, profileId: number) => {
-  assertTrustedIpc(event)
-  return applyStoredProvider(profileId)
-})
-ipcMain.handle('resumego:key-storage-mode', async (event) => {
-  assertTrustedIpc(event)
-  return keyStore?.mode() ?? 'session'
-})
-
-ipcMain.handle('resumego:backup-list', async (event) => {
-  assertTrustedIpc(event)
-  return listWorkspaceBackups(dataDir)
-})
-ipcMain.handle('resumego:backup-create', async (event) => {
-  assertTrustedIpc(event)
-  return createColdWorkspaceBackup(dataDir)
-})
-ipcMain.handle('resumego:backup-restore', async (event, backupId: string) => {
-  assertTrustedIpc(event)
-  const result = await restoreWorkspaceBackup(dataDir, backupId)
-  if (result.restored) {
-    // A restored database requires the local backend to reload its file; simplest
-    // safe path is to tell the renderer to restart the workspace via app reload.
-    return result
-  }
-  return result
-})
-ipcMain.handle('resumego:backup-export', async (event, backupId: string | null) => {
-  assertTrustedIpc(event)
-  const choice = await dialog.showOpenDialog({
-    properties: ['openDirectory', 'createDirectory'],
-    title: '选择备份保存位置',
-  })
-  if (choice.canceled || choice.filePaths.length === 0) {
-    return { canceled: true }
-  }
-  const result = await exportWorkspaceBackup(dataDir, backupId, choice.filePaths[0])
-  return { canceled: false, ...result }
-})
-
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.whenReady().then(startApplication).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : '未知错误'
-    dialog.showErrorBox('ResumeGo 无法启动', `${message}\n\n原始本地数据和启动前备份均未删除。`)
+    let logTail = ''
+    const logPath = path.join(app.getPath('userData'), 'backend.log')
+    try {
+      const content = readFileSync(logPath, 'utf-8')
+      logTail = content.split('\n').slice(-25).join('\n')
+    } catch {
+      // No log yet; the backend may have failed before writing anything.
+    }
+    dialog.showErrorBox(
+      'ResumeGo 无法启动',
+      `${message}\n\n原始本地数据和启动前备份均未删除。\n\n===== 后端日志（最后 25 行） =====\n${logTail || '（暂无日志）'}\n\n日志文件位置：${logPath}`,
+    )
     app.quit()
   })
 }

@@ -51,6 +51,7 @@
           :updated-at="editor.updatedAt.value"
           :dirty="editor.dirty.value"
           :saving="editor.saving.value"
+          :blank="editor.blank.value"
           @select-section="selectSection"
           @update-field="editor.updateField"
           @update-paragraph="editor.updateParagraph"

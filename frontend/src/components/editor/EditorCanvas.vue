@@ -13,8 +13,8 @@
         <button type="button" :disabled="!dirty || saving" @click="$emit('reset-draft')">
           放弃
         </button>
-        <button class="save-button" type="button" :disabled="!dirty || saving" @click="$emit('save-draft')">
-          {{ saving ? '保存中...' : '保存为新版本' }}
+        <button class="save-button" type="button" :disabled="(!dirty && !blank) || saving" @click="$emit('save-draft')">
+          {{ saving ? '保存中...' : (blank ? '创建简历' : '保存为新版本') }}
         </button>
       </div>
     </header>
@@ -56,6 +56,7 @@ const props = defineProps<{
   updatedAt?: string | null
   dirty: boolean
   saving: boolean
+  blank?: boolean
 }>()
 
 defineEmits<{

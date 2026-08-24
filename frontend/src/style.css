@@ -20,8 +20,9 @@
   --action-bg: #111212; --action-fg: #ffffff;
   --control-bg: var(--action-bg); --control-fg: var(--action-fg);
   --control-hover: #2a2b2c; --control-selected: var(--brand);
-  --danger: #b53c32; --danger-soft: rgba(180, 62, 53, .09);
-  --warning: #b7791f; --warning-soft: rgba(183, 121, 31, .12);
+   --danger: #b53c32; --danger-soft: rgba(180, 62, 53, .09);
+   --warning: #b7791f; --warning-soft: rgba(183, 121, 31, .12);
+   --external-accent: #7c5cbf;
   --radius-control: 10px; --radius-panel: 16px; --radius-large: 22px;
   /* ── spacing 刻度（第 14 轮收敛）：新布局统一消费；既有已达标 px 不强制迁移 ── */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
@@ -58,8 +59,9 @@ body[data-theme='dark'] {
   --action-bg: #f1f1ee; --action-fg: #171717;
   --control-bg: var(--action-bg); --control-fg: var(--action-fg);
   --control-hover: #d8d8d3; --control-selected: var(--brand);
-  --danger: #e06c60; --danger-soft: rgba(224, 108, 96, .14);
-  --warning: #d9a441; --warning-soft: rgba(217, 164, 65, .14);
+   --danger: #e06c60; --danger-soft: rgba(224, 108, 96, .14);
+   --warning: #d9a441; --warning-soft: rgba(217, 164, 65, .14);
+   --external-accent: #a78bfa;
 }
 
 body {

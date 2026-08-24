@@ -10,6 +10,7 @@ import com.resumego.resume.service.ResumeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -28,6 +30,14 @@ public class ResumeController {
 
     public ResumeController(ResumeService resumeService) {
         this.resumeService = resumeService;
+    }
+
+    @DeleteMapping("/resumes/{resumeId}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long resumeId) {
+        if (!resumeService.deleteResume(resumeId)) {
+            throw new NoSuchElementException("简历不存在");
+        }
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     @GetMapping("/resumes")

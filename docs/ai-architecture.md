@@ -2,7 +2,7 @@
 
 Version: V1.0
 
-Status: Approved (2026-08-21, see docs/decisions.md)
+Status: Far-term direction draft (V2, not in current development)
 
 
 # 1. AI Architecture Overview

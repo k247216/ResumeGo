@@ -23,13 +23,14 @@ export interface BackendLaunchSpec {
 }
 
 export function buildBackendLaunchSpec(options: BackendLaunchOptions): BackendLaunchSpec {
-  const runtimeExecutable = options.platform === 'win32' ? 'java.exe' : 'java'
+  // javaw.exe runs without a console window on Windows (java.exe pops a terminal)
+  const runtimeExecutable = options.platform === 'win32' ? 'javaw.exe' : 'java'
   const command = options.isPackaged
     ? path.join(options.resourcesPath, 'runtime', 'bin', runtimeExecutable)
     : 'java'
   const jarPath = options.isPackaged
     ? path.join(options.resourcesPath, 'backend', 'resume-go.jar')
-    : path.join(options.projectRoot, 'backend', 'target', 'resume-go-0.0.1-SNAPSHOT.jar')
+    : path.join(options.projectRoot, 'backend', 'target', 'resume-go.jar')
 
   return {
     command,

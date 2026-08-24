@@ -45,7 +45,7 @@ describe('SettingsView', () => {
     expect(setup.text()).toContain('验证后从服务商获取模型')
     // 空态下不出现任何已填好的模型字段
     expect(wrapper.find('input[value="DeepSeek"]').exists()).toBe(false)
-    expect(wrapper.find('input[list="provider-models"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="provider-model-select"]').exists()).toBe(false)
   })
 
   it('offers the common provider presets in the connect flow', async () => {
@@ -78,11 +78,12 @@ describe('SettingsView', () => {
     }))
     expect(wrapper.get('[data-test="connected-banner"]').text()).toContain('DeepSeek 已连接')
     // 模型不被自动填满：由用户从服务商返回的列表中选择
-    const modelInput = wrapper.find('input[list="provider-models"]')
-    expect(modelInput.exists()).toBe(true)
-    expect((modelInput.element as HTMLInputElement).value).toBe('')
-    const datalistValues = wrapper.findAll('datalist#provider-models option').map((option) => option.attributes('value'))
-    expect(datalistValues).toEqual(expect.arrayContaining(['model-a', 'model-b']))
+    const modelSelect = wrapper.find('[data-test="provider-model-select"]')
+    expect(modelSelect.exists()).toBe(true)
+    expect(wrapper.get('[data-test="connected-banner"]').text()).toContain('DeepSeek 已连接')
+    // 模型字段保持为空：验证后不自动预填模型（不出现任何已选中的模型值）
+    expect(wrapper.text()).not.toContain('model-a')
+    expect(wrapper.text()).toContain('刷新模型')
     expect(wrapper.get('[data-test="save-config"]').text()).toBe('保存配置')
   })
 
@@ -100,8 +101,8 @@ describe('SettingsView', () => {
     expect(wrapper.get('[data-test="connected-banner"]').text()).toContain('DeepSeek 已连接')
     // 空模型列表：高级设置自动展开，模型名称输入框直接可见可填
     expect(wrapper.get('[data-test="advanced-toggle"]').text()).toContain('收起')
-    expect(wrapper.find('input[list="provider-models"]').exists()).toBe(true)
-    expect(wrapper.find('datalist#provider-models').text()).not.toContain('model-')
+    expect(wrapper.find('[data-test="provider-model-select"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('model-a')
   })
 
   it('keeps the empty two-column layout after cancelling a connect flow', async () => {

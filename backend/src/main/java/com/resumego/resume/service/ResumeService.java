@@ -318,4 +318,9 @@ public class ResumeService {
         }
         return null;
     }
+
+    @Transactional
+    public boolean deleteResume(long resumeId) {
+        return resumeRepository.softDelete(CurrentUser.DEMO_USER_ID, resumeId) > 0;
+    }
 }

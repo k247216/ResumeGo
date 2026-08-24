@@ -3,7 +3,6 @@ import type {
   CreateResumeRequest,
   CreateResumeVersionRequest,
   Resume,
-  ResumeAssessment,
   ResumeVersion,
   UpdateResumeTargetJobRequest,
 } from '../types/resume'
@@ -26,6 +25,13 @@ async function parseResponse<T>(res: Response, fallbackMessage: string): Promise
 export async function listResumes(): Promise<ApiResponse<Resume[]>> {
   const res = await apiFetch(RESUME_BASE)
   return parseResponse<Resume[]>(res, '获取简历列表失败')
+}
+
+export async function deleteResume(resumeId: number): Promise<ApiResponse<null>> {
+  const res = await apiFetch(`${RESUME_BASE}/${resumeId}`, {
+    method: 'DELETE',
+  })
+  return parseResponse<null>(res, '删除简历失败')
 }
 
 export async function createResume(req: CreateResumeRequest): Promise<ApiResponse<Resume>> {
@@ -71,9 +77,3 @@ export async function createResumeVersion(
   return parseResponse<ResumeVersion>(res, '保存简历新版本失败')
 }
 
-export async function assessResumeVersion(versionId: number): Promise<ApiResponse<ResumeAssessment>> {
-  const res = await apiFetch(`${VERSION_BASE}/${versionId}/assessments`, {
-    method: 'POST',
-  })
-  return parseResponse<ResumeAssessment>(res, '生成简历评分失败')
-}

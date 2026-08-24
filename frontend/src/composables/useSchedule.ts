@@ -46,10 +46,15 @@ export function useSchedule() {
     errorMessage.value = ''
     try {
       const { year, month } = visibleMonth.value
-      const from = new Date(year, month, 1)
-      from.setDate(from.getDate() - 31)
-      const to = new Date(year, month + 1, 1)
-      to.setDate(to.getDate() + 31)
+      const windowFrom = new Date(year, month, 1)
+      windowFrom.setDate(windowFrom.getDate() - 31)
+      const windowTo = new Date(year, month + 1, 1)
+      windowTo.setDate(windowTo.getDate() + 31)
+      // 「即将到来」面板固定展示未来 7 天：无论可见月离当前月多远，加载窗口都要覆盖今天起的 7 天
+      const upcomingFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      const upcomingTo = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7)
+      const from = windowFrom < upcomingFrom ? windowFrom : upcomingFrom
+      const to = windowTo > upcomingTo ? windowTo : upcomingTo
       const res = await listScheduleEvents(toIso(from), toIso(to))
       events.value = res.data ?? []
     } catch (err) {

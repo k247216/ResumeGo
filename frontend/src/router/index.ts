@@ -16,7 +16,13 @@ const router = createRouter({
     {
       path: '/targets',
       name: 'targets',
-      component: () => import('../views/targets/TargetListView.vue'),
+      component: () => import('../views/pipelines/PipelineView.vue'),
+      meta: { fill: true },
+    },
+    {
+      path: '/knowledge',
+      name: 'knowledge',
+      component: () => import('../views/knowledge/KnowledgeLibraryView.vue'),
       meta: { fill: true },
     },
     {

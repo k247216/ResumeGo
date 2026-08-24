@@ -43,6 +43,6 @@ describe('buildBackendLaunchSpec', () => {
     })
 
     expect(spec.command).toBe('java')
-    expect(spec.args[1]).toBe('/workspace/backend/target/resume-go-0.0.1-SNAPSHOT.jar')
+    expect(spec.args[1]).toBe('/workspace/backend/target/resume-go.jar')
   })
 })

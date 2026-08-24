@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ResumeLibraryView from './ResumeLibraryView.vue'
 
-const api = vi.hoisted(() => ({ listResumes: vi.fn(), getResumeVersions: vi.fn(), createResume: vi.fn() }))
+const api = vi.hoisted(() => ({ listResumes: vi.fn(), getResumeVersions: vi.fn(), createResume: vi.fn(), deleteResume: vi.fn() }))
 const jobApi = vi.hoisted(() => ({ getJobDescription: vi.fn() }))
 const targets = vi.hoisted(() => ({
   targets: [] as Array<Record<string, unknown>>,
@@ -16,6 +16,11 @@ const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('../../api/resume', () => api)
 vi.mock('../../api/job', () => jobApi)
 vi.mock('../../stores/targets', () => ({ useTargetsStore: () => targets }))
+vi.mock('element-plus', async (importOriginal) => {
+  const original = await importOriginal<typeof import('element-plus')>()
+  return { ...original, ElMessage: { success: vi.fn(), error: vi.fn() }, ElMessageBox: { confirm: vi.fn() } }
+})
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
   RouterLink: { name: 'RouterLink', props: ['to'], template: '<a class="router-link-stub"><slot /></a>' },
@@ -158,5 +163,38 @@ describe('ResumeLibraryView', () => {
     await wrapper.get('[data-test="versions-expand"]').trigger('click')
     expect(wrapper.findAll('[data-test^="version-row-"]')).toHaveLength(4)
     expect(wrapper.get('[data-test="versions-expand"]').text()).toContain('收起版本')
+  })
+
+  it('deletes the selected resume after confirmation and refreshes the list', async () => {
+    api.listResumes.mockResolvedValue({ success: true, data: [{ id: 3, title: '小林简历', currentVersion: version() }] })
+    api.getResumeVersions.mockResolvedValue({ success: true, data: [version()] })
+    api.deleteResume.mockResolvedValue({ success: true, data: null })
+    const wrapper = mountLibrary()
+    await flushPromises()
+    // select the paper
+    await wrapper.get('[data-test="paper-open-3"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="delete-resume"]').text()).toContain('删除这份简历')
+    // confirm then delete
+    const { ElMessageBox, ElMessage } = await import('element-plus')
+    vi.mocked(ElMessageBox.confirm).mockResolvedValue('confirm' as never)
+    await wrapper.get('[data-test="delete-resume"]').trigger('click')
+    await flushPromises()
+    expect(api.deleteResume).toHaveBeenCalledWith(3)
+    expect(ElMessage.success).toHaveBeenCalled()
+  })
+
+  it('does not delete when the confirmation is cancelled', async () => {
+    api.listResumes.mockResolvedValue({ success: true, data: [{ id: 3, title: '小林简历', currentVersion: version() }] })
+    api.getResumeVersions.mockResolvedValue({ success: true, data: [version()] })
+    const wrapper = mountLibrary()
+    await flushPromises()
+    await wrapper.get('[data-test="paper-open-3"]').trigger('click')
+    await flushPromises()
+    const { ElMessageBox } = await import('element-plus')
+    vi.mocked(ElMessageBox.confirm).mockRejectedValue(new Error('cancel') as never)
+    await wrapper.get('[data-test="delete-resume"]').trigger('click')
+    await flushPromises()
+    expect(api.deleteResume).not.toHaveBeenCalled()
   })
 })
