@@ -65,11 +65,12 @@
 
 | ID | 场景 | 当前门禁 | 通过条件 |
 | --- | --- | --- | --- |
-| INT-01 | Role Based Interview | `NOT_RUN_UNTIL_IMPLEMENTED` | 进入面试工作区后手动绑定 Pipeline、Resume version 与面试官角色 |
-| INT-02 | Knowledge Training | `NOT_RUN_UNTIL_IMPLEMENTED` | 从选定 Knowledge 来源生成基础/深入/场景问题并保留来源 |
-| INT-03 | Experience Simulation | `NOT_RUN_UNTIL_IMPLEMENTED` | 使用真实面经/用户题库主持提问、追问和评价，不冒充来源 |
+| INT-01 | Role Based Interview | Role Based Interview  | 进入面试工作区后手动绑定 Pipeline、Resume version 与面试官角色 |
+| INT-02 | Knowledge Training | Knowledge Training  | 从选定 Knowledge 来源生成基础/深入/场景问题并保留来源 |
+| INT-03 | Experience Simulation | Experience Simulation  | 使用真实面经/用户题库主持提问、追问和评价，不冒充来源 |
 | INT-04 | 中断与恢复 | `NOT_RUN_UNTIL_IMPLEMENTED` | 会话中断、模型错误、用户退出时可恢复或明确结束，无假完成记录 |
 | INT-05 | 反馈生成 | `NOT_RUN_UNTIL_IMPLEMENTED` | 反馈关联实际 Pipeline/简历/模式，提炼核心问题和下一步，不直接改状态 |
+| INT-06 | 反馈事件投影 | V2-I1 集成后必测（已实现：PENDING 事件，核心问题/建议映射，不修改源状态） | 完成后生成一条 PENDING 反馈事件；总结缺薄弱点/建议时如实为 null | 
 
 ## 7. Workspace 与 Growth
 

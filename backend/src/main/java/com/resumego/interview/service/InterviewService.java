@@ -14,6 +14,8 @@ import com.resumego.ai.AiResult;
 import com.resumego.ai.validate.AiOutputValidator;
 import com.resumego.company.CompanyProfileService;
 import com.resumego.common.CurrentUser;
+import com.resumego.interview.feedback.InterviewFeedbackEvent;
+import com.resumego.interview.feedback.InterviewFeedbackProjector;
 import com.resumego.interview.InterviewAction;
 import com.resumego.interview.dto.InterviewQuestionDTO;
 import com.resumego.interview.dto.InterviewStatusResponse;
@@ -40,6 +42,7 @@ import com.resumego.job.JobDescriptionMapper;
 import com.resumego.resume.dto.ResumeVersionDTO;
 import com.resumego.resume.repository.ResumeRepository;
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,6 +94,9 @@ public class InterviewService {
     private final JobDescriptionMapper jobDescriptionMapper;
     private final CompanyProfileService companyProfileService;
     private final ObjectMapper objectMapper;
+
+    @Autowired(required = false)
+    private InterviewFeedbackProjector feedbackProjector;
 
     public InterviewService(
             InterviewSessionMapper sessionMapper,
@@ -1209,5 +1215,22 @@ public class InterviewService {
         } catch (Exception e) {
             return json;
         }
+    }
+
+    /**
+     * 完成计划后的规范化反馈投影入口：只映射持久化总结中的核心问题与建议，
+     * 生成 PENDING 事件；不修改简历、Pipeline、知识或 Workspace 状态。
+     * 持久化与消费归 Workspace Action（W1）。
+     */
+    public InterviewFeedbackEvent projectFeedbackEvent(Long planId, MultiSessionSummaryResponse summary) {
+        if (feedbackProjector == null) {
+            throw new IllegalStateException("反馈投影器不可用");
+        }
+        InterviewPlan plan = planMapper.selectById(planId);
+        if (plan == null || plan.getUserId() == null
+                || !Objects.equals(plan.getUserId(), CurrentUser.DEMO_USER_ID)) {
+            throw new IllegalArgumentException("面试计划不存在");
+        }
+        return feedbackProjector.project(plan, summary);
     }
 }
