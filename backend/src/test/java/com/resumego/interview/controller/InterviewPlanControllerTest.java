@@ -68,7 +68,13 @@ class InterviewPlanControllerTest {
     }
 
     private InterviewPlanController controller() { return new InterviewPlanController(planService); }
-    private CreateInterviewPlanRequest request() { return new CreateInterviewPlanRequest(10L, 20L, 5, List.of(1L), List.of(), null); }
-    private InterviewPlanResponse plan() { return new InterviewPlanResponse(1L, 10L, 20L, "计划", 5, List.of(), null, null, null, List.of(), false, null, null); }
+    private CreateInterviewPlanRequest request() {
+        return new CreateInterviewPlanRequest(com.resumego.interview.InterviewMode.ROLE_BASED, 5L, 10L,
+                null, null, null, null, 5, List.of(1L), List.of(), null);
+    }
+    private InterviewPlanResponse plan() {
+        return new InterviewPlanResponse(1L, "ROLE_BASED", "1", java.util.Map.of(), 10L, 20L, "计划", 5,
+                List.of(), null, null, null, List.of(), false, null, null);
+    }
     private MultiSessionSummaryResponse summary() { return new MultiSessionSummaryResponse("总结", 80, List.of(), List.of(), List.of(), List.of()); }
 }

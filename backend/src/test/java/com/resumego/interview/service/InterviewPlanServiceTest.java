@@ -1,6 +1,11 @@
 package com.resumego.interview.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.resumego.common.CurrentUser;
+import com.resumego.interview.context.ExperienceSimulationContextValidator;
+import com.resumego.interview.context.InterviewContextValidator;
+import com.resumego.interview.context.KnowledgeTrainingContextValidator;
+import com.resumego.interview.context.RoleBasedContextValidator;
 import com.resumego.interview.dto.CreateInterviewPlanRequest;
 import com.resumego.interview.dto.InterviewPlanResponse;
 import com.resumego.interview.dto.MultiSessionSummaryResponse;
@@ -12,6 +17,12 @@ import com.resumego.interview.entity.InterviewerPersona;
 import com.resumego.interview.mapper.InterviewPlanMapper;
 import com.resumego.interview.mapper.InterviewSessionMapper;
 import com.resumego.interview.mapper.InterviewerPersonaMapper;
+import com.resumego.interview.repository.InterviewQuestionSetRepository;
+import com.resumego.knowledge.KnowledgeRepository;
+import com.resumego.project.JobProject;
+import com.resumego.project.JobProjectRepository;
+import com.resumego.resume.dto.ResumeVersionDTO;
+import com.resumego.resume.repository.ResumeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +30,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,24 +60,42 @@ class InterviewPlanServiceTest {
     private InterviewService interviewService;
     @Mock
     private InterviewGrowthService growthService;
+    @Mock
+    private JobProjectRepository jobProjectRepository;
+    @Mock
+    private ResumeRepository resumeRepository;
+    @Mock
+    private KnowledgeRepository knowledgeRepository;
+    @Mock
+    private InterviewQuestionSetRepository questionSetRepository;
 
     private InterviewPlanService planService;
 
     @BeforeEach
     void setUp() {
+        List<InterviewContextValidator> validators = List.of(
+                new RoleBasedContextValidator(jobProjectRepository, resumeRepository, personaMapper),
+                new KnowledgeTrainingContextValidator(knowledgeRepository),
+                new ExperienceSimulationContextValidator(questionSetRepository, personaMapper)
+        );
         planService = new InterviewPlanService(
                 planMapper,
                 sessionMapper,
                 personaMapper,
                 interviewService,
                 growthService,
+                validators,
                 new ObjectMapper()
         );
     }
 
     @Test
-    @DisplayName("创建面试计划时按最初选择的人设顺序绑定每一轮会话")
+    @DisplayName("创建岗位模拟计划时按所选人设顺序创建每一轮会话，并写入不可变快照")
     void shouldCreatePlanAndBindSessionsInPersonaOrder() {
+        when(jobProjectRepository.findById(CurrentUser.DEMO_USER_ID, 5L)).thenReturn(Optional.of(buildProject(5L, 20L)));
+        when(resumeRepository.findVersionByIdForUser(CurrentUser.DEMO_USER_ID, 10L))
+                .thenReturn(new ResumeVersionDTO(10L, 1L, null, 2, Map.of(), "创建", "user", LocalDateTime.now()));
+        when(resumeRepository.findTitleById(CurrentUser.DEMO_USER_ID, 1L)).thenReturn("后端简历");
         when(personaMapper.selectById(1L)).thenReturn(buildPersona(1L, "技术面试官", "高级后端工程师"));
         when(personaMapper.selectById(2L)).thenReturn(buildPersona(2L, "HR 面试官", "招聘经理"));
         doAnswer(invocation -> {
@@ -76,8 +109,13 @@ class InterviewPlanServiceTest {
                 .thenReturn(buildStatus(502L, "HR 面试官", "招聘经理"));
 
         InterviewPlanResponse response = planService.createPlan(new CreateInterviewPlanRequest(
+                com.resumego.interview.InterviewMode.ROLE_BASED,
+                5L,
                 10L,
-                20L,
+                null,
+                null,
+                null,
+                null,
                 5,
                 List.of(1L, 2L),
                 List.of("项目深挖"),
@@ -85,6 +123,9 @@ class InterviewPlanServiceTest {
         ));
 
         assertThat(response.planId()).isEqualTo(100L);
+        assertThat(response.mode()).isEqualTo("ROLE_BASED");
+        assertThat(response.contextContractVersion()).isEqualTo("1");
+        assertThat(response.startContextSnapshot()).containsEntry("jobProjectName", "腾讯 Java 后端");
         assertThat(response.summary()).isNull();
         assertThat(response.rounds()).extracting(InterviewPlanResponse.Round::sessionId)
                 .containsExactly(501L, 502L);
@@ -230,10 +271,18 @@ class InterviewPlanServiceTest {
         return persona;
     }
 
+    private JobProject buildProject(Long id, Long jobDescriptionId) {
+        return new JobProject(id, CurrentUser.DEMO_USER_ID, "腾讯 Java 后端", "active", "applied",
+                jobDescriptionId, 10L, null, null, null, null, null, null,
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
     private InterviewPlan buildPlan(Long id, String summaryJson) {
         InterviewPlan plan = new InterviewPlan();
         plan.setId(id);
         plan.setUserId(1L);
+        plan.setMode("ROLE_BASED");
+        plan.setContextContractVersion("1");
         plan.setResumeVersionId(10L);
         plan.setJobDescriptionId(20L);
         plan.setTitle("多轮模拟面试");

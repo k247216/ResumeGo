@@ -25,6 +25,18 @@ public class InterviewPlan {
     @TableField("user_id")
     private Long userId;
 
+    /** 训练模式（ROLE_BASED/KNOWLEDGE_TRAINING/EXPERIENCE_SIMULATION），创建后不可变 */
+    @TableField("mode")
+    private String mode;
+
+    /** 开始上下文契约版本 */
+    @TableField("context_contract_version")
+    private String contextContractVersion;
+
+    /** 不可变开始上下文快照 JSON（不含正文、API Key、绝对路径） */
+    @TableField("start_context_snapshot_json")
+    private String startContextSnapshotJson;
+
     @TableField("resume_version_id")
     private Long resumeVersionId;
 

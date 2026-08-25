@@ -4,6 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resumego.common.CurrentUser;
+import com.resumego.interview.InterviewMode;
+import com.resumego.interview.context.InterviewContextSnapshot;
+import com.resumego.interview.context.InterviewContextValidator;
+import com.resumego.interview.context.InterviewStartContext;
 import com.resumego.interview.dto.CreateInterviewPlanRequest;
 import com.resumego.interview.dto.InterviewPlanResponse;
 import com.resumego.interview.dto.InterviewStatusResponse;
@@ -22,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,7 +34,7 @@ import java.util.Objects;
 /**
  * 多轮模拟面试计划服务。
  * <p>
- * 只负责“一次面试”和“多位面试官轮次”的持久化归属，
+ * 只负责“一次面试”和“多位面试官轮次”的持久化归属与模式上下文快照，
  * 不实现、不修改每轮面试的状态机转换。
  */
 @Service
@@ -41,41 +46,25 @@ public class InterviewPlanService {
     private final InterviewerPersonaMapper personaMapper;
     private final InterviewService interviewService;
     private final InterviewGrowthService growthService;
+    private final List<InterviewContextValidator> contextValidators;
     private final ObjectMapper objectMapper;
 
     @Transactional
     public InterviewPlanResponse createPlan(CreateInterviewPlanRequest request) {
-        List<Long> personaIds = request.personaIds();
-        if (personaIds == null || personaIds.isEmpty()) {
-            throw new IllegalArgumentException("至少选择一位面试官");
-        }
-        if (personaIds.size() > 5) {
-            throw new IllegalArgumentException("面试官数量最多为 5 位");
-        }
-
-        List<InterviewerPersona> personas = new ArrayList<>();
-        for (Long personaId : personaIds) {
-            InterviewerPersona persona = personaMapper.selectById(personaId);
-            if (persona == null) {
-                throw new IllegalArgumentException("面试官人设不存在: " + personaId);
-            }
-            personas.add(persona);
-        }
+        InterviewStartContext context = request.toContext();
+        InterviewContextSnapshot snapshot = validateContext(context);
 
         LocalDateTime now = LocalDateTime.now();
         InterviewPlan plan = new InterviewPlan();
         plan.setUserId(CurrentUser.DEMO_USER_ID);
-        plan.setResumeVersionId(request.resumeVersionId());
-        plan.setJobDescriptionId(request.jobDescriptionId());
+        plan.setMode(context.mode().name());
+        plan.setContextContractVersion(snapshot.contextContractVersion());
+        plan.setStartContextSnapshotJson(writeJson(snapshot));
+        plan.setResumeVersionId(snapshot.resumeVersionId());
+        plan.setJobDescriptionId(snapshot.jobDescriptionId());
         plan.setTitle("多轮模拟面试");
-        plan.setQuestionCount(request.questionCount());
-        plan.setPersonaPlanJson(writeJson(personas.stream()
-                .map(persona -> Map.of(
-                        "personaId", persona.getId(),
-                        "personaName", persona.getName(),
-                        "personaTitle", persona.getTitle()
-                ))
-                .toList()));
+        plan.setQuestionCount(request.questionCount() != null ? request.questionCount() : 5);
+        plan.setPersonaPlanJson(writeJson(personaPlan(context.mode(), snapshot)));
         plan.setFocusTagsJson(writeJson(request.focusTags() != null ? request.focusTags() : List.of()));
         plan.setSupplementText(request.supplement());
         plan.setCreatedAt(now);
@@ -83,34 +72,48 @@ public class InterviewPlanService {
         planMapper.insert(plan);
 
         List<InterviewPlanResponse.Round> rounds = new ArrayList<>();
-        for (int index = 0; index < personas.size(); index++) {
-            InterviewerPersona persona = personas.get(index);
-            int roundOrder = index + 1;
-            InterviewStatusResponse created = interviewService.createInterview(new StartInterviewRequest(
-                    request.resumeVersionId(),
-                    request.jobDescriptionId(),
-                    request.questionCount(),
-                    persona.getId()
-            ));
-            bindSessionToPlan(created.sessionId(), plan.getId(), roundOrder);
-            rounds.add(toRound(created, persona.getId(), roundOrder));
+        if (context.mode() == InterviewMode.ROLE_BASED) {
+            List<Long> personaIds = snapshot.personaIds();
+            for (int index = 0; index < personaIds.size(); index++) {
+                Long personaId = personaIds.get(index);
+                int roundOrder = index + 1;
+                InterviewStatusResponse created = interviewService.createInterview(new StartInterviewRequest(
+                        snapshot.resumeVersionId(),
+                        snapshot.jobDescriptionId(),
+                        plan.getQuestionCount(),
+                        personaId
+                ));
+                bindSessionToPlan(created.sessionId(), plan.getId(), roundOrder);
+                rounds.add(toRound(created, personaId, roundOrder));
+            }
         }
+        // 知识训练与面经模式的轮次创建在问题来源适配器就绪后进行（Task 3），计划先落库并携带快照。
 
-        return new InterviewPlanResponse(
-                plan.getId(),
-                plan.getResumeVersionId(),
-                plan.getJobDescriptionId(),
-                plan.getTitle(),
-                plan.getQuestionCount(),
-                parseStringList(plan.getFocusTagsJson()),
-                plan.getSupplementText(),
-                null,
-                null,
-                rounds,
-                rounds.stream().allMatch(InterviewPlanResponse.Round::completed),
-                plan.getCreatedAt(),
-                plan.getUpdatedAt()
-        );
+        return buildResponse(plan, rounds);
+    }
+
+    private Map<String, Object> personaPlan(InterviewMode mode, InterviewContextSnapshot snapshot) {
+        // 快照已包含 persona 顺序；persona_plan_json 保持既有结构以兼容现有读取方
+        List<Map<String, Object>> plan = new ArrayList<>();
+        if (snapshot.personaIds() != null) {
+            for (int index = 0; index < snapshot.personaIds().size(); index++) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("personaId", snapshot.personaIds().get(index));
+                if (snapshot.personaNames() != null && index < snapshot.personaNames().size()) {
+                    row.put("personaName", snapshot.personaNames().get(index));
+                }
+                plan.add(row);
+            }
+        }
+        return Map.of("personas", plan);
+    }
+
+    private InterviewContextSnapshot validateContext(InterviewStartContext context) {
+        return contextValidators.stream()
+                .filter(validator -> validator.supports(context.mode()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("没有支持该模式的校验器: " + context.mode()))
+                .validate(context);
     }
 
     public List<InterviewPlanResponse> listMyPlans() {
@@ -199,8 +202,16 @@ public class InterviewPlanService {
                 ))
                 .toList();
 
+        return buildResponse(plan, rounds);
+    }
+
+    /** 响应中的快照来自持久化 JSON：源对象改名不改变历史展示。 */
+    private InterviewPlanResponse buildResponse(InterviewPlan plan, List<InterviewPlanResponse.Round> rounds) {
         return new InterviewPlanResponse(
                 plan.getId(),
+                plan.getMode(),
+                plan.getContextContractVersion(),
+                parseSnapshot(plan.getStartContextSnapshotJson()),
                 plan.getResumeVersionId(),
                 plan.getJobDescriptionId(),
                 plan.getTitle(),
@@ -214,6 +225,18 @@ public class InterviewPlanService {
                 plan.getCreatedAt(),
                 plan.getUpdatedAt()
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseSnapshot(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, LinkedHashMap.class);
+        } catch (Exception e) {
+            return Map.of();
+        }
     }
 
     private InterviewPlan loadOwnedPlan(Long planId) {
