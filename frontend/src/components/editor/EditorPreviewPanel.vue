@@ -30,7 +30,7 @@
             v-for="section in printableSections"
             :key="section.id"
             class="resume-preview-section"
-            :class="{ active: section.id === selectedSectionId }"
+            :class="{ active: section.id === selectedSectionId, 'diff-modified': highlightSectionIds?.includes(section.id), 'diff-added': addedSectionIds?.includes(section.id) }"
             :data-preview-section-id="section.id"
             role="button"
             tabindex="0"
@@ -114,6 +114,10 @@ const props = defineProps<{
   selectedSectionId: string
   versionLabel: string
   templateStyle?: string
+  /** 荧光笔高亮：内容有变化的章节（琥珀扫过） */
+  highlightSectionIds?: string[]
+  /** 新增章节（绿色扫过） */
+  addedSectionIds?: string[]
 }>()
 
 defineEmits<{
@@ -547,6 +551,19 @@ const paperViewportStyle = computed(() => ({
 
 .a4-paper.template-compact .resume-preview-section {
   padding: 5px 0 7px;
+}
+
+/* 荧光笔高亮：修改=琥珀扫过；新增=绿色扫过（章节级，不伪造词级 diff） */
+.resume-preview-section.diff-modified {
+  background: linear-gradient(120deg, rgba(217, 119, 6, 0.14), rgba(217, 119, 6, 0.05));
+  box-shadow: inset 3px 0 0 rgba(217, 119, 6, 0.45);
+  border-radius: 4px;
+}
+
+.resume-preview-section.diff-added {
+  background: linear-gradient(120deg, rgba(22, 139, 104, 0.13), rgba(22, 139, 104, 0.04));
+  box-shadow: inset 3px 0 0 rgba(22, 139, 104, 0.45);
+  border-radius: 4px;
 }
 
 .a4-paper.template-compact .resume-preview-section h2 {

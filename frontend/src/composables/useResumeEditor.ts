@@ -309,7 +309,7 @@ export function useResumeEditor() {
   }
 }
 
-function buildSections(content: ResumeContent): EditorSection[] {
+export function buildSections(content: ResumeContent): EditorSection[] {
   const active = resolveActiveSections(content)
   const hidden = new Set(stringArray(content.hiddenSections))
   const basic = content.basicInfo ?? {}

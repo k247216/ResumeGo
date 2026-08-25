@@ -2,8 +2,7 @@
   <aside class="version-inspector" data-test="resume-version-inspector">
     <header class="inspector-head">
       <div>
-        <p class="inspector-kicker">版本检查器</p>
-        <h2 v-if="selectedVersion">V{{ selectedVersion.versionNo }}</h2>
+        <h2 v-if="selectedVersion">版本 V{{ selectedVersion.versionNo }}</h2>
         <h2 v-else-if="resume">{{ resume.title }}</h2>
       </div>
       <button type="button" class="inspector-close" data-test="inspector-close" aria-label="收起检查器" @click="emit('close')">×</button>
@@ -81,9 +80,10 @@
       <section class="inspector-section" data-test="activity-timeline">
         <div class="section-head">
           <h3 class="section-title">历史活动</h3>
+          <button v-if="activityEvents.length > 4" type="button" class="activity-all" data-test="activity-toggle" @click="activityShowAll = !activityShowAll">{{ activityShowAll ? '收起' : '查看全部' }}</button>
         </div>
         <ul class="activity-list" data-test="activity-list">
-          <li v-for="event in activityEvents" :key="event.key" class="activity-row">
+          <li v-for="event in activityShowAll ? activityEvents : activityEvents.slice(0, 4)" :key="event.key" class="activity-row">
             <span class="activity-dot" :class="{ fork: event.fork }" aria-hidden="true"></span>
             <span class="activity-copy">
               <strong>{{ event.label }}</strong>
@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Resume, ResumeVersion } from '../../types/resume'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
 
@@ -131,6 +131,7 @@ const viewingCurrent = computed(() =>
 /** 版本健康：确定性结构检查（正文可读、基本字段存在），不代表 AI 评分 */
 
 /** 历史活动：从真实版本派生（创建事件），不虚构改名/编辑记录 */
+const activityShowAll = ref(false)
 const activityEvents = computed(() => {
   const events = [...props.versions].sort((left, right) =>
     String(right.createdAt).localeCompare(String(left.createdAt)))
@@ -188,6 +189,7 @@ function formatTime(value: string) {
 .used-by-row{display:flex;align-items:center;border:0;background:none;border-radius:8px;padding:7px 9px;font-size:12px;color:var(--copy);cursor:pointer;text-align:left}
 .used-by-row:hover{background:var(--bg-hover);color:var(--brand)}
 .used-by-copy{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-all{border:0;background:none;padding:0;color:var(--brand);font-size:11px;font-weight:600;cursor:pointer}
 .activity-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}
 .activity-row{display:flex;align-items:flex-start;gap:9px}
 .activity-dot{width:8px;height:8px;border-radius:50%;background:var(--line,rgba(28,31,35,.3));flex:0 0 auto;margin-top:4px}

@@ -54,16 +54,16 @@ function shortDate(value: string) {
 </script>
 
 <style scoped>
-.version-rail{position:relative;display:flex;align-items:center;gap:10px;height:72px;flex:0 0 auto}
+.version-rail{position:relative;display:flex;align-items:center;gap:14px;height:92px;flex:0 0 auto}
 .rail-scroll{flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;padding:4px 2px}
-.rail-track{position:relative;display:inline-flex;gap:26px;padding:0 6px}
+.rail-track{position:relative;display:inline-flex;gap:44px;padding:0 10px}
 .rail-track::before{content:'';position:absolute;left:10px;right:10px;top:50%;height:1px;background:var(--line-subtle,rgba(28,31,35,.12))}
 .rail-node{position:relative;display:grid;justify-items:center;gap:3px;border:0;background:none;padding:2px 4px;cursor:pointer;min-width:34px}
-.node-dot{width:9px;height:9px;border-radius:50%;background:var(--surface-solid,#fff);border:2px solid var(--line,rgba(28,31,35,.3));transition:all .15s ease-out}
+.node-dot{width:11px;height:11px;border-radius:50%;background:var(--surface-solid,#fff);border:2px solid var(--line,rgba(28,31,35,.3));transition:all .15s ease-out}
 .rail-node:hover .node-dot{border-color:var(--brand)}
-.rail-node.current .node-dot{width:12px;height:12px;background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
-.node-label{font-size:12px;font-weight:600;color:var(--copy);font-variant-numeric:tabular-nums}
+.rail-node.current .node-dot{width:14px;height:14px;background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.node-label{font-size:13.5px;font-weight:600;color:var(--copy);font-variant-numeric:tabular-nums}
 .rail-node.current .node-label{color:var(--ink);font-weight:700}
-.node-date{font-size:10px;color:var(--muted);white-space:nowrap}
+.node-date{font-size:11px;color:var(--muted);white-space:nowrap}
 .readonly-badge{flex:0 0 auto;padding:2px 9px;border-radius:999px;background:var(--bg-subtle);color:var(--muted);font-size:10.5px;font-weight:600}
 </style>

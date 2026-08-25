@@ -41,11 +41,14 @@ describe('ResumeAssetNavigator', () => {
     expect(heads[1].text()).toContain('1')
   })
 
-  it('资产行只展示标题/当前版本/更新时间，岗位表达用克制标记', () => {
+  it('资产行只展示标题/时间，岗位表达用克制标记；附真实模版缩略图', () => {
     const wrapper = mountNavigator()
     const row = wrapper.get('[data-test="asset-row-2"]')
-    expect(row.text()).toContain('V1')
+    expect(row.text()).toContain('简历 2')
+    expect(row.text()).toContain('今天')
     expect(wrapper.get('[data-test="asset-kind-2"]').text()).toBe('岗')
+    // 真实模版微缩渲染缩略图
+    expect(wrapper.findAll('.asset-thumb')).toHaveLength(2)
     expect(row.text()).not.toContain('岗位表达副本')
   })
 
@@ -56,14 +59,17 @@ describe('ResumeAssetNavigator', () => {
     expect(wrapper.emitted('select')).toEqual([[2]])
   })
 
-  it('过滤三态 + 归档独立入口', async () => {
+  it('过滤三态 + 过滤菜单 + 归档独立入口', async () => {
     const wrapper = mountNavigator()
-    expect(wrapper.findAll('[data-test^="filter-"]')).toHaveLength(3)
+    expect(wrapper.findAll('[data-test="filter-all"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-test="filter-general"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-test="filter-expression"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-test="filter-menu"]')).toHaveLength(1)
     await wrapper.get('[data-test="filter-expression"]').trigger('click')
     expect(wrapper.emitted('update:filter')).toEqual([['expression']])
     await wrapper.get('[data-test="archived-entry"]').trigger('click')
     expect(wrapper.emitted('open-archived')).toHaveLength(1)
-    expect(wrapper.get('[data-test="archived-entry"]').text()).toContain('(3)')
+    expect(wrapper.get('[data-test="archived-entry"]').text()).toContain('回收站')
   })
 
   it('空库与失败状态诚实呈现', () => {

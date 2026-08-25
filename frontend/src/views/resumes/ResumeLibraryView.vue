@@ -65,6 +65,7 @@
                 :content="viewingContent"
                 :changes="chapterChanges"
                 :compare-mode="comparing"
+                :template-style="templateStyle"
                 @edit="goEditCurrent"
               />
               <div v-if="comparing" class="compare-legend" data-test="compare-legend">
@@ -171,6 +172,8 @@ import { useTargetsStore } from '../../stores/targets'
 import type { ParsedMarkdownResume } from '../../utils/parseMarkdownResume'
 import { parseMarkdownResume } from '../../utils/parseMarkdownResume'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
+
+const templateStyle = (() => { try { return globalThis.localStorage?.getItem('resumego:selectedResumeTemplate') ?? 'blue' } catch { return 'blue' } })()
 
 const library = useResumeLibrary()
 const targetsStore = useTargetsStore()
