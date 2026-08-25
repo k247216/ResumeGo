@@ -653,6 +653,7 @@ const paperViewportStyle = computed(() => ({
   border: 10px solid #101a33;
   background: #f8fafc;
   font-family: 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, 'Noto Sans SC', monospace;
+}
 
 .a4-paper.template-terminal .resume-head {
   border-bottom-color: #34d399;
