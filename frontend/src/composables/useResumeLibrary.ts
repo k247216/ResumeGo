@@ -1,7 +1,26 @@
 import { computed, ref } from 'vue'
-import { deleteResume, getResumeVersions, listResumes } from '../api/resume'
+import {
+  archiveResume,
+  deleteResume,
+  forkResumeVersion,
+  getResumeVersions,
+  listResumes,
+  renameResume,
+  restoreResume,
+} from '../api/resume'
 import type { Resume, ResumeVersion } from '../types/resume'
 
+export type ResumeLibraryKindFilter = 'all' | 'general' | 'expression' | 'archived'
+
+export interface ResumeLibraryFilter {
+  kind: ResumeLibraryKindFilter
+  keyword: string
+}
+
+/**
+ * 简历库资产状态：Library → Workspace → Inspector 共用的单一事实来源。
+ * 不自动选择或修改任何 Pipeline 绑定；历史引用来自真实数据。
+ */
 export function useResumeLibrary() {
   const resumes = ref<Resume[]>([])
   const selectedResumeId = ref<number | null>(null)
@@ -11,15 +30,31 @@ export function useResumeLibrary() {
   const versionLoading = ref(false)
   const errorMessage = ref('')
   const versionError = ref('')
+  const filter = ref<ResumeLibraryFilter>({ kind: 'all', keyword: '' })
+
+  /** 别名：资产语义命名 */
+  const items = resumes
+  const error = errorMessage
 
   const selectedResume = computed(() => resumes.value.find((resume) => resume.id === selectedResumeId.value) ?? null)
   const selectedVersion = computed(() => versions.value.find((version) => version.id === selectedVersionId.value) ?? selectedResume.value?.currentVersion ?? null)
+
+  /** 关键词标题过滤（客户端，不产生额外请求） */
+  const visibleItems = computed(() => {
+    const keyword = filter.value.keyword.trim().toLowerCase()
+    if (!keyword) return resumes.value
+    return resumes.value.filter((resume) => resume.title.toLowerCase().includes(keyword))
+  })
 
   async function load() {
     loading.value = true
     errorMessage.value = ''
     try {
-      const response = await listResumes()
+      const kind = filter.value.kind === 'general'
+        ? 'GENERAL'
+        : filter.value.kind === 'expression' ? 'JOB_EXPRESSION' : undefined
+      const archived = filter.value.kind === 'archived' ? true : false
+      const response = await listResumes(kind, archived)
       resumes.value = response.data
       const current = resumes.value.find((resume) => resume.id === selectedResumeId.value) ?? resumes.value[0] ?? null
       if (current) await selectResume(current.id)
@@ -28,14 +63,20 @@ export function useResumeLibrary() {
         selectedVersionId.value = null
         versions.value = []
       }
-    } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : '读取本地简历失败'
+    } catch (err) {
+      errorMessage.value = err instanceof Error ? err.message : '读取本地简历失败'
     } finally {
       loading.value = false
     }
   }
 
-  async function selectResume(id: number) {
+  async function selectResume(id: number | null) {
+    if (id == null) {
+      selectedResumeId.value = null
+      selectedVersionId.value = null
+      versions.value = []
+      return
+    }
     const resume = resumes.value.find((item) => item.id === id)
     if (!resume) return
     selectedResumeId.value = id
@@ -49,14 +90,51 @@ export function useResumeLibrary() {
       if (!versions.value.some((version) => version.id === selectedVersionId.value)) {
         selectedVersionId.value = versions.value[0]?.id ?? null
       }
-    } catch (error) {
+    } catch (err) {
       if (selectedResumeId.value === id) {
         versions.value = resume.currentVersion ? [resume.currentVersion] : []
-        versionError.value = error instanceof Error ? error.message : '读取版本历史失败'
+        versionError.value = err instanceof Error ? err.message : '读取版本历史失败'
       }
     } finally {
       if (selectedResumeId.value === id) versionLoading.value = false
     }
+  }
+
+  const select = selectResume
+
+  function selectVersion(id: number) {
+    if (versions.value.some((version) => version.id === id)) selectedVersionId.value = id
+  }
+
+  /** fork 后刷新并选中新资产。 */
+  async function fork(versionId: number, title: string): Promise<Resume> {
+    const res = await forkResumeVersion(versionId, title)
+    await load()
+    if (resumes.value.some((item) => item.id === res.data.id)) {
+      await selectResume(res.data.id)
+    }
+    return res.data
+  }
+
+  /** 归档后从默认列表移除，选中回退到剩余资产。 */
+  async function archive(resumeId: number): Promise<void> {
+    await archiveResume(resumeId)
+    if (selectedResumeId.value === resumeId) {
+      selectedResumeId.value = null
+      versions.value = []
+      selectedVersionId.value = null
+    }
+    await load()
+  }
+
+  async function restore(resumeId: number): Promise<void> {
+    await restoreResume(resumeId)
+    await load()
+  }
+
+  async function rename(resumeId: number, title: string): Promise<void> {
+    await renameResume(resumeId, title)
+    await load()
   }
 
   async function remove(id: number) {
@@ -69,9 +147,29 @@ export function useResumeLibrary() {
     await load()
   }
 
-  function selectVersion(id: number) {
-    if (versions.value.some((version) => version.id === id)) selectedVersionId.value = id
+  return {
+    resumes,
+    items,
+    visibleItems,
+    selectedResumeId,
+    selectedResume,
+    versions,
+    selectedVersionId,
+    selectedVersion,
+    loading,
+    versionLoading,
+    errorMessage,
+    error,
+    versionError,
+    filter,
+    load,
+    selectResume,
+    select,
+    selectVersion,
+    fork,
+    archive,
+    restore,
+    rename,
+    remove,
   }
-
-  return { resumes, selectedResumeId, selectedResume, versions, selectedVersionId, selectedVersion, loading, versionLoading, errorMessage, versionError, load, selectResume, selectVersion, remove }
 }

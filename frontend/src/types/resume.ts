@@ -4,9 +4,15 @@ export interface ApiResponse<T> {
   message?: string | null
 }
 
+export type ResumeKind = 'GENERAL' | 'JOB_EXPRESSION'
+
 export interface Resume {
   id: number
   title: string
+  /** 资产种类；后端契约必返回，历史夹具可省略（缺省按通用简历处理） */
+  kind?: ResumeKind
+  forkedFromVersionId?: number | null
+  archivedAt?: string | null
   targetJobDescriptionId?: number | null
   currentVersion?: ResumeVersion | null
   createdAt?: string | null
@@ -38,6 +44,16 @@ export interface CreateResumeRequest {
 
 export interface UpdateResumeTargetJobRequest {
   targetJobDescriptionId?: number | null
+}
+
+/** fork 请求：只提交新标题；正文由服务端读取源版本复制。 */
+export interface ForkResumeVersionRequest {
+  title: string
+}
+
+/** 简历资产改名请求。 */
+export interface UpdateResumeAssetRequest {
+  title: string
 }
 
 export interface ScoreDeduction {

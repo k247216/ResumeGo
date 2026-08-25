@@ -2,8 +2,10 @@ import type {
   ApiResponse,
   CreateResumeRequest,
   CreateResumeVersionRequest,
+  ForkResumeVersionRequest,
   Resume,
   ResumeVersion,
+  UpdateResumeAssetRequest,
   UpdateResumeTargetJobRequest,
 } from '../types/resume'
 import { apiFetch } from './http'
@@ -22,9 +24,44 @@ async function parseResponse<T>(res: Response, fallbackMessage: string): Promise
   return body
 }
 
-export async function listResumes(): Promise<ApiResponse<Resume[]>> {
-  const res = await apiFetch(RESUME_BASE)
+export async function listResumes(kind?: string, archived?: boolean): Promise<ApiResponse<Resume[]>> {
+  const params = new URLSearchParams()
+  if (kind) params.set('kind', kind)
+  if (archived !== undefined) params.set('archived', String(archived))
+  const query = params.toString()
+  const res = await apiFetch(query ? `${RESUME_BASE}?${query}` : RESUME_BASE)
   return parseResponse<Resume[]>(res, '获取简历列表失败')
+}
+
+/** 从任意版本创建岗位表达副本：只提交新标题，正文由服务端复制。 */
+export async function forkResumeVersion(versionId: number, title: string): Promise<ApiResponse<Resume>> {
+  const req: ForkResumeVersionRequest = { title }
+  const res = await apiFetch(`${VERSION_BASE}/${versionId}/fork`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  return parseResponse<Resume>(res, '创建岗位表达副本失败')
+}
+
+export async function archiveResume(resumeId: number): Promise<ApiResponse<Resume>> {
+  const res = await apiFetch(`${RESUME_BASE}/${resumeId}/archive`, { method: 'POST' })
+  return parseResponse<Resume>(res, '归档简历失败')
+}
+
+export async function restoreResume(resumeId: number): Promise<ApiResponse<Resume>> {
+  const res = await apiFetch(`${RESUME_BASE}/${resumeId}/restore`, { method: 'POST' })
+  return parseResponse<Resume>(res, '恢复简历失败')
+}
+
+export async function renameResume(resumeId: number, title: string): Promise<ApiResponse<Resume>> {
+  const req: UpdateResumeAssetRequest = { title }
+  const res = await apiFetch(`${RESUME_BASE}/${resumeId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  return parseResponse<Resume>(res, '重命名简历失败')
 }
 
 export async function deleteResume(resumeId: number): Promise<ApiResponse<null>> {
