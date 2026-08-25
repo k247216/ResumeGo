@@ -210,6 +210,23 @@ describe('ResumeLibraryView', () => {
     expect(wrapper.get('[data-test="inspector-fork-source"]').text()).toContain('#9')
   })
 
+  it('shows the current version summary and preview entry in the inspector', async () => {
+    api.listResumes.mockResolvedValue({ success: true, data: [generalResume] })
+    api.getResumeVersions.mockResolvedValue({ success: true, data: [generalResume.currentVersion] })
+    const wrapper = mountLibrary()
+    await flushPromises()
+
+    const summary = wrapper.get('[data-test="workspace-summary"]')
+    expect(summary.text()).toContain('当前版本摘要')
+    expect(summary.text()).toContain('V2')
+    expect(summary.text()).toContain('项目经历')
+    expect(summary.text()).toContain('技能项')
+
+    const preview = wrapper.findAll('[data-test="view-current-version"]')
+    expect(preview.length).toBe(1)
+    expect(wrapper.findAll('[data-test="continue-editing"]').length).toBeGreaterThan(0)
+  })
+
   it('can close and reopen the inspector', async () => {
     api.listResumes.mockResolvedValue({ success: true, data: [generalResume] })
     const wrapper = mountLibrary()

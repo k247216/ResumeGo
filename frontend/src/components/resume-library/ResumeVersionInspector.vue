@@ -14,6 +14,14 @@
         <slot name="identity-actions" />
       </div>
 
+      <section class="inspector-section" data-test="workspace-summary">
+        <h3 class="section-title">当前版本摘要</h3>
+        <div class="stat-row"><span>当前版本</span><strong>{{ resume.currentVersion ? `V${resume.currentVersion.versionNo}` : '尚未创建' }}</strong></div>
+        <div class="stat-row"><span>项目经历</span><strong>{{ projectCount }} 条</strong></div>
+        <div class="stat-row"><span>技能项</span><strong>{{ skillCount }} 项</strong></div>
+        <div class="stat-row"><span>最近更新</span><strong>{{ updatedLabel(resume) }}</strong></div>
+      </section>
+
       <section v-if="resume.forkedFromVersionId" class="inspector-section" data-test="inspector-fork-source">
         <h3 class="section-title">来源版本</h3>
         <p class="inspector-note">复制自版本 #{{ resume.forkedFromVersionId }}，创建后与源简历独立演进。</p>
@@ -114,6 +122,19 @@ const emit = defineEmits<{
 const showAll = ref(false)
 watch(() => props.resume?.id, () => { showAll.value = false })
 
+const projectCount = computed(() => props.resume?.currentVersion?.content.projects?.length ?? 0)
+const skillCount = computed(() => {
+  const content = props.resume?.currentVersion?.content
+  return content?.skillCategories?.reduce((count, category) => count + (category.skills?.length ?? 0), 0)
+    || content?.skills?.length || 0
+})
+function updatedLabel(resume: Resume) {
+  const value = resume.updatedAt ?? resume.currentVersion?.createdAt
+  if (!value) return '未知'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '未知' : `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
 const orderedVersions = computed(() =>
   [...props.versions].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt))))
 const visibleVersions = computed(() => (showAll.value ? orderedVersions.value : orderedVersions.value.slice(0, 3)))
@@ -139,6 +160,8 @@ function formatTime(value: string) {
 .version-inspector{display:grid;gap:16px;align-content:start}
 .inspector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .inspector-actions{display:grid;gap:8px}
+.stat-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--copy)}
+.stat-row strong{font-variant-numeric:tabular-nums}
 .inspector-kicker{margin:0;color:var(--muted);font-size:11px;font-weight:650;letter-spacing:.06em}
 .inspector-head h2{margin:6px 0 0;font-size:17px;font-weight:700;color:var(--ink)}
 .inspector-close{border:0;background:none;border-radius:8px;width:26px;height:26px;color:var(--muted);font-size:16px;cursor:pointer}

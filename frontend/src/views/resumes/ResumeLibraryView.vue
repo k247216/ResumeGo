@@ -122,7 +122,15 @@
               data-test="continue-editing"
               :to="buildResumeEditorLocation({ resumeId: library.selectedResume.value.id, versionId: library.selectedResume.value.currentVersion.id })"
             >继续编辑</router-link>
-            <button type="button" class="inspector-secondary" data-test="open-fork" @click="openFork">创建岗位表达副本</button>
+            <div class="inspector-secondary-row">
+              <router-link
+                v-if="library.selectedResume.value.currentVersion"
+                class="inspector-secondary"
+                data-test="view-current-version"
+                :to="buildResumeEditorLocation({ resumeId: library.selectedResume.value.id, versionId: library.selectedResume.value.currentVersion.id })"
+              >查看当前版本</router-link>
+              <button type="button" class="inspector-secondary" data-test="open-fork" @click="openFork">创建岗位表达副本</button>
+            </div>
           </template>
         </ResumeVersionInspector>
         <div v-else-if="library.selectedResume.value" class="inspector-collapsed">
@@ -500,8 +508,10 @@ onMounted(() => { void library.load() })
 .lib-inspector{min-height:0;overflow-y:auto;border-left:1px solid rgba(28,31,35,.07);padding:6px 0 24px 24px}
 .inspector-primary{display:grid;place-items:center;border:1px solid #17181a;border-radius:10px;background:#17181a;color:#fff;padding:10px 15px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
 .inspector-primary:hover{background:#000}
-.inspector-secondary{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:9px 14px;font-size:12.5px;font-weight:550;cursor:pointer}
+.inspector-secondary{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:9px 14px;font-size:12.5px;font-weight:550;cursor:pointer;text-decoration:none}
 .inspector-secondary:hover{background:#f4f5f4;color:var(--brand,#168b68)}
+.inspector-secondary-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.inspector-secondary-row .inspector-secondary{display:grid;place-items:center;text-align:center}
 .inspector-collapsed button{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:8px 14px;font-size:12px;cursor:pointer}
 .inspector-placeholder{color:#b0b0ab;font-size:12.5px;padding:20px 0}
 
