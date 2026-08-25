@@ -22,7 +22,10 @@ public class InterviewQuestionSetRepository {
             String title,
             QuestionSourceType sourceType,
             String sourceNote,
-            boolean archived
+            boolean archived,
+            java.time.LocalDateTime archivedAt,
+            java.time.LocalDateTime createdAt,
+            java.time.LocalDateTime updatedAt
     ) {
     }
 
@@ -85,7 +88,7 @@ public class InterviewQuestionSetRepository {
     public QuestionSetRow findSetById(long userId, long setId) {
         List<QuestionSetRow> rows = jdbcTemplate.query(
                 """
-                        SELECT id, title, source_type, source_note, archived_at
+                        SELECT id, title, source_type, source_note, archived_at, created_at, updated_at
                         FROM interview_question_sets
                         WHERE id = ? AND user_id = ?
                         """,
@@ -94,7 +97,10 @@ public class InterviewQuestionSetRepository {
                         rs.getString("title"),
                         QuestionSourceType.valueOf(rs.getString("source_type")),
                         rs.getString("source_note"),
-                        rs.getTimestamp("archived_at") != null
+                        rs.getTimestamp("archived_at") != null,
+                        rs.getTimestamp("archived_at") != null ? rs.getTimestamp("archived_at").toLocalDateTime() : null,
+                        rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toLocalDateTime() : null,
+                        rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toLocalDateTime() : null
                 ),
                 setId, userId
         );
@@ -104,7 +110,7 @@ public class InterviewQuestionSetRepository {
     public List<QuestionSetRow> findAllSets(long userId) {
         return jdbcTemplate.query(
                 """
-                        SELECT id, title, source_type, source_note, archived_at
+                        SELECT id, title, source_type, source_note, archived_at, created_at, updated_at
                         FROM interview_question_sets
                         WHERE user_id = ?
                         ORDER BY id DESC
@@ -114,7 +120,10 @@ public class InterviewQuestionSetRepository {
                         rs.getString("title"),
                         QuestionSourceType.valueOf(rs.getString("source_type")),
                         rs.getString("source_note"),
-                        rs.getTimestamp("archived_at") != null
+                        rs.getTimestamp("archived_at") != null,
+                        rs.getTimestamp("archived_at") != null ? rs.getTimestamp("archived_at").toLocalDateTime() : null,
+                        rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toLocalDateTime() : null,
+                        rs.getTimestamp("updated_at") != null ? rs.getTimestamp("updated_at").toLocalDateTime() : null
                 ),
                 userId
         );
@@ -126,6 +135,32 @@ public class InterviewQuestionSetRepository {
                 "SELECT question_text FROM interview_question_set_items WHERE set_id = ? ORDER BY position_index",
                 String.class,
                 setId
+        );
+    }
+
+    /** 原子替换元数据与题目（先删后插），需在事务内调用。 */
+    public void replaceSet(long userId, long setId, String title, QuestionSourceType sourceType,
+                           String sourceNote, List<String> questions) {
+        jdbcTemplate.update(
+                "UPDATE interview_question_sets SET title = ?, source_type = ?, source_note = ?, updated_at = NOW(3) "
+                        + "WHERE id = ? AND user_id = ?",
+                title, sourceType.name(), sourceNote, setId, userId
+        );
+        jdbcTemplate.update("DELETE FROM interview_question_set_items WHERE set_id = ?", setId);
+        for (int index = 0; index < questions.size(); index++) {
+            jdbcTemplate.update(
+                    "INSERT INTO interview_question_set_items (set_id, position_index, question_text) VALUES (?, ?, ?)",
+                    setId, index, questions.get(index)
+            );
+        }
+    }
+
+    /** 归档：写入时间戳；恢复传 null。 */
+    public void updateArchivedAt(long userId, long setId, java.time.LocalDateTime archivedAt) {
+        jdbcTemplate.update(
+                "UPDATE interview_question_sets SET archived_at = ?, updated_at = NOW(3) "
+                        + "WHERE id = ? AND user_id = ?",
+                archivedAt, setId, userId
         );
     }
 }

@@ -190,7 +190,7 @@ class InterviewContextValidatorTest {
     void experienceSimulationValidatesQuestionSets() {
         when(questionSetRepository.findSetById(CurrentUser.DEMO_USER_ID, 40L))
                 .thenReturn(new InterviewQuestionSetRepository.QuestionSetRow(
-                        40L, "腾讯面经", com.resumego.interview.QuestionSourceType.IMPORTED_EXPERIENCE, "牛客", false));
+                        40L, "腾讯面经", com.resumego.interview.QuestionSourceType.IMPORTED_EXPERIENCE, "牛客", false, null, null, null));
         when(personaMapper.selectById(1L)).thenReturn(persona(1L, "技术面试官"));
 
         InterviewContextSnapshot snapshot = experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
@@ -203,7 +203,7 @@ class InterviewContextValidatorTest {
 
         when(questionSetRepository.findSetById(CurrentUser.DEMO_USER_ID, 41L))
                 .thenReturn(new InterviewQuestionSetRepository.QuestionSetRow(
-                        41L, "旧题集", com.resumego.interview.QuestionSourceType.USER_MANUAL, null, true));
+                        41L, "旧题集", com.resumego.interview.QuestionSourceType.USER_MANUAL, null, true, null, null, null));
         assertThatThrownBy(() -> experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
                 41L, null, null, 5, null, null)))
                 .isInstanceOf(IllegalArgumentException.class)
