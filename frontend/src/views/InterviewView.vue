@@ -23,6 +23,23 @@
         <span class="elapsed-time">{{ formatElapsedTime }}</span>
       </div>
 
+      <!-- ========== 三模式训练入口（知识训练 / 面经模拟 / 快速岗位模拟） ========== -->
+      <section class="lobby-three-mode" data-test="three-mode-entry">
+        <div v-if="!threeModeOpen && !threeModePlan" class="three-mode-launcher">
+          <button type="button" class="three-mode-open-btn" data-test="open-three-mode" @click="threeModeOpen = true">
+            开始三模式训练
+          </button>
+          <span>知识训练 · 面经模拟 · 快速岗位模拟</span>
+        </div>
+        <InterviewResultWorkspace v-else-if="threeModePlan" :plan="threeModePlan" />
+        <template v-else>
+          <div class="three-mode-head">
+            <button type="button" class="three-mode-close" data-test="close-three-mode" @click="closeThreeMode">收起</button>
+          </div>
+          <InterviewComposer @started="onThreeModeStarted" />
+        </template>
+      </section>
+
       <div class="lobby-shell">
         <section class="interview-context-card lobby-create-card">
           <div class="context-heading">
@@ -455,6 +472,8 @@ import InterviewPlanReviewDialog from '../components/interview/InterviewPlanRevi
 import InterviewRoomSidebar from '../components/interview/InterviewRoomSidebar.vue'
 import GrowthTrendDialog from '../components/interview/GrowthTrendDialog.vue'
 import InterviewChatThread from '../components/interview/InterviewChatThread.vue'
+import InterviewComposer from '../components/interview/InterviewComposer.vue'
+import InterviewResultWorkspace from '../components/interview/InterviewResultWorkspace.vue'
 import {
   createInterviewPlan,
   deleteInterviewPlan,
@@ -1120,6 +1139,18 @@ watch(
   { immediate: true },
 )
 
+
+// ── 三模式训练入口 ──
+const threeModeOpen = ref(false)
+const threeModePlan = ref<InterviewPlanResponse | null>(null)
+function closeThreeMode() {
+  threeModeOpen.value = false
+}
+function onThreeModeStarted(plan: InterviewPlanResponse) {
+  threeModePlan.value = plan
+  threeModeOpen.value = false
+}
+
 onMounted(() => {
   loadDeletedSessionIds()
   loadOptions()
@@ -1501,8 +1532,21 @@ async function handleDeletePersona(persona: InterviewerPersona) {
 
 // ── 创建并开始面试 ──
 
+/** 新契约要求 jobProjectId：从当前目标反查绑定该 JD 的求职目标（不伪造） */
+const selectedProjectIdForPlan = computed(() => {
+  const jobId = selectedJobId.value
+  const matched = targetsStore.targets.find(
+    (target) => target.status === 'active' && target.jobDescriptionId != null && target.jobDescriptionId === jobId,
+  )
+  return matched?.id ?? null
+})
+
 async function handleCreateAndStart() {
   if (!selectedVersionId.value || !selectedJobId.value || !selectedPersonaId.value) return
+  if (selectedProjectIdForPlan.value == null) {
+    errorMessage.value = '该岗位尚未关联求职目标，请先在求职计划中创建并录入 JD'
+    return
+  }
   activeReviewMode.value = false
   setWorkspaceSelectedJobId(selectedJobId.value)
   actionLoading.value = true
@@ -1512,8 +1556,9 @@ async function handleCreateAndStart() {
 
   try {
     const planRes = await createInterviewPlan({
+      mode: 'ROLE_BASED',
+      jobProjectId: selectedProjectIdForPlan.value,
       resumeVersionId: selectedVersionId.value,
-      jobDescriptionId: selectedJobId.value,
       questionCount: questionCount.value,
       personaIds: [...selectedPersonaIds.value],
       focusTags: [...selectedFocusTags.value],
