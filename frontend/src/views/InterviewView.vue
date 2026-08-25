@@ -1,5 +1,11 @@
 <template>
   <div class="interview-page">
+    <header class="interview-command-bar" data-test="interview-command-bar">
+      <div class="bar-identity">
+        <h1 class="bar-title"><span class="bar-title-icon" aria-hidden="true"><el-icon :size="17"><Microphone /></el-icon></span><span>模拟面试</span></h1>
+        <span class="bar-subtitle">岗位模拟 · 知识训练 · 面经模拟</span>
+      </div>
+    </header>
     <div v-if="fromWorkspace" class="workspace-return-bar">
       <button type="button" :disabled="!canReturnToWorkspace" @click="returnToEditor">← {{ workspaceReturnLabel }}</button>
       <span>{{ canReturnToWorkspace ? '模拟面试将作为当前简历的改进输入' : '请先完成本次多轮面试，再回到简历工作台' }}</span>
@@ -23,21 +29,10 @@
         <span class="elapsed-time">{{ formatElapsedTime }}</span>
       </div>
 
-      <!-- ========== 三模式训练入口（知识训练 / 面经模拟 / 快速岗位模拟） ========== -->
+      <!-- ========== 三模式训练入口（英雄区，常驻） ========== -->
       <section class="lobby-three-mode" data-test="three-mode-entry">
-        <div v-if="!threeModeOpen && !threeModePlan" class="three-mode-launcher">
-          <button type="button" class="three-mode-open-btn" data-test="open-three-mode" @click="threeModeOpen = true">
-            开始三模式训练
-          </button>
-          <span>知识训练 · 面经模拟 · 快速岗位模拟</span>
-        </div>
-        <InterviewResultWorkspace v-else-if="threeModePlan" :plan="threeModePlan" />
-        <template v-else>
-          <div class="three-mode-head">
-            <button type="button" class="three-mode-close" data-test="close-three-mode" @click="closeThreeMode">收起</button>
-          </div>
-          <InterviewComposer @started="onThreeModeStarted" />
-        </template>
+        <InterviewResultWorkspace v-if="threeModePlan" :plan="threeModePlan" />
+        <InterviewComposer v-else @started="onThreeModeStarted" />
       </section>
 
       <div class="lobby-shell">
@@ -1143,9 +1138,6 @@ watch(
 // ── 三模式训练入口 ──
 const threeModeOpen = ref(false)
 const threeModePlan = ref<InterviewPlanResponse | null>(null)
-function closeThreeMode() {
-  threeModeOpen.value = false
-}
 function onThreeModeStarted(plan: InterviewPlanResponse) {
   threeModePlan.value = plan
   threeModeOpen.value = false
@@ -1842,6 +1834,14 @@ function formatDate(value?: string | null) {
 </script>
 
 <style scoped>
+.interview-command-bar{display:flex;align-items:center;gap:18px;min-height:58px;padding:8px 4px 14px;border-bottom:1px solid var(--border-subtle);margin-bottom:16px}
+.bar-identity{display:flex;align-items:baseline;gap:14px}
+.bar-title{display:inline-flex;align-items:center;gap:10px;margin:0;font-size:22px;font-weight:650;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
+.bar-title-icon{display:grid;width:30px;height:30px;place-items:center;border-radius:9px;background:var(--brand-soft);color:var(--brand)}
+.bar-subtitle{color:var(--muted);font-size:12.5px}
+.lobby-three-mode{margin-bottom:20px}
+.three-mode-head{display:flex;justify-content:flex-end;margin-bottom:8px}
+
 .interview-page {
   box-sizing: border-box;
   min-height: 100vh;

@@ -1,51 +1,71 @@
 <template>
-  <section data-test="resume-library" class="resume-library-view">
-    <PageHeader eyebrow="本地简历" title="简历库" subtitle="简历是独立资产：同一份简历拥有线性版本，岗位表达副本独立演进。">
-      <template #actions>
-        <button type="button" class="header-btn" data-test="import-md-header" @click="pickImportFile"><el-icon :size="14"><Upload /></el-icon>导入 Markdown</button>
-        <button type="button" class="header-btn" :disabled="library.loading.value" @click="library.load()">刷新</button>
-        <router-link class="header-btn btn-link" :to="buildResumeEditorLocation({ mode: 'blank' })">创建空白简历</router-link>
-      </template>
-    </PageHeader>
-
-    <div class="library-toolbar">
-      <div class="filter-pills" role="tablist" aria-label="简历种类过滤">
-        <button
-          v-for="option in KIND_OPTIONS"
-          :key="option.value"
-          type="button"
-          class="filter-pill"
-          :class="{ on: library.filter.value.kind === option.value }"
-          :data-test="`filter-${option.value}`"
-          @click="setKind(option.value)"
-        >{{ option.label }}</button>
+  <section class="resume-library" data-test="resume-library-view">
+    <header class="command-bar" data-test="resume-command-bar">
+      <div class="bar-identity">
+        <h1 class="bar-title"><span class="bar-title-icon" aria-hidden="true"><el-icon :size="17"><Document /></el-icon></span><span>简历库</span></h1>
       </div>
-      <label class="toolbar-search">
-        <el-icon :size="13"><Search /></el-icon>
-        <input v-model="library.filter.value.keyword" data-test="library-search" placeholder="搜索简历名称" />
-      </label>
-    </div>
-
-    <div class="library-body" :class="{ 'inspector-open': inspectorOpen }">
-      <main class="list-pane">
-        <ResumeAssetList
-          :items="library.visibleItems.value"
-          :selected-id="library.selectedResumeId.value"
-          :loading="library.loading.value"
-          :error="library.errorMessage.value"
-          @select="library.selectResume($event)"
-          @retry="library.load()"
-          @create-blank="goCreateBlank"
-          @import="pickImportFile"
+      <div class="bar-search-wrap">
+        <el-icon class="bar-search-icon" :size="14"><Search /></el-icon>
+        <input
+          :value="library.filter.value.keyword"
+          type="search"
+          class="bar-search"
+          placeholder="搜索简历名称"
+          data-test="library-search"
+          @input="library.filter.value.keyword = ($event.target as HTMLInputElement).value"
         />
+      </div>
+      <div class="bar-actions">
+        <button type="button" class="bar-btn" data-test="import-md-header" @click="pickImportFile"><el-icon><Upload /></el-icon><span>导入 Markdown</span></button>
+        <button type="button" class="bar-btn primary" data-test="create-blank-header" @click="goCreateBlank">创建空白简历</button>
+      </div>
+    </header>
+
+    <div class="library-body">
+      <aside class="asset-pane">
+        <div class="pane-head">
+          <span class="pane-title">简历资产</span>
+          <span class="pane-count">{{ library.items.value.length }}</span>
+        </div>
+        <div class="kind-tabs" role="tablist" aria-label="简历种类过滤">
+          <button
+            v-for="option in KIND_OPTIONS"
+            :key="option.value"
+            type="button"
+            class="kind-tab"
+            :class="{ on: library.filter.value.kind === option.value }"
+            :data-test="`filter-${option.value}`"
+            @click="setKind(option.value)"
+          >{{ option.label }}</button>
+        </div>
+        <div class="pane-scroll">
+          <ResumeAssetList
+            :items="library.visibleItems.value"
+            :selected-id="library.selectedResumeId.value"
+            :loading="library.loading.value"
+            :error="library.errorMessage.value"
+            @select="library.selectResume($event)"
+            @retry="library.load()"
+            @create-blank="goCreateBlank"
+            @import="pickImportFile"
+          />
+        </div>
+      </aside>
+
+      <main class="detail-pane">
+        <div class="pane-head">
+          <span class="pane-title">详情</span>
+        </div>
+        <div class="pane-scroll detail-scroll">
+          <ResumeAssetWorkspace
+            :resume="library.selectedResume.value"
+            :version="library.selectedVersion.value"
+            @fork="openFork"
+          />
+        </div>
       </main>
 
-      <div class="detail-pane">
-        <ResumeAssetWorkspace
-          :resume="library.selectedResume.value"
-          :version="library.selectedVersion.value"
-          @fork="openFork"
-        />
+      <aside class="inspector-pane">
         <ResumeVersionInspector
           v-if="inspectorOpen"
           :resume="library.selectedResume.value"
@@ -66,8 +86,8 @@
           class="inspector-reopen"
           data-test="inspector-reopen"
           @click="inspectorOpen = true"
-        >打开详情</button>
-      </div>
+        >打开版本与引用</button>
+      </aside>
     </div>
 
     <input ref="fileInput" type="file" accept=".md,.markdown,.txt,text/markdown" data-test="import-file" class="file-input" @change="handleFileChange" />
@@ -113,14 +133,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check, Search, Upload } from '@element-plus/icons-vue'
+import { Check, Document, Search, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { createResume } from '../../api/resume'
 import { getJobDescription } from '../../api/job'
 import { useResumeLibrary } from '../../composables/useResumeLibrary'
 import type { ResumeLibraryKindFilter } from '../../composables/useResumeLibrary'
-import PageHeader from '../../components/PageHeader.vue'
 import ResumeAssetList from '../../components/resume-library/ResumeAssetList.vue'
 import ResumeAssetWorkspace from '../../components/resume-library/ResumeAssetWorkspace.vue'
 import ResumeVersionInspector from '../../components/resume-library/ResumeVersionInspector.vue'
@@ -335,29 +354,48 @@ onMounted(() => { void library.load() })
 </script>
 
 <style scoped>
-.resume-library-view{display:flex;flex-direction:column;height:100%;min-height:0}
-.library-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--border-subtle)}
-.filter-pills{display:inline-flex;gap:2px;border:1px solid var(--border-subtle);border-radius:10px;background:var(--bg-subtle);padding:3px}
-.filter-pill{border:0;border-radius:8px;background:none;padding:6px 13px;font:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
-.filter-pill:hover{color:var(--ink)}
-.filter-pill.on{background:var(--bg-elevated);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.1)}
-.toolbar-search{display:flex;align-items:center;gap:7px;margin-left:auto;border:1px solid var(--border-subtle);border-radius:9px;background:var(--bg-elevated);padding:6px 11px;color:var(--muted)}
-.toolbar-search input{border:0;outline:none;background:none;width:200px;font:inherit;font-size:12.5px;color:var(--ink)}
+/* ═══════ 命令栏：与知识库同款 ═══════ */
+.resume-library{display:flex;flex-direction:column;height:100vh;min-height:0;background:var(--canvas,#fafaf8)}
+.command-bar{display:flex;align-items:center;gap:18px;min-height:58px;padding:8px 18px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid,#fff)}
+.bar-identity{display:flex;align-items:center;gap:10px}
+.bar-title{display:inline-flex;align-items:center;gap:10px;margin:0;font-size:22px;font-weight:650;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
+.bar-title-icon{display:grid;width:30px;height:30px;place-items:center;border-radius:9px;background:var(--brand-soft);color:var(--brand)}
+.bar-search{flex:1;min-width:0;max-width:300px;padding:7px 12px 7px 32px;border:1px solid transparent;border-radius:9px;background:var(--bg-subtle);color:var(--ink);font-size:12.5px;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease;appearance:none;-webkit-appearance:none}
+.bar-search:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);background:var(--surface-solid,#fff)}
+.bar-search-wrap{position:relative;display:flex;align-items:center;flex:none;margin-left:auto}
+.bar-search-icon{position:absolute;left:10px;color:var(--muted);pointer-events:none}
+.bar-actions{display:flex;align-items:center;gap:10px}
+.bar-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border:1px solid var(--border-default);border-radius:9px;background:transparent;color:var(--copy);font-size:13px;cursor:pointer;white-space:nowrap}
+.bar-btn:hover{background:var(--bg-hover)}
+.bar-btn.primary{border:0;background:var(--brand);color:#fff;font-weight:600}
+.bar-btn.primary:hover{opacity:.92}
 
-.library-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);border-top:1px solid var(--border-subtle)}
-.library-body.inspector-open{grid-template-columns:minmax(280px,340px) minmax(0,1fr) 320px}
-.list-pane{min-height:0;overflow-y:auto;padding:18px 16px 40px;border-right:1px solid var(--border-subtle)}
-.detail-pane{min-height:0;overflow-y:auto;padding:20px 24px 48px;display:grid;gap:18px;align-content:start}
-.inspector-reopen{justify-self:start;border:1px solid var(--border-default);border-radius:var(--radius-control);background:var(--bg-surface);color:var(--copy);padding:7px 13px;font-size:12px;cursor:pointer}
+/* ═══════ 三面板 ═══════ */
+.library-body{flex:1;min-height:0;display:grid;grid-template-columns:320px minmax(0,1fr) 340px}
+.asset-pane,.inspector-pane{min-height:0;display:flex;flex-direction:column;border-right:1px solid var(--border-subtle);background:var(--surface-solid,#fff)}
+.inspector-pane{border-right:0;border-left:1px solid var(--border-subtle)}
+.detail-pane{min-height:0;display:flex;flex-direction:column;background:var(--canvas,#fafaf8)}
+
+.pane-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;flex:0 0 auto}
+.pane-title{font-size:11px;font-weight:650;letter-spacing:.07em;color:var(--muted)}
+.pane-count{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pane-scroll{flex:1;min-height:0;overflow-y:auto;padding:4px 12px 24px}
+.detail-scroll{padding:20px 26px 48px}
+
+/* 种类过滤：分段控制 */
+.kind-tabs{display:inline-flex;gap:2px;margin:0 12px 10px;border:1px solid var(--border-subtle);border-radius:9px;background:var(--bg-subtle);padding:3px;flex:0 0 auto}
+.kind-tab{border:0;border-radius:7px;background:none;padding:5px 11px;font:inherit;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .14s ease-out}
+.kind-tab:hover{color:var(--ink)}
+.kind-tab.on{background:var(--surface-solid,#fff);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.1)}
+
+.inspector-reopen{margin:16px;align-self:flex-start;border:1px solid var(--border-default);border-radius:var(--radius-control,10px);background:var(--bg-surface);color:var(--copy);padding:7px 13px;font-size:12px;cursor:pointer}
 .inspector-reopen:hover{background:var(--bg-hover)}
 
-.header-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border-default);border-radius:var(--radius-control);background:var(--bg-surface);color:var(--copy);padding:7px 12px;font-size:12.5px;font-weight:550;cursor:pointer;text-decoration:none}
-.header-btn:hover{background:var(--bg-hover)}
-.btn-link{color:var(--brand)}
-
 .file-input{display:none}
+
+/* ═══════ 导入弹窗 ═══════ */
 .import-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(7,8,8,.5);padding:24px}
-.import-dialog{position:relative;width:min(420px,100%);border-radius:14px;background:var(--bg-elevated,#fff);padding:20px;box-shadow:0 22px 60px rgba(0,0,0,.35)}
+.import-dialog{position:relative;width:min(420px,100%);border-radius:14px;background:var(--surface-solid,#fff);padding:20px;box-shadow:0 22px 60px rgba(0,0,0,.35)}
 .dialog-close{position:absolute;top:10px;right:12px;border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer}
 .import-dialog>p{margin:0;color:var(--muted);font-size:12px}
 .import-dialog h2{margin:6px 0 4px;font-size:17px;color:var(--ink)}
@@ -372,6 +410,7 @@ onMounted(() => { void library.load() })
 .import-dialog footer button:disabled{opacity:.55;cursor:default}
 
 @media (max-width: 1099px) {
-  .library-body,.library-body.inspector-open{grid-template-columns:minmax(0,1fr) 300px}
+  .library-body{grid-template-columns:280px minmax(0,1fr)}
+  .inspector-pane{display:none}
 }
 </style>

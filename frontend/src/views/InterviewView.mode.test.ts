@@ -123,25 +123,26 @@ describe('InterviewView 三模式入口', () => {
     jobApi.listJobDescriptions.mockResolvedValue({ success: true, data: [] })
   })
 
-  it('大厅提供三模式入口，展开后呈现三模式选择器', async () => {
+  it('大厅常驻三模式英雄区，三个模式卡等权呈现', async () => {
     const wrapper = mountView()
     await flushPromises()
 
     expect(wrapper.find('[data-test="three-mode-entry"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="interview-mode-picker"]').exists()).toBe(false)
-
-    await wrapper.get('[data-test="open-three-mode"]').trigger('click')
-    expect(wrapper.findAll('[data-test="interview-mode-picker"]')).toHaveLength(1)
+    expect(wrapper.get('[data-test="interview-command-bar"]').text()).toContain('模拟面试')
     expect(wrapper.findAll('[data-test^="mode-"]')).toHaveLength(3)
+    const text = wrapper.text()
+    expect(text).not.toContain('规划中')
+    expect(text).not.toContain('敬请期待')
   })
 
-  it('三模式入口可收起', async () => {
+  it('选择模式卡片后进入对应配置面板', async () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.get('[data-test="open-three-mode"]').trigger('click')
-    await wrapper.get('[data-test="close-three-mode"]').trigger('click')
-    expect(wrapper.findAll('[data-test="interview-mode-picker"]')).toHaveLength(0)
-    expect(wrapper.findAll('[data-test="open-three-mode"]')).toHaveLength(1)
+    await wrapper.get('[data-test="mode-KNOWLEDGE_TRAINING"]').trigger('click')
+    expect(wrapper.findAll('[data-test="knowledge-training-setup"]')).toHaveLength(1)
+
+    await wrapper.get('[data-test="mode-EXPERIENCE_SIMULATION"]').trigger('click')
+    expect(wrapper.findAll('[data-test="experience-simulation-setup"]')).toHaveLength(1)
   })
 })
