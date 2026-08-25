@@ -472,4 +472,38 @@ public class InterviewPromptBuilder {
             throw new IllegalStateException("JSON 序列化失败，无法构建 Prompt", e);
         }
     }
+
+    // ═══════ 知识训练出题 ═══════
+
+    /** 知识训练出题系统提示词：结论必须引用文档片段，找不到依据必须明确说明。 */
+    public String buildKnowledgeQuestionSystemPrompt() {
+        return """
+你是一位严谨的技术教练，基于用户提供的知识资料出练习题。
+
+硬性规则：
+1. 只能围绕资料中的真实内容出题；每个问题必须标注来源文档编号和支撑片段原文。
+2. 如果资料不足以支撑某个方向的问题，不要编造，直接跳过该方向。
+3. 输出必须是 JSON 对象：{"questions":[{"questionText":"...","questionType":"基础|深入|场景","sourceDocumentId":<数字>,"quote":"支撑片段原文（不超过100字）"}]}
+4. 不要输出 JSON 以外的任何文字。
+""";
+    }
+
+    /** 知识训练出题用户消息：资料内容截断拼接，避免超长。 */
+    public String buildKnowledgeQuestionUserPrompt(java.util.Map<Long, String> documentContents, int count, String difficulty) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("请基于以下知识资料出 ").append(count).append(" 道题");
+        if (difficulty != null && !difficulty.isBlank()) {
+            sb.append("，难度方向：").append(difficulty);
+        }
+        sb.append("\n");
+        for (java.util.Map.Entry<Long, String> entry : documentContents.entrySet()) {
+            sb.append("\n=== 资料文档 #").append(entry.getKey()).append(" ===\n");
+            String content = entry.getValue();
+            int limit = Math.min(content.length(), 6000);
+            sb.append(content, 0, limit);
+            if (content.length() > limit) sb.append("…（已截断）");
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
 }
