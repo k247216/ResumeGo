@@ -87,6 +87,7 @@
         <ResumeVersionInspector
           v-if="inspectorOpen && library.selectedResume.value"
           :resume="library.selectedResume.value"
+          :versions="library.versions.value"
           :selected-version="library.selectedVersion.value"
           :current-version-id="library.selectedResume.value.currentVersion?.id ?? null"
           :used-by-targets="usedByTargets"
@@ -417,13 +418,13 @@ onMounted(() => { void library.load() })
 
 .studio-topbar{display:flex;align-items:center;gap:16px;min-height:56px;padding:8px 20px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid,#fff);flex:0 0 auto}
 .topbar-title{margin:0;font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
-.topbar-search{display:flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:9px;background:var(--bg-subtle);padding:7px 12px;color:var(--muted)}
+.topbar-search{display:flex;align-items:center;gap:7px;flex:1;max-width:420px;margin:0 auto;border:1px solid var(--border-subtle);border-radius:10px;background:#fff;padding:7px 12px;color:var(--muted);box-shadow:0 1px 2px rgba(16,24,40,.04)}
 .topbar-search:focus-within{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);background:var(--surface-solid,#fff)}
 .topbar-search input{border:0;outline:none;background:none;width:240px;font:inherit;font-size:12.5px;color:var(--ink)}
 .topbar-actions{display:flex;gap:10px;margin-left:auto}
 .topbar-btn{border:1px solid var(--border-default);border-radius:9px;background:transparent;color:var(--copy);padding:8px 13px;font-size:12.5px;cursor:pointer}
 .topbar-btn:hover{background:var(--bg-hover)}
-.topbar-btn.primary{border:0;background:var(--brand);color:#fff;font-weight:600}
+.topbar-btn.primary{border:1px solid #17181a;background:#17181a;color:#fff;font-weight:600}
 .topbar-btn.primary:hover{opacity:.92}
 
 .studio-body{flex:1;min-height:0;display:grid;grid-template-columns:264px minmax(0,1fr) 292px}
@@ -431,7 +432,7 @@ onMounted(() => { void library.load() })
 
 .nav-pane{min-height:0;border-right:1px solid var(--border-subtle);background:var(--surface-solid,#fff);display:flex;flex-direction:column}
 .nav-empty-actions{display:grid;gap:8px;padding:0 12px 16px}
-.btn-solid{border:1px solid var(--brand);border-radius:9px;background:var(--brand);color:#fff;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+.btn-solid{border:1px solid #17181a;border-radius:9px;background:#17181a;color:#fff;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
 .btn-ghost{border:1px solid var(--border-default);border-radius:9px;background:transparent;color:var(--copy);padding:8px 13px;font-size:12px;cursor:pointer}
 
 .work-pane{min-height:0;overflow-y:auto;padding:18px 24px 48px;display:flex;flex-direction:column;gap:14px}

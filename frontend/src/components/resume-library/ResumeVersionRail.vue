@@ -61,7 +61,7 @@ function shortDate(value: string) {
 .rail-node{position:relative;display:grid;justify-items:center;gap:3px;border:0;background:none;padding:2px 4px;cursor:pointer;min-width:34px}
 .node-dot{width:9px;height:9px;border-radius:50%;background:var(--surface-solid,#fff);border:2px solid var(--line,rgba(28,31,35,.3));transition:all .15s ease-out}
 .rail-node:hover .node-dot{border-color:var(--brand)}
-.rail-node.current .node-dot{background:var(--brand);border-color:var(--brand)}
+.rail-node.current .node-dot{width:12px;height:12px;background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .node-label{font-size:12px;font-weight:600;color:var(--copy);font-variant-numeric:tabular-nums}
 .rail-node.current .node-label{color:var(--ink);font-weight:700}
 .node-date{font-size:10px;color:var(--muted);white-space:nowrap}

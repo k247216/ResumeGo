@@ -51,13 +51,7 @@
         </div>
       </section>
 
-      <section class="inspector-section" data-test="version-health">
-        <h3 class="section-title">版本状态</h3>
-        <p class="health-row" :class="{ ok: healthOk }" data-test="version-health-status">
-          <span class="health-dot" aria-hidden="true"></span>{{ healthOk ? '健康' : '内容缺失' }}
-        </p>
-        <p class="inspector-note">{{ healthOk ? '文档可读，内容结构正常。' : '正文内容为空，建议进入编辑台补充。' }}</p>
-      </section>
+      
 
       <section v-if="resume.forkedFromVersionId" class="inspector-section" data-test="inspector-fork-source">
         <h3 class="section-title">资产来源</h3>
@@ -84,6 +78,21 @@
         </div>
       </section>
 
+      <section class="inspector-section" data-test="activity-timeline">
+        <div class="section-head">
+          <h3 class="section-title">历史活动</h3>
+        </div>
+        <ul class="activity-list" data-test="activity-list">
+          <li v-for="event in activityEvents" :key="event.key" class="activity-row">
+            <span class="activity-dot" :class="{ fork: event.fork }" aria-hidden="true"></span>
+            <span class="activity-copy">
+              <strong>{{ event.label }}</strong>
+              <small>{{ event.time }}</small>
+            </span>
+          </li>
+        </ul>
+      </section>
+
       <div class="inspector-overflow">
         <button type="button" class="overflow-btn" data-test="archive-resume" @click="emit('archive')">
           {{ resume.archivedAt ? '恢复这份简历' : '归档这份简历' }}
@@ -102,6 +111,7 @@ import { buildResumeEditorLocation } from '../../utils/editorRoute'
 
 const props = defineProps<{
   resume: Resume | null
+  versions: ResumeVersion[]
   selectedVersion: ResumeVersion | null
   currentVersionId: number | null
   usedByTargets: Array<{ targetId: number; label: string }>
@@ -119,10 +129,18 @@ const viewingCurrent = computed(() =>
   props.selectedVersion != null && props.selectedVersion.id === props.currentVersionId)
 
 /** 版本健康：确定性结构检查（正文可读、基本字段存在），不代表 AI 评分 */
-const healthOk = computed(() => {
-  const content = props.selectedVersion?.content
-  if (!content) return false
-  return !!(content.basicInfo && Object.keys(content.basicInfo).length)
+
+/** 历史活动：从真实版本派生（创建事件），不虚构改名/编辑记录 */
+const activityEvents = computed(() => {
+  const events = [...props.versions].sort((left, right) =>
+    String(right.createdAt).localeCompare(String(left.createdAt)))
+    .map((version) => ({
+      key: version.id,
+      label: `创建了版本 V${version.versionNo}`,
+      time: formatTime(version.createdAt),
+      fork: version.createdByType === 'fork',
+    }))
+  return events
 })
 
 function sourceLabel(type: string) {
@@ -149,7 +167,7 @@ function formatTime(value: string) {
 .inspector-close{border:0;background:none;border-radius:8px;width:26px;height:26px;color:var(--muted);font-size:16px;cursor:pointer}
 .inspector-close:hover{background:var(--bg-hover);color:var(--ink)}
 .inspector-actions{display:grid;gap:8px}
-.inspector-primary{display:grid;place-items:center;border:1px solid var(--brand);border-radius:10px;background:var(--brand);color:#fff;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
+.inspector-primary{display:grid;place-items:center;border:1px solid #17181a;border-radius:10px;background:#17181a;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
 .health-row{display:flex;align-items:center;gap:8px;margin:0;color:var(--muted);font-size:12.5px;font-weight:600}
 .health-row.ok{color:var(--brand)}
 .health-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
@@ -170,6 +188,13 @@ function formatTime(value: string) {
 .used-by-row{display:flex;align-items:center;border:0;background:none;border-radius:8px;padding:7px 9px;font-size:12px;color:var(--copy);cursor:pointer;text-align:left}
 .used-by-row:hover{background:var(--bg-hover);color:var(--brand)}
 .used-by-copy{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.activity-row{display:flex;align-items:flex-start;gap:9px}
+.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--line,rgba(28,31,35,.3));flex:0 0 auto;margin-top:4px}
+.activity-dot.fork{background:var(--brand)}
+.activity-copy{display:grid;gap:1px;min-width:0}
+.activity-copy strong{font-size:12px;font-weight:550;color:var(--copy)}
+.activity-copy small{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .inspector-overflow{border-top:1px solid var(--border-subtle);padding-top:12px}
 .overflow-btn{border:0;background:none;padding:0;color:var(--muted);font-size:12px;font-weight:550;cursor:pointer}
 .overflow-btn:hover{color:var(--danger)}

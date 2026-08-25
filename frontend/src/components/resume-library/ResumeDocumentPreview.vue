@@ -7,7 +7,8 @@
     </div>
 
     <article v-else-if="content" class="doc-paper" aria-label="简历正文只读预览">
-      <header class="doc-head">
+      <!-- 头部：姓名 + 意向 + 联系方式 -->
+      <header class="doc-head" :class="sectionClass('basicInfo')">
         <div class="doc-head-row">
           <strong class="doc-name">{{ content.basicInfo?.name?.trim() || '姓名待补充' }}</strong>
           <span v-if="content.basicInfo?.targetRole" class="doc-role">{{ content.basicInfo.targetRole }}</span>
@@ -27,7 +28,7 @@
         <div v-for="(item, index) in content.workExperience" :key="index" class="doc-item">
           <div class="doc-item-head">
             <strong>{{ item.company || item.position || '经历' }}</strong>
-            <span v-if="item.period || item.startDate">{{ item.period || `${item.startDate ?? ''} ~ ${item.endDate ?? '至今'}` }}</span>
+            <span class="doc-item-meta">{{ [item.position, item.period || (item.startDate ? `${item.startDate ?? ''} ~ ${item.endDate ?? '至今'}` : ''), item.location].filter(Boolean).join('　') }}</span>
           </div>
           <p v-if="item.description">{{ item.description }}</p>
           <ul v-if="item.highlights?.length"><li v-for="line in item.highlights" :key="line">{{ line }}</li></ul>
@@ -39,7 +40,7 @@
         <div v-for="(item, index) in content.projects" :key="index" class="doc-item">
           <div class="doc-item-head">
             <strong>{{ item.title || item.name || '项目' }}</strong>
-            <span v-if="item.technologies?.length">{{ item.technologies.join(' / ') }}</span>
+            <span v-if="item.technologies?.length" class="doc-item-meta">{{ item.technologies.join(' / ') }}</span>
           </div>
           <p v-if="item.description">{{ item.description }}</p>
           <ul v-if="item.highlights?.length"><li v-for="line in item.highlights" :key="line">{{ line }}</li></ul>
@@ -51,9 +52,8 @@
         <div v-for="(item, index) in content.education" :key="index" class="doc-item">
           <div class="doc-item-head">
             <strong>{{ item.school || item.institution || '学校' }}</strong>
-            <span v-if="item.period">{{ item.period }}</span>
+            <span class="doc-item-meta">{{ [item.major, item.degree, item.period].filter(Boolean).join('　') }}</span>
           </div>
-          <p v-if="item.major">{{ item.major }}<template v-if="item.degree"> · {{ item.degree }}</template></p>
         </div>
       </section>
 
@@ -67,6 +67,11 @@
       <section v-if="content.certifications?.length" class="doc-section" :class="sectionClass('certifications')">
         <h3>证书<span v-if="added('certifications')" class="sec-badge">新增</span></h3>
         <ul><li v-for="item in content.certifications" :key="item.name">{{ item.name }}<template v-if="item.date">（{{ item.date }}）</template></li></ul>
+      </section>
+
+      <section v-if="content.languages?.length" class="doc-section" :class="sectionClass('languages')">
+        <h3>语言<span v-if="added('languages')" class="sec-badge">新增</span></h3>
+        <ul><li v-for="item in content.languages" :key="item.name">{{ item.name }}<template v-if="item.level"> · {{ item.level }}</template></li></ul>
       </section>
     </article>
   </div>
@@ -99,11 +104,11 @@ const empty = computed(() => {
     content.skills?.length ? 'x' : '',
     content.skillCategories?.length ? 'x' : '',
     content.certifications?.length ? 'x' : '',
+    content.languages?.length ? 'x' : '',
   ]
   return chapters.every((chapter) => !chapter)
 })
 
-/** 技能清单：skills 与 skillCategories 合并展示 */
 const hasSkills = computed(() => !!(props.content?.skills?.length || props.content?.skillCategories?.length))
 const hasSkillsKey = computed(() => (props.content?.skills?.length ? 'skills' : 'skillCategories'))
 const flatSkills = computed(() => {
@@ -119,8 +124,8 @@ const flatSkills = computed(() => {
 const contactParts = computed(() => {
   const basic = props.content?.basicInfo
   const parts: string[] = []
-  if (basic?.phone) parts.push(basic.phone)
-  if (basic?.email) parts.push(basic.email)
+  if (basic?.phone) parts.push(`电话 ${basic.phone}`)
+  if (basic?.email) parts.push(`邮箱 ${basic.email}`)
   if (basic?.location) parts.push(basic.location)
   return parts
 })
@@ -141,32 +146,38 @@ function sectionClass(key: string) {
 </script>
 
 <style scoped>
-.doc-preview{min-height:0}
-.doc-paper{background:var(--surface-solid,#fff);border:1px solid var(--border-subtle);border-radius:12px;padding:26px 30px;box-shadow:0 1px 3px rgba(16,24,40,.04)}
-.doc-head{padding-bottom:14px;border-bottom:1px solid var(--border-subtle);margin-bottom:6px}
-.doc-head-row{display:flex;align-items:baseline;gap:12px}
-.doc-name{font-size:20px;font-weight:750;color:var(--ink);letter-spacing:.02em}
-.doc-role{font-size:12.5px;color:var(--muted)}
-.doc-contact{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
-.doc-contact-item{font-size:11px;color:var(--muted)}
-.doc-section{padding:12px 10px;border-bottom:1px solid var(--border-subtle);border-radius:8px;margin:0 -10px}
+/* ═══════ 真实纸张简历：与编辑台同源的阅读视图 ═══════ */
+.doc-preview{min-height:0;display:flex;justify-content:center}
+.doc-paper{width:100%;max-width:760px;background:var(--surface-solid,#fff);border:1px solid var(--border-subtle);border-radius:6px;padding:44px 52px 52px;box-shadow:0 2px 10px rgba(16,24,40,.07),0 1px 3px rgba(16,24,40,.04)}
+
+.doc-head{padding-bottom:18px;border-bottom:2px solid var(--ink);margin-bottom:4px}
+.doc-head-row{display:flex;align-items:baseline;gap:14px}
+.doc-name{font-size:23px;font-weight:800;color:var(--ink);letter-spacing:.04em}
+.doc-role{font-size:13px;font-weight:600;color:var(--copy)}
+.doc-contact{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px}
+.doc-contact-item{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.doc-section{padding:16px 8px 14px;border-radius:6px;margin:0 -8px;border-bottom:1px solid var(--border-subtle)}
 .doc-section:last-child{border-bottom:0}
-.doc-section h3{margin:0 0 8px;font-size:11px;font-weight:650;letter-spacing:.07em;color:var(--brand);display:flex;align-items:center;gap:8px}
-/* 比较高亮：修改=琥珀底纹；新增=绿色底纹 */
-.doc-section.sec-modified{background:rgba(217,119,6,.06);outline:1px solid rgba(217,119,6,.18)}
-.doc-section.sec-added{background:rgba(22,139,104,.05);outline:1px solid rgba(22,139,104,.2)}
-.sec-badge{padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;background:var(--brand-soft);color:var(--brand)}
-.doc-item{display:grid;gap:4px;padding:6px 0}
-.doc-item-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.doc-item-head strong{font-size:13px;font-weight:650;color:var(--ink)}
-.doc-item-head span{font-size:11px;color:var(--muted);white-space:nowrap}
-.doc-item p{margin:0;color:var(--copy);font-size:12px;line-height:1.7}
-.doc-item ul{margin:0;padding-left:16px;color:var(--copy);font-size:12px;line-height:1.8}
-.doc-skills{margin:0}
-.skill-chips{display:flex;flex-wrap:wrap;gap:7px}
-.skill-chip{padding:3px 10px;border-radius:6px;background:var(--bg-subtle);color:var(--copy);font-size:11.5px}
+.doc-section h3{margin:0 0 10px;font-size:13px;font-weight:750;color:var(--ink);display:flex;align-items:center;gap:8px}
+.doc-section h3::after{content:'';flex:1;height:1px;background:var(--border-subtle)}
+
+/* 比较高亮：修改=琥珀、新增=绿 */
+.doc-section.sec-modified{background:rgba(217,119,6,.055);outline:1px solid rgba(217,119,6,.22)}
+.doc-section.sec-added{background:rgba(22,139,104,.05);outline:1px solid rgba(22,139,104,.22)}
+.sec-badge{padding:1px 8px;border-radius:999px;font-size:9.5px;font-weight:700;background:var(--brand-soft);color:var(--brand)}
+
+.doc-item{display:grid;gap:5px;padding:8px 0}
+.doc-item + .doc-item{border-top:1px dashed var(--border-subtle)}
+.doc-item-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.doc-item-head strong{font-size:13.5px;font-weight:700;color:var(--ink)}
+.doc-item-meta{font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.doc-item p{margin:0;color:var(--copy);font-size:12.5px;line-height:1.8}
+.doc-item ul{margin:2px 0 0;padding-left:16px;color:var(--copy);font-size:12.5px;line-height:1.85}
+.skill-chips{display:flex;flex-wrap:wrap;gap:8px}
+.skill-chip{padding:4px 12px;border-radius:6px;background:var(--bg-subtle);color:var(--copy);font-size:12px}
 .doc-empty{display:grid;justify-items:center;gap:10px;border:1px dashed var(--border-default);border-radius:12px;padding:44px 24px;text-align:center;color:var(--muted)}
 .doc-empty strong{color:var(--ink);font-size:14px}
 .doc-empty span{font-size:12px;line-height:1.7;max-width:320px}
-.doc-empty-btn{border:1px solid var(--brand);border-radius:9px;background:var(--brand);color:#fff;padding:8px 15px;font-size:12.5px;font-weight:600;cursor:pointer}
+.doc-empty-btn{border:1px solid #17181a;border-radius:9px;background:#17181a;color:#fff;padding:8px 15px;font-size:12.5px;font-weight:600;cursor:pointer}
 </style>

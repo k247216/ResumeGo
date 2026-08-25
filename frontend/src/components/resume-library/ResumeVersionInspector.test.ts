@@ -30,6 +30,7 @@ const resume: Resume = {
 function mountInspector(props: Record<string, unknown> = {}) {
   return mount(ResumeVersionInspector, {
     props: {
+      versions: [version(9, 2), version(8, 1)],
       resume,
       selectedVersion: version(9, 2),
       currentVersionId: 9,
@@ -59,6 +60,7 @@ describe('ResumeVersionInspector（版本检查器）', () => {
 
   it('历史版本：只读提示 + 主操作变为创建岗位副本', () => {
     const wrapper = mountInspector({
+      versions: [version(9, 2), version(8, 1)],
       selectedVersion: version(8, 1),
       currentVersionId: 9,
     })
