@@ -31,13 +31,72 @@ export interface StartInterviewRequest {
   personaId: number
 }
 
-export interface CreateInterviewPlanRequest {
+/** 训练模式：三种且仅三种；创建后不可修改 */
+export type InterviewMode = 'ROLE_BASED' | 'KNOWLEDGE_TRAINING' | 'EXPERIENCE_SIMULATION'
+
+/** 岗位模拟：Pipeline（jobProjectId）、Resume Version 与 persona 均为用户显式选择 */
+export interface RoleBasedPlanRequest {
+  mode: 'ROLE_BASED'
+  jobProjectId: number
   resumeVersionId: number
-  jobDescriptionId: number
   questionCount: number
   personaIds: number[]
   focusTags?: string[]
   supplement?: string
+}
+
+/** 知识训练：只要求当前用户的 Knowledge Document，不强制岗位/简历 */
+export interface KnowledgeTrainingPlanRequest {
+  mode: 'KNOWLEDGE_TRAINING'
+  knowledgeDocumentIds: number[]
+  difficulty?: string
+  questionCount: number
+  focusTags?: string[]
+  supplement?: string
+}
+
+/** 面经模拟：只使用本地题集；AI 追问单独标源 */
+export interface ExperienceSimulationPlanRequest {
+  mode: 'EXPERIENCE_SIMULATION'
+  questionSetId: number
+  personaIds?: number[]
+  followUpIntensity?: string
+  questionCount: number
+  focusTags?: string[]
+  supplement?: string
+}
+
+/** 按 mode 键控的判别联合：不允许全可选大请求 */
+export type CreateInterviewPlanRequest =
+  | RoleBasedPlanRequest
+  | KnowledgeTrainingPlanRequest
+  | ExperienceSimulationPlanRequest
+
+export type QuestionSetSourceType = 'USER_MANUAL' | 'IMPORTED_EXPERIENCE' | 'GENERATED_PRACTICE'
+
+export interface InterviewQuestionSetItem {
+  positionIndex: number
+  questionText: string
+}
+
+export interface InterviewQuestionSetResponse {
+  id: number
+  title: string
+  sourceType: QuestionSetSourceType
+  sourceNote?: string | null
+  archived: boolean
+  archivedAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+  /** 列表模式为 null；详情模式返回有序题目 */
+  items?: InterviewQuestionSetItem[] | null
+}
+
+export interface InterviewQuestionSetRequest {
+  title: string
+  sourceType: QuestionSetSourceType
+  sourceNote?: string
+  questions: string[]
 }
 
 export interface InterviewPlanRound {
@@ -54,6 +113,11 @@ export interface InterviewPlanRound {
 
 export interface InterviewPlanResponse {
   planId: number
+  /** 训练模式（创建后不可变）；历史数据回填 ROLE_BASED */
+  mode?: InterviewMode
+  contextContractVersion?: string
+  /** 不可变开始上下文快照：历史回放展示其中的名称与版本号，不用当前数据覆盖 */
+  startContextSnapshot?: Record<string, unknown> | null
   resumeVersionId: number
   jobDescriptionId: number
   title: string

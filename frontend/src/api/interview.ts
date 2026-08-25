@@ -4,6 +4,8 @@ import type {
   InterviewPlanResponse,
   GrowthReport,
   InterviewerPersona,
+  InterviewQuestionSetRequest,
+  InterviewQuestionSetResponse,
   InterviewStatusResponse,
   MultiSessionSummaryRequest,
   MultiSessionSummaryResponse,
@@ -16,6 +18,7 @@ import { apiFetch } from './http'
 
 const BASE = '/api/v1/interviews'
 const PLAN_BASE = '/api/v1/interview-plans'
+const QUESTION_SET_BASE = '/api/v1/interview-question-sets'
 
 async function parseResponse<T>(
   res: Response,
@@ -163,4 +166,44 @@ export async function generateMultiSessionSummary(
     body: JSON.stringify(request),
   })
   return parseResponse<MultiSessionSummaryResponse>(res, '生成跨会话总结失败')
+}
+
+// ═══════ 面经题集 ═══════
+
+export async function listInterviewQuestionSets(): Promise<InterviewApiResponse<InterviewQuestionSetResponse[]>> {
+  const res = await apiFetch(QUESTION_SET_BASE)
+  return parseResponse<InterviewQuestionSetResponse[]>(res, '获取面经题集失败')
+}
+
+export async function getInterviewQuestionSet(id: number): Promise<InterviewApiResponse<InterviewQuestionSetResponse>> {
+  const res = await apiFetch(`${QUESTION_SET_BASE}/${id}`)
+  return parseResponse<InterviewQuestionSetResponse>(res, '获取面经题集失败')
+}
+
+export async function createInterviewQuestionSet(
+  req: InterviewQuestionSetRequest,
+): Promise<InterviewApiResponse<InterviewQuestionSetResponse>> {
+  const res = await apiFetch(QUESTION_SET_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  return parseResponse<InterviewQuestionSetResponse>(res, '创建面经题集失败')
+}
+
+export async function updateInterviewQuestionSet(
+  id: number,
+  req: InterviewQuestionSetRequest,
+): Promise<InterviewApiResponse<InterviewQuestionSetResponse>> {
+  const res = await apiFetch(`${QUESTION_SET_BASE}/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  return parseResponse<InterviewQuestionSetResponse>(res, '更新面经题集失败')
+}
+
+export async function archiveInterviewQuestionSet(id: number): Promise<InterviewApiResponse<InterviewQuestionSetResponse>> {
+  const res = await apiFetch(`${QUESTION_SET_BASE}/${id}/archive`, { method: 'POST' })
+  return parseResponse<InterviewQuestionSetResponse>(res, '归档面经题集失败')
 }
