@@ -5,8 +5,10 @@
 - Status: `READY`
 - Owner: External Feature Agent
 - Branch: `codex/v2-r1-resume-asset-library`
-- Base commit: `f4877b1`
+- Base commit: 包含本任务卡与视觉基线的最新 `origin/main`
 - Spec: `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`
+- UI spec: `docs/superpowers/specs/2026-08-25-resume-library-version-studio-design.md`
+- Visual target: `docs/design/v2-resume-library-version-studio-target.png`
 - Execution plan: `docs/superpowers/plans/2026-08-25-resume-system-v2.md`
 - Acceptance owner: Core Controller
 
@@ -28,6 +30,8 @@
 6. Pipeline 只绑定一个明确 `resumeVersionId`；任务不得自动创建、更新或替换 Pipeline 绑定。
 7. 版本不可原地覆盖；物理删除不在本任务范围，只做归档/恢复。
 8. AI 建议、面试、Workspace 和 Knowledge 均不在本任务范围。
+9. 目标图中的姓名、正文、版本数量、引用、更新数量、作者和日期都是视觉示例，必须替换为真实接口数据或诚实空态。
+10. 版本轨道采用小节点紧凑线性历史：高度不超过 96px、普通节点直径不超过 10px，不得恢复为大白圆或多行版本卡片。
 
 ## Allowed files
 
@@ -40,9 +44,11 @@
 - `frontend/src/composables/useResumeLibrary.ts`
 - `frontend/src/composables/useResumeLibrary.test.ts`
 - `frontend/src/components/resume-library/**`
+- `frontend/src/utils/resumeVersionDiff.ts`
+- `frontend/src/utils/resumeVersionDiff.test.ts`
 - `frontend/src/views/resumes/ResumeLibraryView.vue`
 - `frontend/src/views/resumes/ResumeLibraryView.test.ts`
-- 本任务交付报告文件
+- `docs/tasks/v2/deliveries/V2-R1-RESUME-01-delivery.md`
 
 未列出的文件禁止修改。特别禁止修改 `WorkbenchView.vue`、`InterviewView.vue`、Pipeline、Schedule、Knowledge、Electron、全局导航和构建配置。
 
@@ -56,6 +62,10 @@
 6. 跨用户读取、fork、改名、归档、恢复均按不存在处理且无副作用。
 7. 页面提供加载、空、失败、重试、fork loading 和归档确认。
 8. 页面不自动选择或修改任何 Pipeline，不展示伪造引用。
+9. 页面在 1440px 呈现资产导航、中央版本工作区和窄 Inspector；中央简历正文是第一视觉主体。
+10. 版本切换同步真实正文与元数据；历史版本只读且不改变 currentVersionId。
+11. 与上一版的章节变化由纯函数确定性计算；V1、无变化和缺少数据均有诚实状态。
+12. 1280px 与 1024px 不压扁正文：Inspector 可关闭/抽屉化，页面无横向滚动；浅色与暗色均可读。
 
 ## Verification
 
@@ -64,7 +74,7 @@ cd backend
 mvn -q -Dtest=ResumeRepositoryTest,ResumeServiceTest,ResumeControllerTest test
 
 cd ../frontend
-npx vitest run src/composables/useResumeLibrary.test.ts src/views/resumes/ResumeLibraryView.test.ts src/views/resumes/ResumeEditorView.test.ts src/components/resume-library
+npx vitest run src/composables/useResumeLibrary.test.ts src/views/resumes/ResumeLibraryView.test.ts src/views/resumes/ResumeEditorView.test.ts src/components/resume-library src/utils/resumeVersionDiff.test.ts
 npm run build
 ```
 
@@ -72,4 +82,4 @@ npm run build
 
 ## Delivery
 
-提交：每个计划 Task 一个范围清楚的提交。最终回传完整提交序列、迁移/API 契约、真实测试命令/退出码/数量、四条手工流程结果、风险和未执行项。不得自行合并到 `main`。
+提交：每个计划 Task 一个范围清楚的提交。最终将完整提交序列、迁移/API 契约、真实测试命令/退出码/数量、视觉截图路径、四条手工流程结果、风险和未执行项写入 `docs/tasks/v2/deliveries/V2-R1-RESUME-01-delivery.md`。本轮不使用 DSH 通道；不得自行合并到 `main`。
