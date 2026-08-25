@@ -7,15 +7,15 @@ import type { Resume, ResumeVersion } from '../../types/resume'
 const version = (id: number, versionNo: number, createdByType = 'user'): ResumeVersion => ({
   id,
   resumeId: 3,
-  parentVersionId: id > 1 ? id - 1 : null,
+  parentVersionId: versionNo > 1 ? id - 1 : null,
   versionNo,
   content: {},
-  changeSummary: `版本 ${versionNo}`,
+  changeSummary: `第 ${versionNo} 版`,
   createdByType,
-  createdAt: '2026-08-25',
+  createdAt: '2026-08-25T10:00:00',
 })
 
-const generalResume: Resume = {
+const resume: Resume = {
   id: 3,
   title: '后端简历',
   kind: 'GENERAL',
@@ -27,81 +27,71 @@ const generalResume: Resume = {
   updatedAt: '2026-08-25',
 }
 
-const expressionResume: Resume = {
-  ...generalResume,
-  id: 7,
-  title: '腾讯岗位表达',
-  kind: 'JOB_EXPRESSION',
-  forkedFromVersionId: 9,
-}
-
-function mountInspector(props: Record<string, unknown>) {
+function mountInspector(props: Record<string, unknown> = {}) {
   return mount(ResumeVersionInspector, {
     props: {
-      resume: generalResume,
-      versions: [version(9, 2), version(8, 1)],
-      selectedVersionId: 9,
-      versionLoading: false,
-      versionError: '',
+      resume,
+      selectedVersion: version(9, 2),
+      currentVersionId: 9,
       usedByTargets: [],
       usedByLoading: false,
       ...props,
     },
+    global: { stubs: ['RouterLink'] },
   })
 }
 
-describe('ResumeVersionInspector', () => {
-  it('shows version history with read-only note and selection state', () => {
+describe('ResumeVersionInspector（版本检查器）', () => {
+  it('展示版本元数据：来源、时间、变更说明', () => {
     const wrapper = mountInspector({})
-    const section = wrapper.get('[data-test="inspector-versions"]')
-    expect(section.text()).toContain('只读')
-    expect(wrapper.get('[data-test="version-row-9"]').classes()).toContain('active')
-    expect(wrapper.text()).toContain('手工维护')
+    expect(wrapper.get('.inspector-head').text()).toContain('V2')
+    const meta = wrapper.get('[data-test="version-meta"]')
+    expect(meta.text()).toContain('手工保存')
+    expect(meta.text()).toContain('第 2 版')
+    expect(meta.text()).toContain('2026')
   })
 
-  it('shows the fork source version for expression copies', () => {
-    const wrapper = mountInspector({ resume: expressionResume })
-    expect(wrapper.get('[data-test="inspector-fork-source"]').text()).toContain('#9')
+  it('当前版本：主操作为进入编辑台，无只读提示', () => {
+    const wrapper = mountInspector({})
+    expect(wrapper.findAll('[data-test="continue-editing"]').length).toBe(1)
+    expect(wrapper.find('[data-test="history-readonly-note"]').exists()).toBe(false)
   })
 
-  it('does not show the fork source section for general resumes', () => {
-    const wrapper = mountInspector({})
-    expect(wrapper.find('[data-test="inspector-fork-source"]').exists()).toBe(false)
+  it('历史版本：只读提示 + 主操作变为创建岗位副本', () => {
+    const wrapper = mountInspector({
+      selectedVersion: version(8, 1),
+      currentVersionId: 9,
+    })
+    expect(wrapper.get('[data-test="history-readonly-note"]').text()).toContain('只读')
+    expect(wrapper.get('[data-test="open-fork"]').text()).toContain('基于此版本创建岗位副本')
+    expect(wrapper.find('[data-test="continue-editing"]').exists()).toBe(false)
   })
 
-  it('emits select-version, archive and close', async () => {
+  it('岗位表达资产展示跨资产来源版本', () => {
+    const wrapper = mountInspector({
+      resume: { ...resume, kind: 'JOB_EXPRESSION', forkedFromVersionId: 77 },
+    })
+    expect(wrapper.get('[data-test="inspector-fork-source"]').text()).toContain('#77')
+    expect(wrapper.get('[data-test="inspector-fork-source"]').text()).toContain('独立演进')
+  })
+
+  it('引用状态：真实绑定列表 + 诚实空态 + 跳转事件', async () => {
+    const withRefs = mountInspector({
+      usedByTargets: [{ targetId: 5, label: '腾讯 · Java 后端实习' }],
+    })
+    expect(withRefs.get('[data-test="inspector-used-by"]').text()).toContain('1 个求职目标')
+    await withRefs.get('[data-test="used-by-target"]').trigger('click')
+    expect(withRefs.emitted('open-target')).toEqual([[5]])
+
+    const empty = mountInspector({})
+    expect(empty.get('[data-test="inspector-used-by"]').text()).toContain('尚未绑定')
+  })
+
+  it('归档入口发出 archive 事件；关闭发出 close', async () => {
     const wrapper = mountInspector({})
-    await wrapper.get('[data-test="version-row-8"]').trigger('click')
     await wrapper.get('[data-test="archive-resume"]').trigger('click')
     await wrapper.get('[data-test="inspector-close"]').trigger('click')
-
-    expect(wrapper.emitted('select-version')).toEqual([[8]])
     expect(wrapper.emitted('archive')).toHaveLength(1)
     expect(wrapper.emitted('close')).toHaveLength(1)
-  })
-
-  it('emits open-target from used-by rows and keeps honest empty state', async () => {
-    const wrapper = mountInspector({
-      usedByTargets: [
-        { targetId: 5, label: '腾讯 · Java 后端实习' },
-        { targetId: 7, label: '字节 目标' },
-      ],
-    })
-    expect(wrapper.get('[data-test="inspector-used-by"]').text()).toContain('2 个求职目标')
-    await wrapper.findAll('[data-test="used-by-target"]')[0].trigger('click')
-    expect(wrapper.emitted('open-target')).toEqual([[5]])
-
-    const empty = mountInspector({ usedByTargets: [] })
-    expect(empty.get('[data-test="inspector-used-by"]').text()).toContain('尚未关联求职目标')
-  })
-
-  it('collapses to the three most recent versions and expands on demand', async () => {
-    const versions = [version(4, 4), version(3, 3), version(2, 2), version(1, 1)]
-    const wrapper = mountInspector({ versions })
-    expect(wrapper.findAll('[data-test^="version-row-"]')).toHaveLength(3)
-    expect(wrapper.get('[data-test="versions-expand"]').text()).toContain('查看全部版本')
-    await wrapper.get('[data-test="versions-expand"]').trigger('click')
-    expect(wrapper.findAll('[data-test^="version-row-"]')).toHaveLength(4)
-    expect(wrapper.get('[data-test="versions-expand"]').text()).toContain('收起版本')
   })
 })

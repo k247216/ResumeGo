@@ -1,142 +1,101 @@
 <template>
-  <section class="resume-library" data-test="resume-library-view">
-    <!-- ── 头部：标题 + 主行动 ── -->
-    <header class="lib-head">
-      <div class="lib-head-copy">
-        <h1>简历库</h1>
-        <p class="lib-sub">
-          {{ library.items.value.length }} 份简历资产<template v-if="library.items.value.length"> · 版本即历史，副本即独立表达</template>
-        </p>
-      </div>
-      <div class="lib-actions">
-        <button type="button" class="btn-ghost" data-test="import-md-header" @click="pickImportFile">导入 Markdown</button>
-        <button type="button" class="btn-solid" data-test="create-blank-header" @click="goCreateBlank">创建空白简历</button>
-      </div>
-    </header>
-
-    <!-- ── 工具栏：种类过滤 + 搜索 ── -->
-    <div class="lib-toolbar">
-      <div class="filter-pills" role="tablist" aria-label="简历种类过滤">
-        <button
-          v-for="option in KIND_OPTIONS"
-          :key="option.value"
-          type="button"
-          class="filter-pill"
-          :class="{ on: library.filter.value.kind === option.value }"
-          :data-test="`filter-${option.value}`"
-          @click="setKind(option.value)"
-        >{{ option.label }}</button>
-      </div>
-      <label class="toolbar-search">
+  <section class="studio" data-test="resume-library-view">
+    <!-- ── 顶栏：标题 + 搜索 + 主入口 ── -->
+    <header class="studio-topbar" data-test="resume-command-bar">
+      <h1 class="topbar-title">简历库</h1>
+      <label class="topbar-search">
         <el-icon :size="13"><Search /></el-icon>
         <input
           :value="library.filter.value.keyword"
           type="search"
-          placeholder="搜索简历名称"
+          placeholder="搜索简历标题"
           data-test="library-search"
           @input="library.filter.value.keyword = ($event.target as HTMLInputElement).value"
         />
       </label>
-    </div>
-
-    <!-- ── 主体：纸张卡片网格 + 右侧版本面板 ── -->
-    <div class="lib-body">
-      <div class="shelf" data-test="asset-shelf">
-        <div v-if="library.loading.value && !library.items.value.length" class="shelf-state">正在读取本地简历…</div>
-
-        <div v-else-if="library.errorMessage.value && !library.items.value.length" class="shelf-state error" data-test="resume-library-error">
-          <strong>无法读取本地简历</strong>
-          <span>{{ library.errorMessage.value }}</span>
-          <button type="button" class="state-btn" data-test="retry-load" @click="library.load()">重新加载</button>
-        </div>
-
-        <div v-else-if="!library.visibleItems.value.length" class="shelf-state empty" data-test="resume-library-empty">
-          <strong>创建第一份本地简历</strong>
-          <span>可以先整理一份通用简历，也可以直接导入 Markdown 文件。</span>
-          <button type="button" class="state-solid" data-test="create-blank" @click="goCreateBlank">从空白开始</button>
-          <button type="button" class="state-btn" data-test="import-md-empty" @click="pickImportFile">导入 Markdown</button>
-        </div>
-
-        <div v-else class="paper-grid">
-          <article
-            v-for="(resume, index) in library.visibleItems.value"
-            :key="resume.id"
-            class="paper-card"
-            :class="{ selected: resume.id === library.selectedResumeId.value, expression: isExpression(resume) }"
-            :style="{ '--i': Math.min(index, 8) }"
-            :data-test="`asset-row-${resume.id}`"
-            @click="library.selectResume(resume.id)"
-          >
-            <div class="paper-visual">
-              <span class="paper-kind" :data-test="`asset-kind-${resume.id}`">{{ kindLabel(resume) }}</span>
-              <div class="paper-face">
-                <strong class="paper-name">{{ paperName(resume) }}</strong>
-                <span class="paper-role">{{ paperRole(resume) }}</span>
-                <span class="paper-lines"><i></i><i></i><i></i></span>
-              </div>
-              <em v-if="resume.currentVersion" class="paper-version">V{{ resume.currentVersion.versionNo }}</em>
-            </div>
-            <div class="paper-meta">
-              <div class="paper-meta-copy">
-                <strong>{{ resume.title }}</strong>
-                <small>{{ updatedLabel(resume) }}<template v-if="resume.archivedAt"> · 已归档</template></small>
-              </div>
-              <div class="paper-meta-actions" @click.stop>
-                <router-link
-                  v-if="resume.currentVersion"
-                  data-test="continue-editing"
-                  :to="buildResumeEditorLocation({ resumeId: resume.id, versionId: resume.currentVersion.id })"
-                >编辑</router-link>
-                <button type="button" data-test="open-fork" @click="openForkFor(resume)">副本</button>
-                <button v-if="!resume.archivedAt" type="button" data-test="archive-resume" @click="openArchiveFor(resume)">归档</button>
-              </div>
-            </div>
-          </article>
-
-          <button type="button" class="paper-card import-card" data-test="import-md" @click="pickImportFile">
-            <span class="import-plus"><el-icon :size="26"><Plus /></el-icon></span>
-            <span class="import-label">导入 Markdown</span>
-          </button>
-        </div>
+      <div class="topbar-actions">
+        <button type="button" class="topbar-btn" data-test="import-md-header" @click="pickImportFile">导入简历</button>
+        <button type="button" class="topbar-btn primary" data-test="create-blank-header" @click="goCreateBlank">新建简历</button>
       </div>
+    </header>
 
-      <aside class="lib-inspector">
+    <!-- ── 三栏：资产导航 | 版本工作区 | 检查器 ── -->
+    <div class="studio-body" :class="{ 'inspector-open': inspectorOpen }">
+      <aside class="nav-pane">
+        <ResumeAssetNavigator
+          :items="library.visibleItems.value"
+          :selected-id="library.selectedResumeId.value"
+          :loading="library.loading.value"
+          :error="library.errorMessage.value"
+          :filter="library.filter.value.kind"
+          :archived-count="0"
+          @select="onSelectAsset"
+          @retry="library.load()"
+          @update:filter="setKind"
+          @open-archived="setKind('archived')"
+        />
+      </aside>
+
+      <main class="work-pane">
+        <template v-if="library.selectedResume.value">
+          <ResumeAssetHeader
+            :resume="library.selectedResume.value"
+            @rename="onRename"
+          />
+          <ResumeVersionRail
+            :versions="library.versions.value"
+            :selected-version-id="library.selectedVersionId.value"
+            :current-version-id="library.selectedResume.value.currentVersion?.id ?? null"
+            @select-version="onSelectVersion"
+          />
+          <ResumeCompareToolbar
+            :selected-version-no="library.selectedVersion.value?.versionNo ?? null"
+            :viewing-current="viewingCurrent"
+            :comparing="comparing"
+            @update:comparing="comparing = $event"
+          />
+          <div class="work-canvas">
+            <ResumeChangeSummary
+              v-if="comparing"
+              :changes="chapterChanges"
+              :has-parent="hasParent"
+            />
+            <div class="doc-canvas" data-test="doc-canvas">
+              <ResumeDocumentPreview
+                :content="viewingContent"
+                @edit="goEditCurrent"
+              />
+            </div>
+          </div>
+        </template>
+        <div v-else class="work-empty" data-test="resume-library-empty">
+          <strong>还没有简历</strong>
+          <span>新建空白简历或导入 Markdown，开始维护你的第一份简历资产。</span>
+          <button type="button" class="btn-solid" data-test="create-blank" @click="goCreateBlank">新建简历</button>
+          <button type="button" class="btn-ghost" data-test="import-md-empty" @click="pickImportFile">导入 Markdown</button>
+        </div>
+      </main>
+
+      <aside class="inspector-pane">
         <ResumeVersionInspector
           v-if="inspectorOpen && library.selectedResume.value"
           :resume="library.selectedResume.value"
-          :versions="library.versions.value"
-          :selected-version-id="library.selectedVersionId.value"
-          :version-loading="library.versionLoading.value"
-          :version-error="library.versionError.value"
+          :selected-version="library.selectedVersion.value"
+          :current-version-id="library.selectedResume.value.currentVersion?.id ?? null"
           :used-by-targets="usedByTargets"
           :used-by-loading="usedByLoading"
-          @select-version="library.selectVersion($event)"
           @open-target="openTarget"
+          @fork="openFork"
           @archive="openArchive"
           @close="inspectorOpen = false"
-        >
-          <template #identity-actions>
-            <router-link
-              v-if="library.selectedResume.value.currentVersion"
-              class="inspector-primary"
-              data-test="continue-editing"
-              :to="buildResumeEditorLocation({ resumeId: library.selectedResume.value.id, versionId: library.selectedResume.value.currentVersion.id })"
-            >继续编辑</router-link>
-            <div class="inspector-secondary-row">
-              <router-link
-                v-if="library.selectedResume.value.currentVersion"
-                class="inspector-secondary"
-                data-test="view-current-version"
-                :to="buildResumeEditorLocation({ resumeId: library.selectedResume.value.id, versionId: library.selectedResume.value.currentVersion.id })"
-              >查看当前版本</router-link>
-              <button type="button" class="inspector-secondary" data-test="open-fork" @click="openFork">创建岗位表达副本</button>
-            </div>
-          </template>
-        </ResumeVersionInspector>
-        <div v-else-if="library.selectedResume.value" class="inspector-collapsed">
-          <button type="button" data-test="inspector-reopen" @click="inspectorOpen = true">版本与引用</button>
-        </div>
-        <div v-else class="inspector-placeholder">选中一份简历查看版本与引用</div>
+        />
+        <button
+          v-else
+          type="button"
+          class="inspector-reopen"
+          data-test="inspector-reopen"
+          @click="inspectorOpen = true"
+        >版本检查器</button>
       </aside>
     </div>
 
@@ -183,74 +142,90 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check, Plus, Search } from '@element-plus/icons-vue'
+import { Check, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { createResume } from '../../api/resume'
 import { getJobDescription } from '../../api/job'
 import { useResumeLibrary } from '../../composables/useResumeLibrary'
 import type { ResumeLibraryKindFilter } from '../../composables/useResumeLibrary'
-import type { Resume } from '../../types/resume'
+import ResumeAssetNavigator from '../../components/resume-library/ResumeAssetNavigator.vue'
+import ResumeAssetHeader from '../../components/resume-library/ResumeAssetHeader.vue'
+import ResumeVersionRail from '../../components/resume-library/ResumeVersionRail.vue'
+import ResumeCompareToolbar from '../../components/resume-library/ResumeCompareToolbar.vue'
+import ResumeChangeSummary from '../../components/resume-library/ResumeChangeSummary.vue'
+import ResumeDocumentPreview from '../../components/resume-library/ResumeDocumentPreview.vue'
 import ResumeVersionInspector from '../../components/resume-library/ResumeVersionInspector.vue'
 import ResumeForkDialog from '../../components/resume-library/ResumeForkDialog.vue'
 import ResumeArchiveDialog from '../../components/resume-library/ResumeArchiveDialog.vue'
+import { diffResumeContent, type ResumeChapterChange } from '../../utils/resumeVersionDiff'
 import { useTargetsStore } from '../../stores/targets'
 import type { ParsedMarkdownResume } from '../../utils/parseMarkdownResume'
 import { parseMarkdownResume } from '../../utils/parseMarkdownResume'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
-
-const KIND_OPTIONS: Array<{ value: ResumeLibraryKindFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'general', label: '通用简历' },
-  { value: 'expression', label: '岗位表达' },
-  { value: 'archived', label: '归档' },
-]
 
 const library = useResumeLibrary()
 const targetsStore = useTargetsStore()
 const router = useRouter()
 
 const inspectorOpen = ref(true)
-watch(() => library.selectedResumeId.value, () => { inspectorOpen.value = true })
+const comparing = ref(false)
+watch(() => library.selectedVersionId.value, () => { comparing.value = false })
 
 function setKind(kind: ResumeLibraryKindFilter) {
   library.filter.value.kind = kind
   void library.load()
 }
 
+function onSelectAsset(id: number) {
+  comparing.value = false
+  library.selectResume(id)
+}
+
+function onSelectVersion(id: number) {
+  library.selectVersion(id)
+}
+
+const viewingCurrent = computed(() => {
+  const resume = library.selectedResume.value
+  const version = library.selectedVersion.value
+  return resume != null && version != null && version.id === resume.currentVersion?.id
+})
+
+/** 画布渲染选中版本的正文（历史版本只读预览同一来源） */
+const viewingContent = computed(() => library.selectedVersion.value?.content ?? null)
+
+/** 选中版本相对父版本的确定性章节变化 */
+const chapterChanges = computed<ResumeChapterChange[]>(() => {
+  const version = library.selectedVersion.value
+  if (!version?.parentVersionId) return []
+  const parent = library.versions.value.find((item) => item.id === version.parentVersionId)
+  if (!parent) return []
+  return diffResumeContent(parent.content, version.content)
+})
+
+const hasParent = computed(() => !!library.selectedVersion.value?.parentVersionId)
+
+function goEditCurrent() {
+  const resume = library.selectedResume.value
+  if (!resume) return
+  void router.push(buildResumeEditorLocation({ resumeId: resume.id, versionId: resume.currentVersion?.id }))
+}
+
 function goCreateBlank() {
   void router.push(buildResumeEditorLocation({ mode: 'blank' }))
 }
 
-function isExpression(resume: Resume) {
-  return resume.kind === 'JOB_EXPRESSION'
-}
-function kindLabel(resume: Resume) {
-  return isExpression(resume) ? '岗位表达' : '通用'
-}
-function paperName(resume: Resume) {
-  const basic = resume.currentVersion?.content.basicInfo
-  return basic?.name?.trim() || resume.title
-}
-function paperRole(resume: Resume) {
-  const basic = resume.currentVersion?.content.basicInfo
-  return basic?.targetRole?.trim() || '求职意向待补充'
-}
-function updatedLabel(resume: Resume) {
-  const value = resume.updatedAt ?? resume.currentVersion?.createdAt
-  if (!value) return '时间未知'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '时间未知' : `${date.getMonth() + 1}月${date.getDate()}日更新`
+function onRename(title: string) {
+  const resume = library.selectedResume.value
+  if (!resume) return
+  library.rename(resume.id, title).then(() => ElMessage.success('已改名')).catch((error) => {
+    ElMessage.error(error instanceof Error ? error.message : '改名失败')
+  })
 }
 
-// 卡片上的 fork/归档：先选中再打开，保证弹窗上下文正确
-function openForkFor(resume: Resume) {
-  library.selectResume(resume.id)
-  openFork()
-}
-function openArchiveFor(resume: Resume) {
-  library.selectResume(resume.id)
-  openArchive()
+function openTarget(targetId: number) {
+  void router.push({ name: 'targets', query: { targetId: String(targetId) } })
 }
 
 // ── fork 流程 ──
@@ -259,7 +234,7 @@ const forkSubmitting = ref(false)
 const forkError = ref('')
 
 function openFork() {
-  if (!library.selectedResume.value) return
+  if (!library.selectedResume.value || !library.selectedVersion.value) return
   forkError.value = ''
   forkOpen.value = true
 }
@@ -315,7 +290,7 @@ async function confirmArchive() {
   }
 }
 
-// ── 用于：反查引用本简历任意版本的目标，经 JD 显示 公司 · 岗位 ──
+// ── 用于：反查引用选中版本的求职目标 ──
 interface UsedByTarget { targetId: number; jobDescriptionId: number | null; label: string }
 const usedByTargets = ref<UsedByTarget[]>([])
 const usedByLoading = ref(false)
@@ -360,10 +335,6 @@ async function jobLabelFor(jobDescriptionId: number, fallback: string): Promise<
   } catch {
     return fallback
   }
-}
-
-function openTarget(targetId: number) {
-  void router.push({ name: 'targets', query: { targetId: String(targetId) } })
 }
 
 // ── Markdown 导入 ──
@@ -434,102 +405,51 @@ onMounted(() => { void library.load() })
 </script>
 
 <style scoped>
-/* ═══════ 画布：与求职计划同款纯白固定布局 ═══════ */
-.resume-library{position:fixed;top:0;right:0;bottom:0;left:92px;display:flex;flex-direction:column;padding:30px 64px 40px;background:#fff;overflow:hidden;z-index:5}
+/* ═══════ Version Studio：资产导航 | 版本工作区 | 检查器 ═══════ */
+.studio{position:fixed;top:0;right:0;bottom:0;left:92px;display:flex;flex-direction:column;background:var(--canvas,#fafaf8);overflow:hidden;z-index:5}
 
-/* ── 头部 ── */
-.lib-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px}
-.lib-head h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.02em;color:#17181a}
-.lib-sub{margin:6px 0 0;color:#989893;font-size:13px}
-.lib-actions{display:flex;gap:10px}
-.btn-ghost{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:9px 15px;font-size:13px;font-weight:550;cursor:pointer}
-.btn-ghost:hover{background:#f4f5f4;color:#17181a}
-.btn-solid{border:1px solid #17181a;border-radius:10px;background:#17181a;color:#fff;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s ease-out}
-.btn-solid:hover{background:#000}
+.studio-topbar{display:flex;align-items:center;gap:16px;min-height:56px;padding:8px 20px;border-bottom:1px solid var(--border-subtle);background:var(--surface-solid,#fff);flex:0 0 auto}
+.topbar-title{margin:0;font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
+.topbar-search{display:flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:9px;background:var(--bg-subtle);padding:7px 12px;color:var(--muted)}
+.topbar-search:focus-within{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);background:var(--surface-solid,#fff)}
+.topbar-search input{border:0;outline:none;background:none;width:240px;font:inherit;font-size:12.5px;color:var(--ink)}
+.topbar-actions{display:flex;gap:10px;margin-left:auto}
+.topbar-btn{border:1px solid var(--border-default);border-radius:9px;background:transparent;color:var(--copy);padding:8px 13px;font-size:12.5px;cursor:pointer}
+.topbar-btn:hover{background:var(--bg-hover)}
+.topbar-btn.primary{border:0;background:var(--brand);color:#fff;font-weight:600}
+.topbar-btn.primary:hover{opacity:.92}
 
-/* ── 工具栏 ── */
-.lib-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:18px 0 4px;border-bottom:1px solid rgba(28,31,35,.07)}
-.filter-pills{display:inline-flex;gap:2px}
-.filter-pill{border:1px solid transparent;border-radius:999px;background:none;padding:5px 12px;font-size:12px;font-weight:550;color:#5c625d;cursor:pointer;transition:all .14s ease-out}
-.filter-pill:hover{background:#f3f4f3;color:#17181a}
-.filter-pill.on{border-color:rgba(22,139,104,.4);background:rgba(22,139,104,.1);color:var(--brand,#168b68);font-weight:650}
-.toolbar-search{display:flex;align-items:center;gap:7px;margin-left:auto;border:1px solid rgba(28,31,35,.12);border-radius:9px;background:#fff;padding:6px 11px;color:#a2a29d}
-.toolbar-search:focus-within{border-color:rgba(22,139,104,.5)}
-.toolbar-search input{border:0;outline:none;background:none;width:220px;font:inherit;font-size:12.5px;color:#23292e}
+.studio-body{flex:1;min-height:0;display:grid;grid-template-columns:264px minmax(0,1fr) 292px}
+.studio-body.inspector-open{grid-template-columns:264px minmax(0,1fr) 292px}
 
-/* ── 主体 ── */
-.lib-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;padding-top:16px}
-.shelf{min-height:0;overflow-y:auto;padding:4px 4px 24px 0}
+.nav-pane{min-height:0;border-right:1px solid var(--border-subtle);background:var(--surface-solid,#fff);display:flex;flex-direction:column}
+.nav-empty-actions{display:grid;gap:8px;padding:0 12px 16px}
+.btn-solid{border:1px solid var(--brand);border-radius:9px;background:var(--brand);color:#fff;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer}
+.btn-ghost{border:1px solid var(--border-default);border-radius:9px;background:transparent;color:var(--copy);padding:8px 13px;font-size:12px;cursor:pointer}
 
-/* ── 纸张卡片网格 ── */
-.paper-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:20px}
-.paper-card{display:grid;gap:10px;border:0;background:none;padding:0;cursor:pointer;animation:paper-in .34s cubic-bezier(.2,.7,.3,1) both;animation-delay:calc(var(--i,0)*45ms)}
-@keyframes paper-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion: reduce){.paper-card{animation:none}}
-.paper-visual{position:relative;aspect-ratio:3/4;display:flex;flex-direction:column;gap:6px;padding:18px 16px;border:1px solid rgba(28,31,35,.1);border-radius:14px;background:linear-gradient(180deg,#fdfdfc,#f7f8f6);overflow:hidden;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s ease-out,border-color .18s ease-out}
-.paper-card:hover .paper-visual{transform:translateY(-3px);border-color:rgba(22,139,104,.45);box-shadow:0 14px 34px rgba(16,24,40,.1)}
-.paper-card.selected .paper-visual{border-color:var(--brand,#168b68);box-shadow:0 0 0 1px var(--brand,#168b68)}
-.paper-kind{position:absolute;top:12px;right:12px;padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700;background:rgba(28,31,35,.06);color:#5c625d}
-.paper-card.expression .paper-kind{background:rgba(22,139,104,.12);color:var(--brand,#168b68)}
-.paper-face{display:grid;gap:5px;margin-top:14px;min-width:0}
-.paper-name{font-size:15px;font-weight:750;color:#17181a;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.paper-role{font-size:11px;color:#a2a29d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.paper-lines{display:grid;gap:7px;margin-top:10px}
-.paper-lines i{display:block;height:5px;border-radius:3px;background:rgba(28,31,35,.07)}
-.paper-lines i:nth-child(2){width:84%}
-.paper-lines i:nth-child(3){width:62%}
-.paper-version{position:absolute;right:12px;bottom:12px;padding:2px 9px;border-radius:999px;background:#fff;border:1px solid rgba(28,31,35,.1);color:#3c443f;font-size:10.5px;font-weight:800;font-style:normal;font-variant-numeric:tabular-nums}
-.paper-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:0 2px}
-.paper-meta-copy{min-width:0;display:grid;gap:2px}
-.paper-meta-copy strong{font-size:13px;font-weight:600;color:#23292e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.paper-meta-copy small{font-size:11px;color:#a2a29d}
-.paper-meta-actions{display:none;gap:2px;flex:0 0 auto}
-.paper-card:hover .paper-meta-actions,.paper-card.selected .paper-meta-actions{display:inline-flex}
-.paper-meta-actions a,.paper-meta-actions button{border:0;background:none;padding:4px 7px;border-radius:7px;color:#3c443f;font-size:11.5px;font-weight:600;cursor:pointer;text-decoration:none}
-.paper-meta-actions a:hover,.paper-meta-actions button:hover{background:#f1f2f1;color:var(--brand,#168b68)}
+.work-pane{min-height:0;overflow-y:auto;padding:18px 24px 48px;display:flex;flex-direction:column;gap:14px}
+.work-canvas{flex:1;min-height:0;display:flex;gap:16px;align-items:flex-start}
+.doc-canvas{flex:1;min-width:0}
+.work-empty{margin:auto;display:grid;justify-items:center;gap:12px;border:1px dashed var(--border-default);border-radius:16px;padding:52px 40px;text-align:center;color:var(--muted)}
+.work-empty strong{font-size:15px;color:var(--ink)}
+.work-empty span{font-size:12.5px;line-height:1.7;max-width:340px}
 
-/* 导入卡 */
-.import-card{border:1px dashed rgba(28,31,35,.2);border-radius:14px;min-height:0;place-content:center;justify-items:center;gap:10px;transition:border-color .15s ease-out,color .15s ease-out}
-.import-card:hover{border-color:rgba(22,139,104,.5);transform:none;box-shadow:none}
-.import-card:hover .import-plus{color:var(--brand,#168b68)}
-.import-plus{display:grid;width:52px;height:52px;place-items:center;border-radius:50%;background:#f4f5f4;color:#8a9089}
-.import-label{font-size:12.5px;font-weight:600;color:#5c625d}
-
-/* 空态 / 错误态 */
-.shelf-state{max-width:420px;margin:60px auto;display:grid;justify-items:center;gap:12px;border:1px dashed rgba(28,31,35,.15);border-radius:16px;padding:44px 32px;color:#989893;text-align:center}
-.shelf-state strong{font-size:15px;color:#17181a}
-.shelf-state span{font-size:12.5px;line-height:1.7}
-.shelf-state.error strong{color:var(--danger)}
-.state-solid{border:1px solid #17181a;border-radius:10px;background:#17181a;color:#fff;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
-.state-btn{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:8px 14px;font-size:12.5px;cursor:pointer}
-.state-btn:hover{background:#f4f5f4}
-
-/* ── 右侧版本面板 ── */
-.lib-inspector{min-height:0;overflow-y:auto;border-left:1px solid rgba(28,31,35,.07);padding:6px 0 24px 24px}
-.inspector-primary{display:grid;place-items:center;border:1px solid #17181a;border-radius:10px;background:#17181a;color:#fff;padding:10px 15px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
-.inspector-primary:hover{background:#000}
-.inspector-secondary{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:9px 14px;font-size:12.5px;font-weight:550;cursor:pointer;text-decoration:none}
-.inspector-secondary:hover{background:#f4f5f4;color:var(--brand,#168b68)}
-.inspector-secondary-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.inspector-secondary-row .inspector-secondary{display:grid;place-items:center;text-align:center}
-.inspector-collapsed button{border:1px solid rgba(28,31,35,.18);border-radius:10px;background:#fff;color:#3c443f;padding:8px 14px;font-size:12px;cursor:pointer}
-.inspector-placeholder{color:#b0b0ab;font-size:12.5px;padding:20px 0}
+.inspector-pane{min-height:0;overflow-y:auto;border-left:1px solid var(--border-subtle);background:var(--surface-solid,#fff);padding:14px 16px 24px}
+.inspector-reopen{border:1px solid var(--border-default);border-radius:9px;background:transparent;color:var(--copy);padding:7px 12px;font-size:12px;cursor:pointer}
 
 .file-input{display:none}
 
-/* ── 导入弹窗 ── */
-.import-backdrop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(7,8,8,.5);padding:24px}
-.import-dialog{position:relative;width:min(420px,100%);border-radius:14px;background:#fff;padding:20px;box-shadow:0 22px 60px rgba(0,0,0,.35)}
-.dialog-close{position:absolute;top:10px;right:12px;border:0;background:none;color:#989893;font-size:18px;cursor:pointer}
-.import-dialog>p{margin:0;color:#989893;font-size:12px}
-.import-dialog h2{margin:6px 0 4px;font-size:17px;color:#17181a}
-.import-file-name{color:#a2a29d;font-size:11.5px}
-.import-warning{margin:8px 0 0;color:#ad6800;font-size:12px}
-.import-summary{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:4px;color:#3c443f;font-size:12px}
-.import-summary li{display:flex;align-items:center;gap:6px}
-.import-error{margin:8px 0 0;color:var(--danger);font-size:12.5px}
-.import-dialog footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
-.import-dialog footer button{border:1px solid rgba(28,31,35,.18);border-radius:9px;background:#fff;padding:8px 13px;font:inherit;cursor:pointer}
-.import-dialog footer .primary{border-color:#17181a;background:#17181a;color:#fff;font-weight:600}
-.import-dialog footer button:disabled{opacity:.55;cursor:default}
+/* ── 响应式：1280 / 1024 两档，不压扁正文 ── */
+@media (max-width: 1279px) {
+  .studio-body,.studio-body.inspector-open{grid-template-columns:240px minmax(0,1fr)}
+  .inspector-pane{display:none}
+  .inspector-reopen{display:block}
+  .studio-body .inspector-pane{display:none}
+  .studio-body.inspector-open .inspector-pane{display:flex;position:absolute;right:0;top:56px;bottom:0;width:300px;z-index:20;box-shadow:-12px 0 32px rgba(16,24,40,.1)}
+}
+@media (max-width: 1023px) {
+  .studio-body,.studio-body.inspector-open{grid-template-columns:minmax(0,1fr)}
+  .nav-pane{display:none}
+  .studio-body.inspector-open .inspector-pane{width:min(340px,90vw)}
+}
 </style>
