@@ -554,16 +554,24 @@ const paperViewportStyle = computed(() => ({
 }
 
 /* 荧光笔高亮：修改=琥珀扫过；新增=绿色扫过（章节级，不伪造词级 diff） */
-.resume-preview-section.diff-modified {
-  background: linear-gradient(120deg, rgba(217, 119, 6, 0.14), rgba(217, 119, 6, 0.05));
-  box-shadow: inset 3px 0 0 rgba(217, 119, 6, 0.45);
-  border-radius: 4px;
+/* 荧光笔效果：落在文字上（标题与正文行），不是整块区域 */
+.resume-preview-section.diff-modified h2,
+.resume-preview-section.diff-modified .resume-preview-fields p,
+.resume-preview-section.diff-modified .resume-preview-item__head strong,
+.resume-preview-section.diff-modified .resume-preview-paragraphs p {
+  background: linear-gradient(to top, rgba(255, 193, 7, 0.45) 46%, transparent 46%);
+  border-radius: 2px;
+  padding: 0 3px;
 }
 
-.resume-preview-section.diff-added {
-  background: linear-gradient(120deg, rgba(22, 139, 104, 0.13), rgba(22, 139, 104, 0.04));
-  box-shadow: inset 3px 0 0 rgba(22, 139, 104, 0.45);
-  border-radius: 4px;
+.resume-preview-section.diff-added h2,
+.resume-preview-section.diff-added .resume-preview-fields p,
+.resume-preview-section.diff-added .resume-preview-chips span,
+.resume-preview-section.diff-added .resume-preview-item__head strong,
+.resume-preview-section.diff-added .resume-preview-paragraphs p {
+  background: linear-gradient(to top, rgba(22, 139, 104, 0.32) 46%, transparent 46%);
+  border-radius: 2px;
+  padding: 0 3px;
 }
 
 .a4-paper.template-compact .resume-preview-section h2 {
@@ -645,18 +653,6 @@ const paperViewportStyle = computed(() => ({
   border: 10px solid #101a33;
   background: #f8fafc;
   font-family: 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, 'Noto Sans SC', monospace;
-}
-
-.a4-paper.template-royal { --resume-accent: #6d28d9; --resume-rule: #7c3aed; --resume-muted: #8b7ab8; }
-.a4-paper.template-steel { --resume-accent: #0e7490; --resume-rule: #0891b2; --resume-muted: #6b8a94; }
-.a4-paper.template-wine { --resume-accent: #9f1239; --resume-rule: #be123c; --resume-muted: #b07a8a; }
-.a4-paper.template-navy { --resume-accent: #1e3a8a; --resume-rule: #1d4ed8; --resume-muted: #7a86ad; }
-.a4-paper.template-forest { --resume-accent: #166534; --resume-rule: #15803d; --resume-muted: #6b8f77; }
-.a4-paper.template-slate { --resume-accent: #334155; --resume-rule: #475569; --resume-muted: #84909e; }
-.a4-paper.template-rose { --resume-accent: #db2777; --resume-rule: #ec4899; --resume-muted: #c48ba6; }
-.a4-paper.template-ocean { --resume-accent: #0891b2; --resume-rule: #06b6d4; --resume-muted: #74a8b5; }
-.a4-paper.template-amber { --resume-accent: #b45309; --resume-rule: #d97706; --resume-muted: #b3926a; }
-.a4-paper.template-nord { --resume-accent: #3d5a73; --resume-rule: #4b6584; --resume-muted: #8496a5; }
 
 .a4-paper.template-terminal .resume-head {
   border-bottom-color: #34d399;
@@ -853,4 +849,109 @@ const paperViewportStyle = computed(() => ({
   font-size: 0.9em;
   margin-left: 6px;
 }
-</style>
+</style>
+
+/* ═══════ 扩展模版（结构性差异，非纯换色） ═══════ */
+
+/* 罗马紫：衬线 + 顶部紫色渐层带 */
+.a4-paper.template-royal {
+  --resume-accent: #6d28d9;
+  --resume-rule: #7c3aed;
+  --resume-muted: #8b7ab8;
+  font-family: Georgia, 'Times New Roman', 'Noto Serif SC', serif;
+  background: linear-gradient(180deg, rgba(109, 40, 217, 0.10), transparent 150px), #fff;
+}
+
+/* 青灰商务：左缘 6px 钢青竖条 */
+.a4-paper.template-steel {
+  --resume-accent: #0e7490;
+  --resume-rule: #0891b2;
+  --resume-muted: #6b8a94;
+  border-left: 6px solid #0e7490;
+}
+
+/* 酒红典雅：居中头部 + 酒红双线 */
+.a4-paper.template-wine {
+  --resume-accent: #9f1239;
+  --resume-rule: #be123c;
+  --resume-muted: #b07a8a;
+  font-family: Georgia, 'Noto Serif SC', serif;
+}
+.a4-paper.template-wine .resume-head {
+  text-align: center;
+  border-bottom: 3px double #be123c;
+  padding-bottom: 18px;
+}
+.a4-paper.template-wine .resume-head-row,
+.a4-paper.template-wine .resume-contact {
+  justify-content: center;
+}
+
+/* 靛蓝学院：顶部靛蓝色带贯穿 */
+.a4-paper.template-navy {
+  --resume-accent: #1e3a8a;
+  --resume-rule: #1d4ed8;
+  --resume-muted: #7a86ad;
+  background: linear-gradient(180deg, #1e3a8a 0 8px, #ffffff 8px 100%);
+  padding-top: 30px !important;
+}
+
+/* 森林绿：右缘 6px 森林绿竖条 + 浅绿底纹 */
+.a4-paper.template-forest {
+  --resume-accent: #166534;
+  --resume-rule: #15803d;
+  --resume-muted: #6b8f77;
+  border-right: 6px solid #15803d;
+  background: linear-gradient(180deg, rgba(22, 101, 52, 0.04), transparent 240px), #fff;
+}
+
+/* 深空灰：深灰粗边框 + 灰阶头部色带 */
+.a4-paper.template-slate {
+  --resume-accent: #334155;
+  --resume-rule: #475569;
+  --resume-muted: #84909e;
+  border: 8px solid #334155;
+  background: linear-gradient(180deg, #f1f5f9 0 90px, #fff 90px 100%);
+}
+
+/* 玫瑰粉：头部浅粉底 + 粉色圆角强调 */
+.a4-paper.template-rose {
+  --resume-accent: #db2777;
+  --resume-rule: #ec4899;
+  --resume-muted: #c48ba6;
+  background: linear-gradient(180deg, #fdf2f8 0 120px, #fff 120px 100%);
+}
+.a4-paper.template-rose .resume-preview-section h2 {
+  border-radius: 6px;
+  background: rgba(219, 39, 119, 0.07);
+  padding: 3px 8px;
+}
+
+/* 海洋蓝：上下海蓝细双线 */
+.a4-paper.template-ocean {
+  --resume-accent: #0891b2;
+  --resume-rule: #06b6d4;
+  --resume-muted: #74a8b5;
+  border-top: 5px solid #0891b2;
+  border-bottom: 5px solid #06b6d4;
+}
+
+/* 琥珀金：衬线 + 琥珀头部厚底线 */
+.a4-paper.template-amber {
+  --resume-accent: #b45309;
+  --resume-rule: #d97706;
+  --resume-muted: #b3926a;
+  font-family: 'Palatino Linotype', Georgia, 'Noto Serif SC', serif;
+}
+.a4-paper.template-amber .resume-head {
+  border-bottom: 4px solid #d97706;
+}
+
+/* 极地灰蓝：整页冷灰底 */
+.a4-paper.template-nord {
+  --resume-accent: #3d5a73;
+  --resume-rule: #4b6584;
+  --resume-muted: #8496a5;
+  background: #e8edf2;
+  border: 1px solid #c5d0da;
+}

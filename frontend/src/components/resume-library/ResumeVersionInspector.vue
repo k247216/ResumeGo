@@ -124,7 +124,6 @@ const activityEvents = computed(() => {
   const sorted = [...props.versions].sort((left, right) =>
     String(right.createdAt).localeCompare(String(left.createdAt)))
   return sorted.map((version, index) => {
-    const actor = version.content.basicInfo?.name?.trim() || '我'
     // 相对父版本的真实章节变化（无父版本 = 初始创建）
     const parent = sorted.find((item) => item.id === version.parentVersionId)
     let modules: string | null = null
@@ -134,7 +133,7 @@ const activityEvents = computed(() => {
     }
     return {
       key: version.id,
-      label: `${actor} 创建了版本 V${version.versionNo}`,
+      label: `创建了版本 V${version.versionNo}`,
       modules: index === sorted.length - 1 && !version.parentVersionId ? null : modules,
       time: formatTime(version.createdAt),
       fork: version.createdByType === 'fork',

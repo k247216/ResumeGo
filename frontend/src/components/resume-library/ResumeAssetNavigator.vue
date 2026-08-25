@@ -47,7 +47,7 @@
             <span class="asset-thumb" aria-hidden="true">
               <span class="thumb-scale">
                 <EditorPreviewPanel
-                  :sections="thumbSections(resume)"
+                  :sections="buildSections(resume.currentVersion?.content ?? {})"
                   selected-section-id=""
                   version-label=""
                   :template-style="templateStyle"
@@ -122,14 +122,6 @@ function accentColor(resume: Resume) {
   let hash = 0
   for (const ch of resume.title) hash = (hash * 31 + ch.codePointAt(0)!) >>> 0
   return ACCENT_PALETTE[hash % ACCENT_PALETTE.length]
-}
-
-/** 缩略图不显示姓名（本地单用户，姓名无信息量） */
-function thumbSections(resume: Resume) {
-  const sections = buildSections(resume.currentVersion?.content ?? {})
-  return sections.map((section) => section.id === 'personal-info'
-    ? { ...section, fields: section.fields.filter((field) => field.key !== 'basicInfo.name') }
-    : section)
 }
 
 const groups = computed(() => {

@@ -11,9 +11,9 @@ const resume = (id: number, kind: Resume['kind'] = 'GENERAL'): Resume => ({
   forkedFromVersionId: kind === 'JOB_EXPRESSION' ? 9 : null,
   archivedAt: null,
   targetJobDescriptionId: null,
-  currentVersion: { id: id * 10, resumeId: id, parentVersionId: null, versionNo: 1, content: {}, createdByType: 'user', createdAt: '2026-08-25' },
-  createdAt: '2026-08-25',
-  updatedAt: '2026-08-25',
+  currentVersion: { id: id * 10, resumeId: id, parentVersionId: null, versionNo: 1, content: {}, createdByType: 'user', createdAt: new Date().toISOString() },
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 })
 
 function mountNavigator(props: Record<string, unknown> = {}) {

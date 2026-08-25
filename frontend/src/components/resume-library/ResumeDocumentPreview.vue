@@ -7,9 +7,9 @@
     </div>
 
     <!-- 编辑台真实模版渲染：与编辑台所见一致，只读；缩放控制由父级提供 -->
-    <div v-else class="studio-preview" data-test="studio-preview">
-      <div class="paper-holder" :style="{ width: `${794 * safeScale}px`, height: `${1123 * safeScale}px` }">
-        <div class="paper-scale" :style="{ transform: `scale(${safeScale})` }">
+    <div v-else ref="containerRef" class="studio-preview" data-test="studio-preview">
+      <div class="paper-holder" :style="{ width: `${PAPER_WIDTH * effectiveScale}px`, height: `${PAPER_HEIGHT * effectiveScale}px` }">
+        <div class="paper-scale" :style="{ transform: `scale(${effectiveScale})` }">
           <EditorPreviewPanel
             :sections="previewSections"
             selected-section-id=""
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import EditorPreviewPanel from '../editor/EditorPreviewPanel.vue'
 import { buildSections } from '../../composables/useResumeEditor'
 import type { ResumeContent } from '../../types/resume'
@@ -38,13 +38,34 @@ const props = defineProps<{
   compareMode?: boolean
   /** 编辑台选择的模版（与编辑台共用同一持久化键） */
   templateStyle?: string
-  /** 展示缩放（1 = 100%） */
+  /** 用户缩放倍率（1 = 100%） */
   scale?: number
 }>()
 
 const emit = defineEmits<{ edit: [] }>()
 
-const safeScale = computed(() => props.scale ?? 1)
+const PAPER_WIDTH = 794
+const PAPER_HEIGHT = 1123
+const containerRef = ref<HTMLDivElement | null>(null)
+const containerWidth = ref(794)
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (containerRef.value && 'ResizeObserver' in globalThis) {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) containerWidth.value = entry.contentRect.width
+    })
+    resizeObserver.observe(containerRef.value)
+  }
+})
+onBeforeUnmount(() => { resizeObserver?.disconnect() })
+
+/** 自适应容器宽度 × 用户缩放 */
+const effectiveScale = computed(() => {
+  const fit = Math.min(1, containerWidth.value / PAPER_WIDTH)
+  const zoom = props.scale ?? 1
+  return Math.max(0.3, fit * zoom)
+})
 
 /** 章节全部为空视为无正文 */
 const empty = computed(() => {
