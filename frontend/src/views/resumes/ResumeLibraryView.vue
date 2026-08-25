@@ -58,13 +58,20 @@
             <ResumeChangeSummary
               v-if="comparing"
               :changes="chapterChanges"
-              :has-parent="hasParent"
+              :parent-version-no="parentVersionNo"
             />
-            <div class="doc-canvas" data-test="doc-canvas">
+            <div class="doc-canvas">
               <ResumeDocumentPreview
                 :content="viewingContent"
+                :changes="chapterChanges"
+                :compare-mode="comparing"
                 @edit="goEditCurrent"
               />
+              <div v-if="comparing" class="compare-legend" data-test="compare-legend">
+                <span class="legend-item"><i class="legend-dot modified" aria-hidden="true"></i>内容已更新</span>
+                <span class="legend-item"><i class="legend-dot added" aria-hidden="true"></i>内容已新增</span>
+                <span class="legend-item"><i class="legend-dot removed" aria-hidden="true"></i>内容已删除</span>
+              </div>
             </div>
           </div>
         </template>
@@ -204,7 +211,7 @@ const chapterChanges = computed<ResumeChapterChange[]>(() => {
   return diffResumeContent(parent.content, version.content)
 })
 
-const hasParent = computed(() => !!library.selectedVersion.value?.parentVersionId)
+const parentVersionNo = computed(() => (library.selectedVersion.value?.versionNo ?? 1) - 1)
 
 function goEditCurrent() {
   const resume = library.selectedResume.value
@@ -429,7 +436,13 @@ onMounted(() => { void library.load() })
 
 .work-pane{min-height:0;overflow-y:auto;padding:18px 24px 48px;display:flex;flex-direction:column;gap:14px}
 .work-canvas{flex:1;min-height:0;display:flex;gap:16px;align-items:flex-start}
-.doc-canvas{flex:1;min-width:0}
+.doc-canvas{flex:1;min-width:0;display:grid;gap:12px}
+.compare-legend{display:flex;gap:18px;padding:2px 4px}
+.legend-item{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.legend-dot{width:8px;height:8px;border-radius:3px}
+.legend-dot.modified{background:rgba(217,119,6,.55)}
+.legend-dot.added{background:var(--brand)}
+.legend-dot.removed{background:#c25656}
 .work-empty{margin:auto;display:grid;justify-items:center;gap:12px;border:1px dashed var(--border-default);border-radius:16px;padding:52px 40px;text-align:center;color:var(--muted)}
 .work-empty strong{font-size:15px;color:var(--ink)}
 .work-empty span{font-size:12.5px;line-height:1.7;max-width:340px}

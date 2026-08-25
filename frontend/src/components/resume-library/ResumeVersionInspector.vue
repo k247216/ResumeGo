@@ -10,18 +10,18 @@
     </header>
 
     <template v-if="resume && selectedVersion">
-      <!-- 操作层级：当前版本 → 编辑台为主；历史版本 → 副本为主，只读默认 -->
+      <!-- 操作层级：按视觉目标，创建岗位副本为绿色主操作 -->
       <div class="inspector-actions">
+        <button type="button" class="inspector-primary" data-test="open-fork" @click="emit('fork')">
+          基于此版本创建岗位副本
+        </button>
         <router-link
           v-if="viewingCurrent"
-          class="inspector-primary"
+          class="inspector-secondary"
           data-test="continue-editing"
           :to="buildResumeEditorLocation({ resumeId: resume.id, versionId: selectedVersion.id })"
         >进入编辑台</router-link>
         <span v-else class="readonly-note" data-test="history-readonly-note">历史版本只读，不改变当前版本</span>
-        <button type="button" class="inspector-secondary" data-test="open-fork" @click="emit('fork')">
-          基于此版本创建岗位副本
-        </button>
       </div>
 
       <section class="inspector-section" data-test="version-meta">
@@ -34,15 +34,40 @@
         <p v-if="selectedVersion.changeSummary" class="meta-summary">{{ selectedVersion.changeSummary }}</p>
       </section>
 
+      <section class="inspector-section" data-test="binding-status">
+        <h3 class="section-title">绑定状态</h3>
+        <p v-if="!usedByTargets.length" class="inspector-note" data-test="binding-empty">此版本尚未绑定到任何求职目标。</p>
+        <div v-else class="used-by-list">
+          <button
+            v-for="row in usedByTargets"
+            :key="row.targetId"
+            type="button"
+            class="used-by-row"
+            data-test="used-by-target"
+            @click="emit('open-target', row.targetId)"
+          >
+            <span class="used-by-copy">{{ row.label }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="inspector-section" data-test="version-health">
+        <h3 class="section-title">版本状态</h3>
+        <p class="health-row" :class="{ ok: healthOk }" data-test="version-health-status">
+          <span class="health-dot" aria-hidden="true"></span>{{ healthOk ? '健康' : '内容缺失' }}
+        </p>
+        <p class="inspector-note">{{ healthOk ? '文档可读，内容结构正常。' : '正文内容为空，建议进入编辑台补充。' }}</p>
+      </section>
+
       <section v-if="resume.forkedFromVersionId" class="inspector-section" data-test="inspector-fork-source">
         <h3 class="section-title">资产来源</h3>
         <p class="inspector-note">岗位表达副本：复制自源版本 #{{ resume.forkedFromVersionId }}，创建后独立演进，不随源资产同步。</p>
       </section>
 
-      <section class="inspector-section" data-test="inspector-used-by">
+      <section class="inspector-section" data-test="inspector-used-by-extra">
         <div class="section-head">
-          <h3 class="section-title">被绑定</h3>
-          <span class="section-count">{{ usedByTargets.length }} 个求职目标</span>
+          <h3 class="section-title">历史引用</h3>
+          <span class="section-count">{{ usedByTargets.length }} 个目标</span>
         </div>
         <p v-if="usedByLoading" class="inspector-note">正在读取绑定目标…</p>
         <p v-else-if="!usedByTargets.length" class="inspector-note">尚未绑定任何求职目标</p>
@@ -52,7 +77,6 @@
             :key="row.targetId"
             type="button"
             class="used-by-row"
-            data-test="used-by-target"
             @click="emit('open-target', row.targetId)"
           >
             <span class="used-by-copy">{{ row.label }}</span>
@@ -94,6 +118,13 @@ const emit = defineEmits<{
 const viewingCurrent = computed(() =>
   props.selectedVersion != null && props.selectedVersion.id === props.currentVersionId)
 
+/** 版本健康：确定性结构检查（正文可读、基本字段存在），不代表 AI 评分 */
+const healthOk = computed(() => {
+  const content = props.selectedVersion?.content
+  if (!content) return false
+  return !!(content.basicInfo && Object.keys(content.basicInfo).length)
+})
+
 function sourceLabel(type: string) {
   if (type === 'user') return '手工保存'
   if (type === 'fork') return '岗位副本创建'
@@ -119,6 +150,10 @@ function formatTime(value: string) {
 .inspector-close:hover{background:var(--bg-hover);color:var(--ink)}
 .inspector-actions{display:grid;gap:8px}
 .inspector-primary{display:grid;place-items:center;border:1px solid var(--brand);border-radius:10px;background:var(--brand);color:#fff;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
+.health-row{display:flex;align-items:center;gap:8px;margin:0;color:var(--muted);font-size:12.5px;font-weight:600}
+.health-row.ok{color:var(--brand)}
+.health-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.health-row.ok .health-dot{background:var(--brand)}
 .inspector-secondary{border:1px solid var(--line,rgba(28,31,35,.18));border-radius:10px;background:transparent;color:var(--copy);padding:9px 13px;font-size:12.5px;font-weight:550;cursor:pointer}
 .inspector-secondary:hover{border-color:var(--brand);color:var(--brand)}
 .readonly-note{padding:8px 0;color:var(--muted);font-size:11.5px}

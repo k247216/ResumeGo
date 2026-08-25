@@ -192,10 +192,11 @@ describe('ResumeLibraryView（Version Studio）', () => {
     await flushPromises()
 
     const summary = wrapper.get('[data-test="change-summary"]')
+    expect(summary.text()).toContain('2 处更新')
     expect(summary.text()).toContain('个人简介')
-    expect(summary.text()).toContain('修改')
+    expect(summary.text()).toContain('内容已更新')
     expect(summary.text()).toContain('技能')
-    expect(summary.text()).toContain('删除')
+    expect(summary.text()).toContain('已移除')
     // V1 无对比入口的诚实态在 rail 选中 V1 时出现
   })
 
@@ -296,8 +297,7 @@ describe('ResumeLibraryView（Version Studio）', () => {
     const wrapper = mountLibrary()
     await flushPromises()
 
-    const usedBy = wrapper.get('[data-test="inspector-used-by"]')
-    expect(usedBy.text()).toContain('1 个求职目标')
+    const usedBy = wrapper.get('[data-test="binding-status"]')
     expect(usedBy.text()).toContain('腾讯 · Java 后端实习')
     await wrapper.get('[data-test="used-by-target"]').trigger('click')
     expect(routerPush).toHaveBeenCalledWith({ name: 'targets', query: { targetId: '5' } })

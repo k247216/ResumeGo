@@ -79,12 +79,12 @@ describe('ResumeVersionInspector（版本检查器）', () => {
     const withRefs = mountInspector({
       usedByTargets: [{ targetId: 5, label: '腾讯 · Java 后端实习' }],
     })
-    expect(withRefs.get('[data-test="inspector-used-by"]').text()).toContain('1 个求职目标')
+    expect(withRefs.get('[data-test="binding-status"]').text()).toContain('腾讯 · Java 后端实习')
     await withRefs.get('[data-test="used-by-target"]').trigger('click')
     expect(withRefs.emitted('open-target')).toEqual([[5]])
 
     const empty = mountInspector({})
-    expect(empty.get('[data-test="inspector-used-by"]').text()).toContain('尚未绑定')
+    expect(empty.get('[data-test="binding-status"]').text()).toContain('尚未绑定')
   })
 
   it('归档入口发出 archive 事件；关闭发出 close', async () => {
