@@ -647,6 +647,17 @@ const paperViewportStyle = computed(() => ({
   font-family: 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, 'Noto Sans SC', monospace;
 }
 
+.a4-paper.template-royal { --resume-accent: #6d28d9; --resume-rule: #7c3aed; --resume-muted: #8b7ab8; }
+.a4-paper.template-steel { --resume-accent: #0e7490; --resume-rule: #0891b2; --resume-muted: #6b8a94; }
+.a4-paper.template-wine { --resume-accent: #9f1239; --resume-rule: #be123c; --resume-muted: #b07a8a; }
+.a4-paper.template-navy { --resume-accent: #1e3a8a; --resume-rule: #1d4ed8; --resume-muted: #7a86ad; }
+.a4-paper.template-forest { --resume-accent: #166534; --resume-rule: #15803d; --resume-muted: #6b8f77; }
+.a4-paper.template-slate { --resume-accent: #334155; --resume-rule: #475569; --resume-muted: #84909e; }
+.a4-paper.template-rose { --resume-accent: #db2777; --resume-rule: #ec4899; --resume-muted: #c48ba6; }
+.a4-paper.template-ocean { --resume-accent: #0891b2; --resume-rule: #06b6d4; --resume-muted: #74a8b5; }
+.a4-paper.template-amber { --resume-accent: #b45309; --resume-rule: #d97706; --resume-muted: #b3926a; }
+.a4-paper.template-nord { --resume-accent: #3d5a73; --resume-rule: #4b6584; --resume-muted: #8496a5; }
+
 .a4-paper.template-terminal .resume-head {
   border-bottom-color: #34d399;
   background: #101a33;

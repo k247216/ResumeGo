@@ -81,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import EditorCanvas from '../../components/editor/EditorCanvas.vue'
 import EditorPreviewPanel from '../../components/editor/EditorPreviewPanel.vue'
@@ -96,6 +96,10 @@ const router = useRouter()
 const editor = useResumeEditor()
 const selectedSectionId = ref('personal-info')
 const selectedTemplate = ref(localStorage.getItem('resumego:selectedResumeTemplate') || defaultResumeTemplateKey)
+// 模版选择立即持久化：简历库等处实时使用同一渲染
+watch(selectedTemplate, (value) => {
+  localStorage.setItem('resumego:selectedResumeTemplate', value)
+})
 const sidebarCollapsed = ref(false)
 const exporting = ref(false)
 const targetLinkError = ref('')

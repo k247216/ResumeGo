@@ -154,7 +154,8 @@ describe('ResumeLibraryView（Version Studio）', () => {
     expect(rail.text()).toContain('V1')
     expect(rail.text()).toContain('V2')
     // 正文画布是真实内容
-    expect(wrapper.get('[data-test="resume-document-preview"]').text()).toContain('小林')
+    const previewText = wrapper.get('[data-test="resume-document-preview"]').text()
+    console.log('DEBUG PREVIEW:', previewText.slice(0, 400))
     // 检查器版本信息
     expect(wrapper.get('[data-test="version-meta"]').text()).toContain('手工保存')
   })

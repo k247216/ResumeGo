@@ -56,7 +56,6 @@
           />
           <div class="work-canvas">
             <ResumeChangeSummary
-              v-if="comparing"
               :changes="chapterChanges"
               :parent-version-no="parentVersionNo"
             />
@@ -66,6 +65,7 @@
                 :changes="chapterChanges"
                 :compare-mode="comparing"
                 :template-style="templateStyle"
+                :scale="previewScale"
                 @edit="goEditCurrent"
               />
               <div v-if="comparing" class="compare-legend" data-test="compare-legend">
@@ -73,6 +73,11 @@
                 <span class="legend-item"><i class="legend-dot added" aria-hidden="true"></i>内容已新增</span>
                 <span class="legend-item"><i class="legend-dot removed" aria-hidden="true"></i>内容已删除</span>
               </div>
+            </div>
+            <div class="zoom-controls" data-test="zoom-controls">
+              <button type="button" aria-label="缩小" @click="zoomOut">−</button>
+              <span>{{ Math.round(previewScale * 100) }}%</span>
+              <button type="button" aria-label="放大" @click="zoomIn">＋</button>
             </div>
           </div>
         </template>
@@ -180,6 +185,9 @@ const targetsStore = useTargetsStore()
 const router = useRouter()
 
 const inspectorOpen = ref(true)
+const previewScale = ref(1)
+function zoomOut() { previewScale.value = Math.max(0.5, Math.round((previewScale.value - 0.1) * 10) / 10) }
+function zoomIn() { previewScale.value = Math.min(1.5, Math.round((previewScale.value + 0.1) * 10) / 10) }
 const comparing = ref(false)
 watch(() => library.selectedVersionId.value, () => { comparing.value = false })
 
@@ -447,6 +455,10 @@ onMounted(() => { void library.load() })
 .legend-dot.modified{background:rgba(217,119,6,.55)}
 .legend-dot.added{background:var(--brand)}
 .legend-dot.removed{background:#c25656}
+.zoom-controls{position:sticky;bottom:8px;justify-self:end;display:inline-flex;align-items:center;gap:2px;border:1px solid var(--border-subtle);border-radius:9px;background:var(--surface-solid,#fff);box-shadow:0 4px 14px rgba(16,24,40,.1);padding:3px}
+.zoom-controls button{width:26px;height:24px;border:0;border-radius:7px;background:none;color:var(--copy);font-size:14px;cursor:pointer}
+.zoom-controls button:hover{background:var(--bg-hover)}
+.zoom-controls span{min-width:42px;text-align:center;font-size:11.5px;color:var(--copy);font-variant-numeric:tabular-nums}
 .work-empty{margin:auto;display:grid;justify-items:center;gap:12px;border:1px dashed var(--border-default);border-radius:16px;padding:52px 40px;text-align:center;color:var(--muted)}
 .work-empty strong{font-size:15px;color:var(--ink)}
 .work-empty span{font-size:12.5px;line-height:1.7;max-width:340px}

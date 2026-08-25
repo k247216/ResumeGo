@@ -47,14 +47,13 @@
             <span class="asset-thumb" aria-hidden="true">
               <span class="thumb-scale">
                 <EditorPreviewPanel
-                  :sections="buildSections(resume.currentVersion?.content ?? {})"
+                  :sections="thumbSections(resume)"
                   selected-section-id=""
                   version-label=""
                   :template-style="templateStyle"
                 />
               </span>
-            </span>
-            <span class="asset-copy">
+            </span>            <span class="asset-copy">
               <strong>{{ resume.title }}</strong>
               <small>{{ preciseTime(resume) }}</small>
             </span>
@@ -70,19 +69,22 @@
       </template>
     </div>
 
+    <button type="button" class="recycle-row" data-test="archived-entry" @click="emit('open-archived')">
+      <el-icon :size="14"><Delete /></el-icon>
+      <span>回收站</span>
+      <em v-if="archivedCount">{{ archivedCount }}</em>
+      <el-icon class="recycle-arrow" :size="11"><ArrowRight /></el-icon>
+    </button>
+
     <div class="nav-foot">
       <span class="local-note">仅保存在本机</span>
-      <button type="button" class="archived-link" data-test="archived-entry" @click="emit('open-archived')">
-        <el-icon :size="12"><Delete /></el-icon>
-        回收站
-      </button>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Delete, Filter } from '@element-plus/icons-vue'
+import { Delete, Filter, ArrowRight } from '@element-plus/icons-vue'
 import EditorPreviewPanel from '../editor/EditorPreviewPanel.vue'
 import { buildSections } from '../../composables/useResumeEditor'
 import type { Resume } from '../../types/resume'
@@ -120,6 +122,14 @@ function accentColor(resume: Resume) {
   let hash = 0
   for (const ch of resume.title) hash = (hash * 31 + ch.codePointAt(0)!) >>> 0
   return ACCENT_PALETTE[hash % ACCENT_PALETTE.length]
+}
+
+/** 缩略图不显示姓名（本地单用户，姓名无信息量） */
+function thumbSections(resume: Resume) {
+  const sections = buildSections(resume.currentVersion?.content ?? {})
+  return sections.map((section) => section.id === 'personal-info'
+    ? { ...section, fields: section.fields.filter((field) => field.key !== 'basicInfo.name') }
+    : section)
 }
 
 const groups = computed(() => {
@@ -178,6 +188,11 @@ function preciseTime(resume: Resume) {
 .asset-row.selected .asset-copy strong{font-weight:650;color:var(--ink)}
 .asset-copy small{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .asset-marker{flex:0 0 auto;display:grid;place-items:center;width:18px;height:18px;border-radius:5px;background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:700}
+.recycle-row{display:flex;align-items:center;gap:9px;width:100%;border:0;border-top:1px solid var(--border-subtle);background:none;padding:11px 14px;color:var(--copy);font-size:12px;font-weight:550;cursor:pointer}
+.recycle-row:hover{background:var(--bg-hover);color:var(--ink)}
+.recycle-row span{flex:1;text-align:left}
+.recycle-row em{font-style:normal;font-size:10.5px;color:var(--muted)}
+.recycle-arrow{color:var(--muted)}
 .nav-foot{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border-subtle);flex:0 0 auto}
 .local-note{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)}
 .local-note::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--brand)}

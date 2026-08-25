@@ -9,33 +9,29 @@
     </header>
 
     <template v-if="resume && selectedVersion">
-      <!-- 操作层级：按视觉目标，创建岗位副本为绿色主操作 -->
-      <div class="inspector-actions">
-        <button type="button" class="inspector-primary" data-test="open-fork" @click="emit('fork')">
-          基于此版本创建岗位副本
-        </button>
-        <router-link
-          v-if="viewingCurrent"
-          class="inspector-secondary"
-          data-test="continue-editing"
-          :to="buildResumeEditorLocation({ resumeId: resume.id, versionId: selectedVersion.id })"
-        >进入编辑台</router-link>
-        <span v-else class="readonly-note" data-test="history-readonly-note">历史版本只读，不改变当前版本</span>
-      </div>
-
+      <!-- 版本信息 -->
       <section class="inspector-section" data-test="version-meta">
         <h3 class="section-title">版本信息</h3>
         <div class="meta-grid">
           <div class="meta-row"><span>创建来源</span><strong>{{ sourceLabel(selectedVersion.createdByType) }}</strong></div>
           <div class="meta-row"><span>创建时间</span><strong>{{ formatTime(selectedVersion.createdAt) }}</strong></div>
           <div v-if="selectedVersion.parentVersionId" class="meta-row"><span>父版本</span><strong>#{{ selectedVersion.parentVersionId }}</strong></div>
+          <div v-if="resume.forkedFromVersionId" class="meta-row"><span>来源版本</span><strong>#{{ resume.forkedFromVersionId }}</strong></div>
         </div>
-        <p v-if="selectedVersion.changeSummary" class="meta-summary">{{ selectedVersion.changeSummary }}</p>
       </section>
 
+      <!-- 版本说明 -->
+      <section class="inspector-section" data-test="version-note">
+        <h3 class="section-title">版本说明</h3>
+        <p v-if="selectedVersion.changeSummary" class="meta-summary">{{ selectedVersion.changeSummary }}</p>
+        <p v-else class="inspector-note">暂无版本说明</p>
+      </section>
+
+      <!-- 绑定状态 -->
       <section class="inspector-section" data-test="binding-status">
         <h3 class="section-title">绑定状态</h3>
-        <p v-if="!usedByTargets.length" class="inspector-note" data-test="binding-empty">此版本尚未绑定到任何求职目标。</p>
+        <p v-if="usedByLoading" class="inspector-note">正在读取绑定目标…</p>
+        <p v-else-if="!usedByTargets.length" class="inspector-note" data-test="binding-empty">此版本尚未绑定到任何求职目标。</p>
         <div v-else class="used-by-list">
           <button
             v-for="row in usedByTargets"
@@ -50,55 +46,46 @@
         </div>
       </section>
 
-      
-
-      <section v-if="resume.forkedFromVersionId" class="inspector-section" data-test="inspector-fork-source">
-        <h3 class="section-title">资产来源</h3>
-        <p class="inspector-note">岗位表达副本：复制自源版本 #{{ resume.forkedFromVersionId }}，创建后独立演进，不随源资产同步。</p>
-      </section>
-
-      <section class="inspector-section" data-test="inspector-used-by-extra">
-        <div class="section-head">
-          <h3 class="section-title">历史引用</h3>
-          <span class="section-count">{{ usedByTargets.length }} 个目标</span>
-        </div>
-        <p v-if="usedByLoading" class="inspector-note">正在读取绑定目标…</p>
-        <p v-else-if="!usedByTargets.length" class="inspector-note">尚未绑定任何求职目标</p>
-        <div v-else class="used-by-list">
-          <button
-            v-for="row in usedByTargets"
-            :key="row.targetId"
-            type="button"
-            class="used-by-row"
-            @click="emit('open-target', row.targetId)"
-          >
-            <span class="used-by-copy">{{ row.label }}</span>
+      <!-- 操作 -->
+      <section class="inspector-section" data-test="inspector-ops">
+        <h3 class="section-title">操作</h3>
+        <div class="inspector-actions">
+          <button type="button" class="inspector-primary" data-test="open-fork" @click="emit('fork')">
+            基于此版本创建岗位副本
           </button>
+          <router-link
+            v-if="viewingCurrent"
+            class="inspector-secondary"
+            data-test="continue-editing"
+            :to="buildResumeEditorLocation({ resumeId: resume.id, versionId: selectedVersion.id })"
+          >进入编辑台</router-link>
+          <span v-else class="readonly-note" data-test="history-readonly-note">历史版本只读，不改变当前版本</span>
+        </div>
+        <div class="inspector-overflow">
+          <button type="button" class="overflow-btn" data-test="archive-resume" @click="emit('archive')">
+            {{ resume.archivedAt ? '恢复这份简历' : '归档这份简历' }}
+          </button>
+          <p>归档不删除版本与历史引用。</p>
         </div>
       </section>
 
+      <!-- 历史活动：竖向时间轴 -->
       <section class="inspector-section" data-test="activity-timeline">
         <div class="section-head">
           <h3 class="section-title">历史活动</h3>
           <button v-if="activityEvents.length > 4" type="button" class="activity-all" data-test="activity-toggle" @click="activityShowAll = !activityShowAll">{{ activityShowAll ? '收起' : '查看全部' }}</button>
         </div>
-        <ul class="activity-list" data-test="activity-list">
+        <ul class="activity-list" :class="{ expanded: activityShowAll }" data-test="activity-list">
           <li v-for="event in activityShowAll ? activityEvents : activityEvents.slice(0, 4)" :key="event.key" class="activity-row">
             <span class="activity-dot" :class="{ fork: event.fork }" aria-hidden="true"></span>
             <span class="activity-copy">
               <strong>{{ event.label }}</strong>
+              <small v-if="event.modules" class="activity-modules">{{ event.modules }}</small>
               <small>{{ event.time }}</small>
             </span>
           </li>
         </ul>
       </section>
-
-      <div class="inspector-overflow">
-        <button type="button" class="overflow-btn" data-test="archive-resume" @click="emit('archive')">
-          {{ resume.archivedAt ? '恢复这份简历' : '归档这份简历' }}
-        </button>
-        <p>归档不删除版本与历史引用。</p>
-      </div>
     </template>
     <div v-else class="inspector-placeholder">选择资产后查看版本信息</div>
   </aside>
@@ -108,6 +95,7 @@
 import { computed, ref } from 'vue'
 import type { Resume, ResumeVersion } from '../../types/resume'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
+import { diffResumeContent } from '../../utils/resumeVersionDiff'
 
 const props = defineProps<{
   resume: Resume | null
@@ -133,15 +121,25 @@ const viewingCurrent = computed(() =>
 /** 历史活动：从真实版本派生（创建事件），不虚构改名/编辑记录 */
 const activityShowAll = ref(false)
 const activityEvents = computed(() => {
-  const events = [...props.versions].sort((left, right) =>
+  const sorted = [...props.versions].sort((left, right) =>
     String(right.createdAt).localeCompare(String(left.createdAt)))
-    .map((version) => ({
+  return sorted.map((version, index) => {
+    const actor = version.content.basicInfo?.name?.trim() || '我'
+    // 相对父版本的真实章节变化（无父版本 = 初始创建）
+    const parent = sorted.find((item) => item.id === version.parentVersionId)
+    let modules: string | null = null
+    if (parent) {
+      const labels = diffResumeContent(parent.content, version.content).map((change) => change.chapterLabel)
+      modules = labels.length ? `更新了 ${labels.join('、')}` : null
+    }
+    return {
       key: version.id,
-      label: `创建了版本 V${version.versionNo}`,
+      label: `${actor} 创建了版本 V${version.versionNo}`,
+      modules: index === sorted.length - 1 && !version.parentVersionId ? null : modules,
       time: formatTime(version.createdAt),
       fork: version.createdByType === 'fork',
-    }))
-  return events
+    }
+  })
 })
 
 function sourceLabel(type: string) {
@@ -190,10 +188,12 @@ function formatTime(value: string) {
 .used-by-row:hover{background:var(--bg-hover);color:var(--brand)}
 .used-by-copy{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .activity-all{border:0;background:none;padding:0;color:var(--brand);font-size:11px;font-weight:600;cursor:pointer}
-.activity-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}
-.activity-row{display:flex;align-items:flex-start;gap:9px}
-.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--line,rgba(28,31,35,.3));flex:0 0 auto;margin-top:4px}
-.activity-dot.fork{background:var(--brand)}
+.activity-list{margin:0;padding:0;list-style:none;display:grid;gap:14px;position:relative}
+/* 竖向时间轴：连线贯穿节点 */
+.activity-list::before{content:'';position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:var(--border-subtle)}
+.activity-row{display:flex;align-items:flex-start;gap:11px;position:relative}
+.activity-dot{width:9px;height:9px;border-radius:50%;background:var(--surface-solid,#fff);border:2px solid var(--line,rgba(28,31,35,.3));flex:0 0 auto;margin-top:3px;z-index:1}
+.activity-dot.fork{border-color:var(--brand)}
 .activity-copy{display:grid;gap:1px;min-width:0}
 .activity-copy strong{font-size:12px;font-weight:550;color:var(--copy)}
 .activity-copy small{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}

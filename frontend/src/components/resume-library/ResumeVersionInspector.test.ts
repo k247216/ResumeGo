@@ -43,13 +43,13 @@ function mountInspector(props: Record<string, unknown> = {}) {
 }
 
 describe('ResumeVersionInspector（版本检查器）', () => {
-  it('展示版本元数据：来源、时间、变更说明', () => {
+  it('展示版本元数据：来源、时间、变更说明独立区块', () => {
     const wrapper = mountInspector({})
     expect(wrapper.get('.inspector-head').text()).toContain('V2')
     const meta = wrapper.get('[data-test="version-meta"]')
     expect(meta.text()).toContain('手工保存')
-    expect(meta.text()).toContain('第 2 版')
     expect(meta.text()).toContain('2026')
+    expect(wrapper.get('[data-test="version-note"]').text()).toContain('第 2 版')
   })
 
   it('当前版本：主操作为进入编辑台，无只读提示', () => {
@@ -73,8 +73,7 @@ describe('ResumeVersionInspector（版本检查器）', () => {
     const wrapper = mountInspector({
       resume: { ...resume, kind: 'JOB_EXPRESSION', forkedFromVersionId: 77 },
     })
-    expect(wrapper.get('[data-test="inspector-fork-source"]').text()).toContain('#77')
-    expect(wrapper.get('[data-test="inspector-fork-source"]').text()).toContain('独立演进')
+    expect(wrapper.get('[data-test="version-meta"]').text()).toContain('#77')
   })
 
   it('引用状态：真实绑定列表 + 诚实空态 + 跳转事件', async () => {
