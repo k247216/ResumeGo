@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resumego.resume.dto.ResumeVersionDTO;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -70,35 +71,51 @@ public class ResumeRepository {
     }
 
     public String findTitleById(long userId, long id) {
-        return jdbcTemplate.queryForObject(
-                "SELECT title FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-                String.class,
-                id, userId
-        );
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT title FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                    String.class,
+                    id, userId
+            );
+        } catch (EmptyResultDataAccessException missing) {
+            return null;
+        }
     }
 
     public String findKindById(long userId, long id) {
-        return jdbcTemplate.queryForObject(
-                "SELECT kind FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-                String.class,
-                id, userId
-        );
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT kind FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                    String.class,
+                    id, userId
+            );
+        } catch (EmptyResultDataAccessException missing) {
+            return null;
+        }
     }
 
     public Long findForkedFromVersionIdById(long userId, long id) {
-        return jdbcTemplate.queryForObject(
-                "SELECT forked_from_version_id FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-                Long.class,
-                id, userId
-        );
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT forked_from_version_id FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                    Long.class,
+                    id, userId
+            );
+        } catch (EmptyResultDataAccessException missing) {
+            return null;
+        }
     }
 
     public java.time.LocalDateTime findArchivedAtById(long userId, long id) {
-        return jdbcTemplate.queryForObject(
-                "SELECT archived_at FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-                java.time.LocalDateTime.class,
-                id, userId
-        );
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT archived_at FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                    java.time.LocalDateTime.class,
+                    id, userId
+            );
+        } catch (EmptyResultDataAccessException missing) {
+            return null;
+        }
     }
 
     public void updateTitle(long userId, long resumeId, String title) {
@@ -143,11 +160,15 @@ public class ResumeRepository {
     }
 
     public Long findTargetJobDescriptionIdById(long userId, long id) {
-        return jdbcTemplate.queryForObject(
-                "SELECT target_job_description_id FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-                Long.class,
-                id, userId
-        );
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT target_job_description_id FROM resumes WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                    Long.class,
+                    id, userId
+            );
+        } catch (EmptyResultDataAccessException missing) {
+            return null;
+        }
     }
 
     public void updateTargetJobDescriptionId(long resumeId, Long targetJobDescriptionId) {
