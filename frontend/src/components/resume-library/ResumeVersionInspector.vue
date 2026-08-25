@@ -10,6 +10,10 @@
     </header>
 
     <template v-if="resume">
+      <div class="inspector-actions">
+        <slot name="identity-actions" />
+      </div>
+
       <section v-if="resume.forkedFromVersionId" class="inspector-section" data-test="inspector-fork-source">
         <h3 class="section-title">来源版本</h3>
         <p class="inspector-note">复制自版本 #{{ resume.forkedFromVersionId }}，创建后与源简历独立演进。</p>
@@ -134,6 +138,7 @@ function formatTime(value: string) {
 <style scoped>
 .version-inspector{display:grid;gap:16px;align-content:start}
 .inspector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.inspector-actions{display:grid;gap:8px}
 .inspector-kicker{margin:0;color:var(--muted);font-size:11px;font-weight:650;letter-spacing:.06em}
 .inspector-head h2{margin:6px 0 0;font-size:17px;font-weight:700;color:var(--ink)}
 .inspector-close{border:0;background:none;border-radius:8px;width:26px;height:26px;color:var(--muted);font-size:16px;cursor:pointer}

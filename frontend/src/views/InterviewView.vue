@@ -2,8 +2,8 @@
   <div class="interview-page">
     <header class="interview-command-bar" data-test="interview-command-bar">
       <div class="bar-identity">
-        <h1 class="bar-title"><span class="bar-title-icon" aria-hidden="true"><el-icon :size="17"><Microphone /></el-icon></span><span>模拟面试</span></h1>
-        <span class="bar-subtitle">岗位模拟 · 知识训练 · 面经模拟</span>
+        <h1 class="bar-title hero-title">模拟面试</h1>
+        <span class="bar-subtitle">选择训练方式，开始一场有来源、可回放的模拟演练</span>
       </div>
     </header>
     <div v-if="fromWorkspace" class="workspace-return-bar">
@@ -40,7 +40,7 @@
           <div class="context-heading">
             <span class="context-step">01</span>
             <div>
-              <h2>新建一次面试演练</h2>
+              <h2>岗位模拟 · 完整配置</h2>
               <p>把简历版本、目标岗位和面试官队列固定下来，形成一组可连续复盘的面试计划。</p>
             </div>
           </div>
@@ -1836,6 +1836,7 @@ function formatDate(value?: string | null) {
 <style scoped>
 .interview-command-bar{display:flex;align-items:center;gap:18px;min-height:58px;padding:8px 4px 14px;border-bottom:1px solid var(--border-subtle);margin-bottom:16px}
 .bar-identity{display:flex;align-items:baseline;gap:14px}
+.bar-title.hero-title{font-size:26px;font-weight:700;letter-spacing:-.02em;color:#17181a;margin:0}
 .bar-title{display:inline-flex;align-items:center;gap:10px;margin:0;font-size:22px;font-weight:650;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
 .bar-title-icon{display:grid;width:30px;height:30px;place-items:center;border-radius:9px;background:var(--brand-soft);color:var(--brand)}
 .bar-subtitle{color:var(--muted);font-size:12.5px}
