@@ -99,6 +99,7 @@ class KnowledgeServiceTest {
         when(repository.findSourceFileByDocument(1L, 2L)).thenReturn(Optional.of(source));
 
         assertThat(service.get(2L).sourceFile()).isEqualTo("redis-notes.md");
+        assertThat(service.get(2L).sizeBytes()).isEqualTo(12L);
     }
 
     @Test

@@ -63,6 +63,8 @@ public class KnowledgeTrainingContextValidator implements InterviewContextValida
                 training.questionCount(),
                 training.focusTags(),
                 training.difficulty(),
+                training.questionStyle(),
+                null,
                 null,
                 InterviewContextSnapshot.PROMPT_VERSION,
                 InterviewContextSnapshot.OUTPUT_SCHEMA_VERSION

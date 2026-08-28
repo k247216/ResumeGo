@@ -1,5 +1,6 @@
 package com.resumego.interview.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -14,8 +15,24 @@ public record SessionHistoryResponse(
             String questionText,
             String questionType,
             String answerText,
-            EvaluationSummary evaluation
+            EvaluationSummary evaluation,
+            String source,
+            String sourceReference,
+            String provenanceLabel,
+            LocalDateTime submittedAt
     ) {
+        public HistoryItem(int questionIndex, String questionText, String questionType,
+                           String answerText, EvaluationSummary evaluation) {
+            this(questionIndex, questionText, questionType, answerText, evaluation, null, null, null, null);
+        }
+
+        /** 兼容旧调用方：没有回答时提交时间为空。 */
+        public HistoryItem(int questionIndex, String questionText, String questionType,
+                           String answerText, EvaluationSummary evaluation,
+                           String source, String sourceReference, String provenanceLabel) {
+            this(questionIndex, questionText, questionType, answerText, evaluation,
+                    source, sourceReference, provenanceLabel, null);
+        }
     }
 
     public record EvaluationSummary(
@@ -31,7 +48,12 @@ public record SessionHistoryResponse(
             int clarity,
             int relevance,
             int depth,
+            int structure,
+            int evidence,
             int accuracy
     ) {
+        public ScoreDetail(int clarity, int relevance, int depth, int accuracy) {
+            this(clarity, relevance, depth, 0, accuracy, accuracy);
+        }
     }
 }

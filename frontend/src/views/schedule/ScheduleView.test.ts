@@ -258,6 +258,20 @@ describe('ScheduleView', () => {
     expect(routerPush).toHaveBeenCalledWith({ name: 'targets', query: { targetId: '3' } })
   })
 
+  it('keeps target context when schedule binding ids arrive as strings', async () => {
+    scheduleMock.eventsOn.mockReturnValue([
+      makeEvent({ id: 2, title: '技术二面', startTime: timeAt(0, 16), jobDescriptionId: '6' as unknown as number, jobProjectId: '3' as unknown as number }),
+    ])
+    targets.targets = [
+      { id: 3, name: '腾讯 · Java 后端实习', status: 'active', jobDescriptionId: 6, resumeVersionId: 9, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]
+    const wrapper = mount(ScheduleView, { global: { stubs } })
+    await flushPromises()
+    await openDayPanel(wrapper)
+
+    expect(wrapper.get('[data-test="event-target-context"]').text()).toContain('腾讯 · Java 后端实习')
+  })
+
   it('keeps endTime and job association when editing an event', async () => {
     // 回归用例：此前编辑会把 endTime/jobDescriptionId 静默清空
     scheduleMock.eventsOn.mockReturnValue([

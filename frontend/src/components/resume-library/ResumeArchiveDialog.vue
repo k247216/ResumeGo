@@ -1,16 +1,16 @@
 <template>
   <div v-if="open && resume" class="dialog-backdrop" role="presentation" @click.self="emit('cancel')">
     <section class="archive-dialog" role="dialog" aria-modal="true" aria-labelledby="archive-title" data-test="archive-dialog">
-      <p>归档简历</p>
+      <p>{{ archived ? '恢复简历' : '归档简历' }}</p>
       <h2 id="archive-title" data-test="archive-source-label">{{ resume.title }}</h2>
       <p class="archive-note">
-        归档后这份简历从默认列表隐藏，可随时恢复。它的历史版本和被引用关系保持不变，不会影响任何求职目标。
+        {{ archived ? '恢复后这份简历会回到默认列表。它的历史版本和被引用关系保持不变。' : '归档后这份简历会进入回收站，可随时恢复。它的历史版本和被引用关系保持不变，不会影响任何求职目标。' }}
       </p>
       <p v-if="error" class="archive-error" data-test="archive-error">{{ error }}</p>
       <footer>
         <button type="button" class="ghost" @click="emit('cancel')">取消</button>
         <button type="button" class="primary" data-test="archive-confirm" :disabled="submitting" @click="emit('confirm')">
-          {{ submitting ? '归档中…' : '确认归档' }}
+          {{ submitting ? (archived ? '恢复中…' : '归档中…') : (archived ? '确认恢复' : '确认归档') }}
         </button>
       </footer>
     </section>
@@ -23,6 +23,7 @@ import type { Resume } from '../../types/resume'
 defineProps<{
   open: boolean
   resume: Resume | null
+  archived?: boolean
   submitting?: boolean
   error?: string
 }>()

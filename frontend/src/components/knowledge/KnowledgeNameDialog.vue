@@ -5,6 +5,7 @@
       <label class="field">
         <span>名称</span>
         <input
+          ref="nameInput"
           v-model="name"
           type="text"
           maxlength="40"
@@ -25,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 
 const props = defineProps<{
   kind: 'category' | 'tag'
@@ -38,6 +39,7 @@ const emit = defineEmits<{ (e: 'close'): void; (e: 'create', name: string): void
 const title = computed(() => (props.kind === 'category' ? '新建分类' : '新建标签'))
 
 const name = ref('')
+const nameInput = ref<HTMLInputElement | null>(null)
 
 const canSubmit = computed(() => {
   const trimmed = name.value.trim()
@@ -48,6 +50,10 @@ function submit() {
   if (!canSubmit.value || props.submitting) return
   emit('create', name.value.trim())
 }
+
+onMounted(() => {
+  void nextTick(() => nameInput.value?.focus())
+})
 </script>
 
 <style scoped>

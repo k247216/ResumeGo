@@ -17,6 +17,9 @@ import com.resumego.common.CurrentUser;
 import com.resumego.interview.feedback.InterviewFeedbackEvent;
 import com.resumego.interview.feedback.InterviewFeedbackProjector;
 import com.resumego.interview.InterviewAction;
+import com.resumego.interview.InterviewMode;
+import com.resumego.interview.QuestionSourceType;
+import com.resumego.interview.context.InterviewContextSnapshot;
 import com.resumego.interview.dto.InterviewQuestionDTO;
 import com.resumego.interview.dto.InterviewStatusResponse;
 import com.resumego.interview.dto.MultiSessionSummaryRequest;
@@ -37,6 +40,8 @@ import com.resumego.interview.mapper.InterviewPlanMapper;
 import com.resumego.interview.mapper.InterviewQuestionMapper;
 import com.resumego.interview.mapper.InterviewSessionMapper;
 import com.resumego.interview.mapper.InterviewerPersonaMapper;
+import com.resumego.interview.source.InterviewQuestionSource;
+import com.resumego.interview.source.QuestionDraft;
 import com.resumego.job.JobDescription;
 import com.resumego.job.JobDescriptionMapper;
 import com.resumego.resume.dto.ResumeVersionDTO;
@@ -55,6 +60,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 面试服务。
@@ -94,6 +101,8 @@ public class InterviewService {
     private final JobDescriptionMapper jobDescriptionMapper;
     private final CompanyProfileService companyProfileService;
     private final ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private List<InterviewQuestionSource> questionSources = List.of();
 
     @Autowired(required = false)
     private InterviewFeedbackProjector feedbackProjector;
@@ -188,6 +197,79 @@ public class InterviewService {
     }
 
     /**
+     * Create a session whose questions come from a frozen Knowledge/Experience
+     * source. These modes intentionally leave Pipeline/Resume references null;
+     * the plan snapshot remains the source of truth for replay.
+     */
+    @Transactional
+    public InterviewStatusResponse createSourceInterview(
+            InterviewPlan plan,
+            InterviewContextSnapshot snapshot,
+            List<QuestionDraft> drafts) {
+        if (plan == null || snapshot == null || drafts == null || drafts.isEmpty()) {
+            throw new IllegalArgumentException("来源练习缺少可用题目");
+        }
+
+        Long personaId = snapshot.personaIds() == null || snapshot.personaIds().isEmpty()
+                ? null : snapshot.personaIds().get(0);
+        InterviewerPersona persona = personaId == null ? null : personaMapper.selectById(personaId);
+
+        InterviewSession session = new InterviewSession();
+        session.setUserId(CurrentUser.DEMO_USER_ID);
+        session.setResumeVersionId(snapshot.resumeVersionId());
+        session.setJobDescriptionId(snapshot.jobDescriptionId());
+        session.setPlanId(plan.getId());
+        session.setStatus(com.resumego.interview.InterviewState.READY.name());
+        session.setCurrentQuestionIndex(0);
+        session.setTotalQuestions(drafts.size());
+        session.setPersonaId(personaId);
+        session.setPersonaName(persona == null ? defaultPersonaName(snapshot.mode()) : persona.getName());
+        session.setPersonaTitle(persona == null ? "AI 面试主持人" : persona.getTitle());
+        session.setCreatedAt(LocalDateTime.now());
+        session.setUpdatedAt(LocalDateTime.now());
+        sessionMapper.insert(session);
+
+        for (int index = 0; index < drafts.size(); index++) {
+            QuestionDraft draft = drafts.get(index);
+            InterviewQuestion question = new InterviewQuestion();
+            question.setSessionId(session.getId());
+            question.setQuestionIndex(index + 1);
+            question.setQuestionText(draft.text());
+            question.setQuestionType(normalizeQuestionType(draft.questionType()));
+            question.setTargetSkill(draft.provenanceLabel());
+            question.setSource(sourceCode(draft.sourceType()));
+            question.setSourceReference(draft.sourceReference());
+            question.setProvenanceLabel(draft.provenanceLabel());
+            question.setCreatedAt(LocalDateTime.now());
+            questionMapper.insert(question);
+        }
+        return buildStatusResponse(session, null);
+    }
+
+    private String defaultPersonaName(String mode) {
+        return InterviewMode.KNOWLEDGE_TRAINING.name().equals(mode) ? "知识训练主持人" : "面经训练主持人";
+    }
+
+    private String normalizeQuestionType(String value) {
+        if (value == null || value.isBlank()) return "other";
+        String normalized = value.toLowerCase();
+        if (Set.of("behavioral", "technical", "situational", "background", "other").contains(normalized)) {
+            return normalized;
+        }
+        return "other";
+    }
+
+    private String sourceCode(QuestionSourceType sourceType) {
+        if (sourceType == null) return "system_defined";
+        return switch (sourceType) {
+            case AI_GENERATED -> "ai_generated";
+            case USER_MANUAL, IMPORTED_EXPERIENCE -> "manual";
+            case GENERATED_PRACTICE, SYSTEM_DEFINED -> "system_defined";
+            case AI_FOLLOW_UP -> "ai_follow_up";
+        };
+    }
+
+    /**
      * 开始面试，触发 AI 生成第一题。
      * <p>
      * 流程：READY → ASKING → 生成问题 → WAITING_ANSWER
@@ -217,8 +299,13 @@ public class InterviewService {
         sessionMapper.updateById(session);
 
         // 3. 生成第一题（AI 失败则标记 FAILED）
-        InterviewQuestion question = generateQuestion(session);
+        InterviewQuestion question = isSourceSession(session)
+                ? findQuestionEntityByIndex(session.getId(), 1)
+                : generateQuestion(session);
         if (question == null) {
+            stateMachine.markFailed(session);
+            session.setUpdatedAt(LocalDateTime.now());
+            sessionMapper.updateById(session);
             return buildStatusResponse(session, null);
         }
 
@@ -315,6 +402,10 @@ public class InterviewService {
                                 scoreMap.getOrDefault("clarity", 0),
                                 scoreMap.getOrDefault("relevance", 0),
                                 scoreMap.getOrDefault("depth", 0),
+                                scoreMap.getOrDefault("structure", 0),
+                                scoreMap.containsKey("evidence")
+                                        ? scoreMap.get("evidence")
+                                        : scoreMap.getOrDefault("accuracy", 0),
                                 scoreMap.getOrDefault("accuracy", 0)
                         )
                 );
@@ -325,7 +416,11 @@ public class InterviewService {
                     q.getQuestionText(),
                     q.getQuestionType(),
                     answer != null ? answer.getAnswerText() : "",
-                    evalSummary
+                    evalSummary,
+                    q.getSource(),
+                    q.getSourceReference(),
+                    q.getProvenanceLabel(),
+                    answer != null ? answer.getCreatedAt() : null
             ));
         }
 
@@ -411,9 +506,11 @@ public class InterviewService {
         }
 
         // 4. 评价回答（先调 AI，失败则返回重试标记）
-        InterviewEvaluation evaluation = evaluateAnswer(session, currentQuestion, answer);
+        EvaluationAttempt evaluationAttempt = evaluateAnswer(session, currentQuestion, answer);
+        InterviewEvaluation evaluation = evaluationAttempt.evaluation();
         if (evaluation == null) {
-            return buildSubmitResponse(session, null, null, false, true);
+            return buildSubmitResponse(session, null, null, false, true,
+                    evaluationAttempt.errorCategory(), evaluationAttempt.errorMessage());
         }
 
         // 5. WAITING_ANSWER → EVALUATING
@@ -531,7 +628,10 @@ public class InterviewService {
         question.setQuestionText((String) parsed.get("questionText"));
         question.setQuestionType((String) parsed.get("questionType"));
         question.setTargetSkill((String) parsed.get("targetSkill"));
-        question.setSource(null); // 预留字段，暂不使用
+        // MySQL 将 source 定义为 NOT NULL，且历史会话需要区分 AI 生成题与
+        // 知识库/面经题。此前这里写入 null，导致首题之后生成下一题时整笔
+        // 事务回滚，用户只能看到“服务内部错误”，已提交回答和评价也随之消失。
+        question.setSource("ai_generated");
         question.setCreatedAt(LocalDateTime.now());
 
         // 关联 AI 调用记录
@@ -550,9 +650,18 @@ public class InterviewService {
     /**
      * 评价回答（含重试）。
      */
-    private InterviewEvaluation evaluateAnswer(InterviewSession session,
-                                                InterviewQuestion question,
-                                                InterviewAnswer answer) {
+    private EvaluationAttempt evaluateAnswer(InterviewSession session,
+                                             InterviewQuestion question,
+                                             InterviewAnswer answer) {
+        // 回答和评价通过 answer_id 建立唯一关系。用户在网络超时、刷新或重复点击后
+        // 重试时，先复用已经落库的评价，避免再次插入触发唯一键异常并返回 500。
+        InterviewEvaluation existingEvaluation = findEvaluationByAnswerId(answer.getId());
+        if (existingEvaluation != null) {
+            log.info("复用已保存评价: sessionId={}, questionIndex={}, evaluationId={}",
+                    session.getId(), question.getQuestionIndex(), existingEvaluation.getId());
+            return EvaluationAttempt.success(existingEvaluation);
+        }
+
         Map<String, Object> jdContent = loadJdContent(session.getJobDescriptionId());
         Map<String, Object> resumeContent = loadResumeContent(session.getResumeVersionId());
         Map<String, Object> companyProfile = loadCompanyProfile(session.getJobDescriptionId());
@@ -567,14 +676,15 @@ public class InterviewService {
 
         if (!aiResult.success()) {
             log.warn("回答评价失败，可重试: sessionId={}", session.getId());
-            return null;
+            return EvaluationAttempt.failed(aiResult.errorCategory(), aiResult.errorMessage());
         }
 
         // 校验并解析 AI 输出
         Map<String, Object> parsed = parseAndValidateEvaluationOutput(aiResult);
         if (parsed == null) {
             log.warn("AI 评价输出校验失败，可重试: sessionId={}", session.getId());
-            return null;
+            return EvaluationAttempt.failed(AiErrorCategory.INVALID_JSON,
+                    "模型返回的评价格式无法识别，请重试或检查模型配置");
         }
 
         // 保存评价
@@ -598,7 +708,29 @@ public class InterviewService {
         log.info("评价已保存: sessionId={}, questionIndex={}, evaluationId={}",
                 session.getId(), question.getQuestionIndex(), evaluation.getId());
 
-        return evaluation;
+        return EvaluationAttempt.success(evaluation);
+    }
+
+    /** 根据回答 ID 查找已落库评价，支持评价请求幂等重试。 */
+    private InterviewEvaluation findEvaluationByAnswerId(Long answerId) {
+        if (answerId == null) return null;
+        QueryWrapper<InterviewEvaluation> query = new QueryWrapper<>();
+        query.eq("answer_id", answerId);
+        return evaluationMapper.selectOne(query);
+    }
+
+    private record EvaluationAttempt(InterviewEvaluation evaluation,
+                                     AiErrorCategory errorCategory,
+                                     String errorMessage) {
+        private static EvaluationAttempt success(InterviewEvaluation evaluation) {
+            return new EvaluationAttempt(evaluation, null, null);
+        }
+
+        private static EvaluationAttempt failed(AiErrorCategory category, String message) {
+            return new EvaluationAttempt(null,
+                    category == null ? AiErrorCategory.PROVIDER_ERROR : category,
+                    message == null || message.isBlank() ? "模型服务调用失败，请稍后重试" : message);
+        }
     }
 
     /**
@@ -607,7 +739,10 @@ public class InterviewService {
     private SubmitAnswerResponse handleNextQuestion(InterviewSession session,
                                                      InterviewEvaluation evaluation) {
         // 生成下一题（先调 AI，失败则直接返回，markFailed 已在 generateQuestion 中调用）
-        InterviewQuestion nextQuestion = generateQuestion(session);
+        int nextIndex = (session.getCurrentQuestionIndex() != null ? session.getCurrentQuestionIndex() : 0) + 1;
+        InterviewQuestion nextQuestion = isSourceSession(session)
+                ? findQuestionEntityByIndex(session.getId(), nextIndex)
+                : generateQuestion(session);
         if (nextQuestion == null) {
             return buildSubmitResponse(session, null, evaluation,
                     isTerminalStatus(session.getStatus()), false);
@@ -623,6 +758,13 @@ public class InterviewService {
         sessionMapper.updateById(session);
 
         return buildSubmitResponse(session, nextQuestion, evaluation, false, false);
+    }
+
+    private boolean isSourceSession(InterviewSession session) {
+        if (session == null || session.getPlanId() == null) return false;
+        InterviewPlan plan = planMapper.selectById(session.getPlanId());
+        return plan != null && (InterviewMode.KNOWLEDGE_TRAINING.name().equals(plan.getMode())
+                || InterviewMode.EXPERIENCE_SIMULATION.name().equals(plan.getMode()));
     }
 
     /**
@@ -787,7 +929,7 @@ public class InterviewService {
             }
 
             var fieldResult = outputValidator.validateRequiredFields(json,
-                    List.of("score", "strengths", "weaknesses", "suggestions", "referenceAnswer"));
+                    List.of("score", "strengths", "weaknesses", "suggestions"));
             if (!fieldResult.isValid()) {
                 log.warn("AI 评价输出缺少必填字段: requestId={}, errors={}",
                         aiResult.requestId(), fieldResult.errors());
@@ -810,9 +952,102 @@ public class InterviewService {
                 }
             }
 
-            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> parsed = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            // referenceAnswer 对知识训练/真题演练不是必需字段；缺失时归一化为空，
+            // 避免模型省略“无简历上下文”的示范回答导致整次评价失败。
+            return normalizeEvaluationPayload(parsed);
         } catch (Exception e) {
             log.warn("AI 评价输出解析失败: requestId={}", aiResult.requestId(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Provider 可能把评分返回为字符串或小数。统一保存为 1-10 的整数，
+     * 这样提交响应、历史复盘和成长趋势都使用同一份可解释数据。
+     */
+    private Map<String, Object> normalizeEvaluationPayload(Map<String, Object> parsed) {
+        Object rawScore = parsed.get("score");
+        if (!(rawScore instanceof Map<?, ?> scoreObject)) {
+            return null;
+        }
+        Map<String, Integer> score = new HashMap<>();
+        for (String key : List.of("clarity", "relevance", "depth")) {
+            Integer normalized = normalizeScoreValue(scoreObject.get(key));
+            if (normalized == null) {
+                log.warn("AI 评价输出评分字段无效: {}", key);
+                return null;
+            }
+            score.put(key, normalized);
+        }
+        // 新版五维评分与主页/复盘保持一致。旧模型仍可能只返回 accuracy，
+        // 此时将其作为 evidence 的兼容回退，并把缺失的 structure 保留为 0，
+        // 由前端按“暂无该维度数据”处理，不虚构用户能力。
+        Integer structure = normalizeScoreValue(scoreObject.get("structure"));
+        if (structure == null) structure = 0;
+        Integer evidence = normalizeScoreValue(scoreObject.get("evidence"));
+        if (evidence == null) evidence = normalizeScoreValue(scoreObject.get("accuracy"));
+        if (evidence == null) {
+            log.warn("AI 评价输出评分字段无效: evidence/accuracy");
+            return null;
+        }
+        score.put("structure", structure);
+        score.put("evidence", evidence);
+        // 保留旧字段，便于历史客户端继续读取；它与 evidence 始终保持同值。
+        score.put("accuracy", evidence);
+        parsed.put("score", score);
+
+        for (String field : List.of("strengths", "weaknesses", "suggestions")) {
+            Object value = parsed.get(field);
+            if (!(value instanceof List<?> items)) {
+                return null;
+            }
+            List<String> normalizedItems = new ArrayList<>();
+            for (Object item : items) {
+                if (!(item instanceof String text)) return null;
+                String normalized = text.trim();
+                if (!normalized.isEmpty()) normalizedItems.add(normalized);
+            }
+            parsed.put(field, normalizedItems);
+        }
+
+        Object referenceAnswer = parsed.get("referenceAnswer");
+        if (referenceAnswer == null) {
+            // 知识训练/真题演练可能没有简历上下文；空字符串表示不生成虚构参考经历。
+            parsed.put("referenceAnswer", "");
+        } else if (!(referenceAnswer instanceof String)) {
+            return null;
+        }
+        return parsed;
+    }
+
+    private Integer normalizeScoreValue(Object value) {
+        if (value == null) return null;
+        try {
+            double numeric;
+            if (value instanceof Number number) {
+                numeric = number.doubleValue();
+            } else {
+                String raw = value.toString().trim();
+                try {
+                    numeric = Double.parseDouble(raw);
+                } catch (NumberFormatException ignored) {
+                    // Models occasionally add “分” or return “8/10”. Extract only
+                    // the numeric score; the range normalization below remains the
+                    // single source of truth for persisted dimensions.
+                    Matcher matcher = Pattern.compile("(?<!\\d)(\\d+(?:\\.\\d+)?)").matcher(raw);
+                    if (!matcher.find()) return null;
+                    numeric = Double.parseDouble(matcher.group(1));
+                }
+            }
+            if (!Double.isFinite(numeric)) return null;
+            // The prompt asks for 1–10, but a few compatible models still answer
+            // with a percentage. Convert 0–100 scores to the same persisted scale
+            // instead of discarding an otherwise valid evaluation.
+            if (numeric > 10 && numeric <= 100) numeric /= 10.0;
+            int rounded = (int) Math.round(numeric);
+            return rounded >= 1 && rounded <= 10 ? rounded : null;
+        } catch (NumberFormatException exception) {
             return null;
         }
     }
@@ -860,6 +1095,9 @@ public class InterviewService {
     }
 
     private Map<String, Object> loadResumeContent(Long resumeVersionId) {
+        if (resumeVersionId == null) {
+            return Map.of();
+        }
         ResumeVersionDTO version = resumeRepository.findVersionById(resumeVersionId);
         if (version == null || version.content() == null) {
             return Map.of();
@@ -868,6 +1106,9 @@ public class InterviewService {
     }
 
     private Map<String, Object> loadJdContent(Long jdId) {
+        if (jdId == null) {
+            return Map.of();
+        }
         JobDescription jd = jobDescriptionMapper.selectById(jdId);
         if (jd == null || jd.getParsedJson() == null) {
             return Map.of();
@@ -992,6 +1233,10 @@ public class InterviewService {
                     scoreMap.getOrDefault("clarity", 0),
                     scoreMap.getOrDefault("relevance", 0),
                     scoreMap.getOrDefault("depth", 0),
+                    scoreMap.getOrDefault("structure", 0),
+                    scoreMap.containsKey("evidence")
+                            ? scoreMap.get("evidence")
+                            : scoreMap.getOrDefault("accuracy", 0),
                     scoreMap.getOrDefault("accuracy", 0)
             ));
         }
@@ -1002,7 +1247,14 @@ public class InterviewService {
     private Map<String, Integer> parseScoreJson(String scoreJson) {
         if (scoreJson == null) return Map.of();
         try {
-            return objectMapper.readValue(scoreJson, new TypeReference<Map<String, Integer>>() {});
+            Map<String, Object> raw = objectMapper.readValue(scoreJson,
+                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Integer> normalized = new HashMap<>();
+            for (Map.Entry<String, Object> entry : raw.entrySet()) {
+                Integer value = normalizeScoreValue(entry.getValue());
+                if (value != null) normalized.put(entry.getKey(), value);
+            }
+            return normalized;
         } catch (Exception e) {
             log.warn("scoreJson 解析失败", e);
             return Map.of();
@@ -1014,6 +1266,16 @@ public class InterviewService {
                                                       InterviewEvaluation evaluation,
                                                       boolean completed,
                                                       boolean retryable) {
+        return buildSubmitResponse(session, nextQuestion, evaluation, completed, retryable, null, null);
+    }
+
+    private SubmitAnswerResponse buildSubmitResponse(InterviewSession session,
+                                                      InterviewQuestion nextQuestion,
+                                                      InterviewEvaluation evaluation,
+                                                      boolean completed,
+                                                      boolean retryable,
+                                                      AiErrorCategory errorCategory,
+                                                      String errorMessage) {
         InterviewQuestionDTO nextQuestionDTO = nextQuestion != null
                 ? toQuestionDTO(nextQuestion) : null;
 
@@ -1027,7 +1289,9 @@ public class InterviewService {
                 nextQuestionDTO,
                 evalSummary,
                 completed,
-                retryable
+                retryable,
+                errorCategory == null ? null : errorCategory.name(),
+                errorMessage
         );
     }
 
@@ -1046,6 +1310,10 @@ public class InterviewService {
                         scoreMap.getOrDefault("clarity", 0),
                         scoreMap.getOrDefault("relevance", 0),
                         scoreMap.getOrDefault("depth", 0),
+                        scoreMap.getOrDefault("structure", 0),
+                        scoreMap.containsKey("evidence")
+                                ? scoreMap.get("evidence")
+                                : scoreMap.getOrDefault("accuracy", 0),
                         scoreMap.getOrDefault("accuracy", 0)
                 )
         );
@@ -1070,7 +1338,10 @@ public class InterviewService {
         return new InterviewQuestionDTO(
                 question.getQuestionIndex() != null ? question.getQuestionIndex() : 0,
                 question.getQuestionText(),
-                question.getQuestionType()
+                question.getQuestionType(),
+                question.getSource(),
+                question.getSourceReference(),
+                question.getProvenanceLabel()
         );
     }
 

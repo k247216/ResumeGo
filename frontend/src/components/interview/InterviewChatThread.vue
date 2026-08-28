@@ -17,6 +17,7 @@
             <span class="bubble-name">{{ activeSession?.personaName || '面试官' }}</span>
             <span class="bubble-question-num">第 {{ msg.questionIndex }} / {{ activeSession?.totalQuestions }} 题</span>
           </div>
+          <span v-if="msg.provenanceLabel" class="bubble-source-label"><el-icon><Document /></el-icon><span>来源：{{ msg.provenanceLabel }}</span></span>
           <div class="bubble-text">{{ msg.text }}</div>
         </div>
       </template>
@@ -24,6 +25,10 @@
       <!-- 用户消息 -->
       <template v-else-if="msg.role === 'user'">
         <div class="msg-bubble user-bubble">
+          <div class="submitted-answer-heading">
+            <span v-if="msg.questionIndex != null" class="submitted-answer-question">第 {{ msg.questionIndex }} 题 · </span>
+            你已提交的回答<span v-if="msg.submittedAt">（{{ msg.submittedAt }}）</span>
+          </div>
           <div class="bubble-text">{{ msg.text }}</div>
         </div>
         <div class="msg-avatar user-avatar">我</div>
@@ -32,6 +37,10 @@
       <!-- 发送中加载指示器 -->
       <template v-else-if="msg.role === 'sending'">
         <div class="msg-bubble user-bubble">
+          <div class="submitted-answer-heading">
+            <span v-if="msg.questionIndex != null" class="submitted-answer-question">第 {{ msg.questionIndex }} 题 · </span>
+            正在提交回答
+          </div>
           <div class="bubble-text">{{ msg.text }}</div>
         </div>
         <div class="msg-avatar user-avatar">我</div>
@@ -46,7 +55,10 @@
         <div class="evaluation-inline">
           <div class="eval-header">
             <el-icon><Trophy /></el-icon>
-            <span>本题评价</span>
+            <span>
+              <span v-if="msg.questionIndex != null" class="evaluation-question-label">第 {{ msg.questionIndex }} 题 · </span>
+              面试官评分与反馈
+            </span>
           </div>
           <div v-if="msg.evaluation.score" class="eval-overall-card">
             <span>本题综合表现</span>
@@ -54,25 +66,11 @@
             <p>{{ questionEvaluationCopy(msg.evaluation.score) }}</p>
           </div>
           <div v-if="msg.evaluation.score" class="eval-score-row">
-            <div class="eval-score-item">
-              <span>清晰度</span>
-              <el-progress :percentage="msg.evaluation.score.clarity * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
-              <strong>{{ msg.evaluation.score.clarity }}/10</strong>
-            </div>
-            <div class="eval-score-item">
-              <span>相关性</span>
-              <el-progress :percentage="msg.evaluation.score.relevance * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
-              <strong>{{ msg.evaluation.score.relevance }}/10</strong>
-            </div>
-            <div class="eval-score-item">
-              <span>深度</span>
-              <el-progress :percentage="msg.evaluation.score.depth * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
-              <strong>{{ msg.evaluation.score.depth }}/10</strong>
-            </div>
-            <div class="eval-score-item">
-              <span>准确度</span>
-              <el-progress :percentage="msg.evaluation.score.accuracy * 10" :show-text="false" :stroke-width="5" color="var(--warning)" />
-              <strong>{{ msg.evaluation.score.accuracy }}/10</strong>
+            <div v-for="item in scoreDimensions(msg.evaluation.score)" :key="item.key" class="eval-score-item" :class="{ missing: item.value == null }">
+              <span>{{ item.label }}</span>
+              <el-progress v-if="item.value != null" :percentage="item.value * 10" :show-text="false" :stroke-width="5" color="var(--brand)" />
+              <span v-else class="eval-score-missing">暂无</span>
+              <strong>{{ item.value == null ? '—' : `${item.value}/10` }}</strong>
             </div>
           </div>
           <div v-if="msg.evaluation.strengths?.length" class="eval-section">
@@ -129,7 +127,8 @@
                   <span>清晰度 {{ score.clarity }}</span>
                   <span>相关性 {{ score.relevance }}</span>
                   <span>深度 {{ score.depth }}</span>
-                  <span>准确度 {{ score.accuracy }}</span>
+                  <span>结构 {{ score.structure ?? '—' }}</span>
+                  <span>证据 {{ score.evidence ?? score.accuracy ?? '—' }}</span>
                 </div>
               </div>
             </div>
@@ -185,7 +184,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { ArrowRight, CircleCheck, Loading, RefreshRight, Trophy, Warning } from '@element-plus/icons-vue'
+import { ArrowRight, CircleCheck, Document, Loading, RefreshRight, Trophy, Warning } from '@element-plus/icons-vue'
 import {
   questionEvaluationAverage,
   questionEvaluationCopy,
@@ -198,6 +197,8 @@ export interface InterviewChatMessage {
   role: 'interviewer' | 'user' | 'sending' | 'evaluation' | 'summary'
   text?: string
   questionIndex?: number
+  provenanceLabel?: string | null
+  submittedAt?: string | null
   evaluation?: EvaluationSummary | null
 }
 
@@ -209,7 +210,7 @@ const props = defineProps<{
   summaryDescription: string
   summaryStrengths: string[]
   summarySuggestions: string[]
-  perQuestionScores: { questionIndex: number; clarity: number; relevance: number; depth: number; accuracy: number }[]
+  perQuestionScores: { questionIndex: number; clarity: number; relevance: number; depth: number; structure?: number; evidence?: number; accuracy: number }[]
   roundScoreSummary: ScoreSummary | null
   reviewMode: boolean
   actionLoading: boolean
@@ -227,18 +228,28 @@ const emit = defineEmits<{
 
 const chatMessagesRef = ref<HTMLElement | null>(null)
 
+function scoreDimensions(score: NonNullable<EvaluationSummary['score']>) {
+  const finiteOrNull = (value: number | undefined) => Number.isFinite(value) ? value! : null
+  return [
+    { key: 'clarity', label: '清晰度', value: finiteOrNull(score.clarity) },
+    { key: 'relevance', label: '相关性', value: finiteOrNull(score.relevance) },
+    { key: 'depth', label: '深度', value: finiteOrNull(score.depth) },
+    { key: 'structure', label: '回答结构', value: finiteOrNull(score.structure) },
+    { key: 'evidence', label: '证据具体性', value: finiteOrNull(score.evidence ?? score.accuracy) },
+  ]
+}
+
 function scrollToBottom() {
   nextTick(() => {
     const el = chatMessagesRef.value
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    // 房间页把消息容器设为 display: contents，以便将提交后的回答与评价
+    // 排到输入区之后；此时真正可滚动的是 chat-main 容器。
+    const scrollTarget = getComputedStyle(el).display === 'contents' ? el.parentElement : el
+    if (scrollTarget) scrollTarget.scrollTop = scrollTarget.scrollHeight
   })
 }
 
-watch(
-  () => props.messages,
-  () => scrollToBottom(),
-  { deep: true },
-)
 watch(
   () => props.actionLoading,
   (val) => {
@@ -307,6 +318,17 @@ watch(
 .bubble-question-num {
   font-size: 11px;
   color: var(--muted, #94a3b8);
+}
+
+.bubble-source-label {
+  display: inline-block;
+  margin: 2px 0 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand, #10b981) 10%, transparent);
+  color: var(--brand-strong, #087f5b);
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .bubble-text {
@@ -403,6 +425,16 @@ watch(
   color: var(--ink, #101a33);
   width: 34px;
   text-align: right;
+}
+
+.eval-score-item.missing {
+  color: var(--muted, #9aa09c);
+}
+
+.eval-score-missing {
+  grid-column: 1 / -1;
+  color: var(--muted, #9aa09c);
+  font-size: 11px;
 }
 
 .eval-section {
@@ -652,4 +684,3 @@ watch(
   overflow-y: auto;
 }
 </style>
-

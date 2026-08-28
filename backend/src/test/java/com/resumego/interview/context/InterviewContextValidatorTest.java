@@ -165,12 +165,13 @@ class InterviewContextValidatorTest {
                         LocalDateTime.now(), LocalDateTime.now())));
 
         InterviewContextSnapshot snapshot = knowledgeValidator.validate(new InterviewStartContext.KnowledgeTraining(
-                List.of(30L), "深入", 5, List.of("GC"), null));
+                List.of(30L), "深入", "案例型", 5, List.of("GC"), null));
 
         assertThat(snapshot.mode()).isEqualTo("KNOWLEDGE_TRAINING");
         assertThat(snapshot.knowledgeDocumentIds()).containsExactly(30L);
         assertThat(snapshot.knowledgeDocumentTitles()).containsExactly("JVM 笔记");
         assertThat(snapshot.difficulty()).isEqualTo("深入");
+        assertThat(snapshot.questionStyle()).isEqualTo("案例型");
         assertThat(snapshot.resumeVersionId()).isNull();
 
         assertThatThrownBy(() -> knowledgeValidator.validate(new InterviewStartContext.KnowledgeTraining(
@@ -191,6 +192,8 @@ class InterviewContextValidatorTest {
         when(questionSetRepository.findSetById(CurrentUser.DEMO_USER_ID, 40L))
                 .thenReturn(new InterviewQuestionSetRepository.QuestionSetRow(
                         40L, "腾讯面经", com.resumego.interview.QuestionSourceType.IMPORTED_EXPERIENCE, "牛客", false, null, null, null));
+        when(questionSetRepository.findQuestionTexts(40L))
+                .thenReturn(List.of("讲讲项目", "如何定位问题", "如何做技术取舍", "如何验证结果", "如何复盘", "如何处理冲突", "如何设计缓存", "如何保证一致性", "如何压测", "如何发布", "如何监控", "如何回滚"));
         when(personaMapper.selectById(1L)).thenReturn(persona(1L, "技术面试官"));
 
         InterviewContextSnapshot snapshot = experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
@@ -200,6 +203,25 @@ class InterviewContextValidatorTest {
         assertThat(snapshot.questionSetId()).isEqualTo(40L);
         assertThat(snapshot.questionSetTitle()).isEqualTo("腾讯面经");
         assertThat(snapshot.questionSetSourceType()).isEqualTo("IMPORTED_EXPERIENCE");
+        assertThat(snapshot.questionCount()).isEqualTo(5);
+
+        InterviewContextSnapshot ordered = experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
+                40L, List.of(1L), List.of(2, 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+                "适中", "END_OF_SESSION", 5, null, null));
+        assertThat(ordered.questionOrder()).containsExactly(2, 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+        assertThatThrownBy(() -> experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
+                40L, null, List.of(0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10), "适中", null, 3, null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("完整排列");
+
+        assertThatThrownBy(() -> experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
+                40L, null, null, 13, null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("只有 12 道题");
+
+        InterviewContextSnapshot defaulted = experienceValidator.validate(new InterviewStartContext.ExperienceSimulation(
+                40L, null, null, null, null, null));
+        assertThat(defaulted.questionCount()).isEqualTo(10);
 
         when(questionSetRepository.findSetById(CurrentUser.DEMO_USER_ID, 41L))
                 .thenReturn(new InterviewQuestionSetRepository.QuestionSetRow(

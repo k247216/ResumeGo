@@ -7,6 +7,7 @@ import com.resumego.ai.AiClientSelector;
 import com.resumego.ai.AiErrorCategory;
 import com.resumego.ai.AiInvocationMapper;
 import com.resumego.ai.AiInvocationService;
+import com.resumego.ai.AiRequest;
 import com.resumego.ai.AiResult;
 import com.resumego.ai.validate.AiOutputValidator;
 import com.resumego.company.CompanyProfileService;
@@ -53,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,6 +115,44 @@ class InterviewServiceTest {
               "weaknesses": ["缺少量化数据"],
               "suggestions": ["建议补充具体指标"],
               "referenceAnswer": "参考回答示例"
+            }
+            """;
+
+    private static final String EVALUATION_DECIMAL_JSON = """
+            {
+              "score": {"clarity": 8.6, "relevance": "7.4", "depth": 6.2, "accuracy": "8"},
+              "strengths": ["表达清晰"],
+              "weaknesses": ["缺少量化数据"],
+              "suggestions": ["建议补充具体指标"],
+              "referenceAnswer": "参考回答示例"
+            }
+            """;
+
+    private static final String EVALUATION_PERCENT_JSON = """
+            {
+              "score": {"clarity": "86/100", "relevance": 74, "depth": "62分", "accuracy": 80},
+              "strengths": ["表达清晰"],
+              "weaknesses": ["缺少量化数据"],
+              "suggestions": ["建议补充具体指标"]
+            }
+            """;
+
+    private static final String EVALUATION_WITHOUT_REFERENCE_JSON = """
+            {
+              "score": {"clarity": 8, "relevance": 7, "depth": 6, "accuracy": 8},
+              "strengths": ["回答结构清楚"],
+              "weaknesses": ["缺少量化结果"],
+              "suggestions": ["补充结果证据"]
+            }
+            """;
+
+    private static final String EVALUATION_FIVE_DIMENSIONS_JSON = """
+            {
+              "score": {"clarity": 8, "relevance": 7, "depth": 6, "structure": 8, "evidence": 7},
+              "strengths": ["表达清晰"],
+              "weaknesses": ["缺少量化数据"],
+              "suggestions": ["补充技术取舍"],
+              "referenceAnswer": ""
             }
             """;
 
@@ -313,7 +353,9 @@ class InterviewServiceTest {
             assertThat(response.currentQuestion().questionType()).isEqualTo("technical");
             assertThat(response.completed()).isFalse();
 
-            verify(questionMapper).insert(any(InterviewQuestion.class));
+            ArgumentCaptor<InterviewQuestion> questionCaptor = ArgumentCaptor.forClass(InterviewQuestion.class);
+            verify(questionMapper).insert(questionCaptor.capture());
+            assertThat(questionCaptor.getValue().getSource()).isEqualTo("ai_generated");
             verify(sessionMapper, atLeastOnce()).updateById(any(InterviewSession.class));
         }
 
@@ -435,6 +477,126 @@ class InterviewServiceTest {
         }
 
         @Test
+        @DisplayName("知识训练或真题演练未绑定岗位简历时仍应完成评价")
+        void shouldEvaluateSourceSessionWithoutJobOrResume() {
+            InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
+            session.setTotalQuestions(1);
+            session.setResumeVersionId(null);
+            session.setJobDescriptionId(null);
+            session.setPlanId(88L);
+            when(sessionMapper.selectById(1L)).thenReturn(session);
+            when(questionMapper.selectOne(any(QueryWrapper.class)))
+                    .thenReturn(buildQuestion(10L, 1, "Redis 如何保证缓存一致性？", "knowledge"));
+            when(questionMapper.selectList(any(QueryWrapper.class)))
+                    .thenReturn(List.of(buildQuestion(10L, 1, "Redis 如何保证缓存一致性？", "knowledge")));
+            when(answerMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
+            when(aiClient.invoke(any())).thenReturn(
+                    AiResult.success("source-eval", EVALUATION_FIVE_DIMENSIONS_JSON, 100, 50, 250),
+                    AiResult.success("source-summary", SUMMARY_JSON, 100, 50, 250));
+
+            SubmitAnswerResponse response = interviewService.submitAnswer(1L,
+                    new SubmitAnswerRequest("通过双写校验和失效策略保持一致性"));
+
+            assertThat(response.completed()).isTrue();
+            assertThat(response.retryable()).isFalse();
+            assertThat(response.evaluation()).isNotNull();
+            assertThat(response.evaluation().score().evidence()).isEqualTo(7);
+            verify(evaluationMapper).insert(any(InterviewEvaluation.class));
+        }
+
+        @Test
+        @DisplayName("模型返回小数或数字字符串时应归一化为可复盘的整数评分")
+        void shouldNormalizeProviderScoreValues() {
+            InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
+            when(sessionMapper.selectById(1L)).thenReturn(session);
+            when(questionMapper.selectOne(any(QueryWrapper.class)))
+                    .thenReturn(buildQuestion(30L, 1, "问题1", "technical"));
+            when(jobDescriptionMapper.selectById(20L)).thenReturn(buildJd());
+            when(resumeRepository.findVersionById(10L))
+                    .thenReturn(new ResumeVersionDTO(10L, 100L, null, 1, Map.of("name", "test"),
+                            null, null, LocalDateTime.now()));
+            when(aiClient.invoke(any())).thenReturn(
+                    AiResult.success("req-eval-decimal", EVALUATION_DECIMAL_JSON, 100, 50, 500),
+                    AiResult.success("req-q2", QUESTION_JSON, 100, 50, 500));
+
+            SubmitAnswerResponse response = interviewService.submitAnswer(1L,
+                    new SubmitAnswerRequest("我的回答包含真实的技术动作和结果"));
+
+            assertThat(response.evaluation()).isNotNull();
+            assertThat(response.evaluation().score().clarity()).isEqualTo(9);
+            assertThat(response.evaluation().score().relevance()).isEqualTo(7);
+            assertThat(response.evaluation().score().depth()).isEqualTo(6);
+            assertThat(response.evaluation().score().accuracy()).isEqualTo(8);
+        }
+
+        @Test
+        @DisplayName("兼容模型返回百分制或带单位的评分，仍应完成评价")
+        void shouldNormalizePercentProviderScoreValues() {
+            InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
+            when(sessionMapper.selectById(1L)).thenReturn(session);
+            when(questionMapper.selectOne(any(QueryWrapper.class)))
+                    .thenReturn(buildQuestion(30L, 1, "问题1", "technical"));
+            when(jobDescriptionMapper.selectById(20L)).thenReturn(buildJd());
+            when(resumeRepository.findVersionById(10L))
+                    .thenReturn(new ResumeVersionDTO(10L, 100L, null, 1, Map.of(), null, null, LocalDateTime.now()));
+            when(aiClient.invoke(any())).thenReturn(
+                    AiResult.success("req-eval-percent", EVALUATION_PERCENT_JSON, 100, 50, 500),
+                    AiResult.success("req-q2", QUESTION_JSON, 100, 50, 500));
+
+            SubmitAnswerResponse response = interviewService.submitAnswer(1L,
+                    new SubmitAnswerRequest("基于真实项目补充了技术动作和结果"));
+
+            assertThat(response.evaluation()).isNotNull();
+            assertThat(response.evaluation().score().clarity()).isEqualTo(9);
+            assertThat(response.evaluation().score().relevance()).isEqualTo(7);
+            assertThat(response.evaluation().score().depth()).isEqualTo(6);
+            assertThat(response.evaluation().score().accuracy()).isEqualTo(8);
+        }
+
+        @Test
+        @DisplayName("评价应返回与主页一致的五个能力维度")
+        void shouldExposeFiveHomepageDimensions() {
+            InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
+            when(sessionMapper.selectById(1L)).thenReturn(session);
+            when(questionMapper.selectOne(any(QueryWrapper.class)))
+                    .thenReturn(buildQuestion(30L, 1, "问题1", "technical"));
+            when(jobDescriptionMapper.selectById(20L)).thenReturn(buildJd());
+            when(resumeRepository.findVersionById(10L))
+                    .thenReturn(new ResumeVersionDTO(10L, 100L, null, 1, Map.of(), null, null, LocalDateTime.now()));
+            when(aiClient.invoke(any())).thenReturn(
+                    AiResult.success("req-eval-five", EVALUATION_FIVE_DIMENSIONS_JSON, 100, 50, 500),
+                    AiResult.success("req-q2", QUESTION_JSON, 100, 50, 500));
+
+            SubmitAnswerResponse response = interviewService.submitAnswer(1L,
+                    new SubmitAnswerRequest("基于真实项目补充了技术动作和结果"));
+
+            assertThat(response.evaluation()).isNotNull();
+            assertThat(response.evaluation().score().structure()).isEqualTo(8);
+            assertThat(response.evaluation().score().evidence()).isEqualTo(7);
+        }
+
+        @Test
+        @DisplayName("模型省略无关上下文字段时仍应保留评价并使用空参考回答")
+        void shouldAcceptEvaluationWithoutReferenceAnswer() {
+            InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
+            when(sessionMapper.selectById(1L)).thenReturn(session);
+            when(questionMapper.selectOne(any(QueryWrapper.class)))
+                    .thenReturn(buildQuestion(30L, 1, "问题1", "technical"));
+            when(jobDescriptionMapper.selectById(20L)).thenReturn(buildJd());
+            when(resumeRepository.findVersionById(10L))
+                    .thenReturn(new ResumeVersionDTO(10L, 100L, null, 1, Map.of(), null, null, LocalDateTime.now()));
+            when(aiClient.invoke(any())).thenReturn(
+                    AiResult.success("req-eval-no-reference", EVALUATION_WITHOUT_REFERENCE_JSON, 100, 50, 500),
+                    AiResult.success("req-q2", QUESTION_JSON, 100, 50, 500));
+
+            SubmitAnswerResponse response = interviewService.submitAnswer(1L,
+                    new SubmitAnswerRequest("基于资料的回答"));
+
+            assertThat(response.evaluation()).isNotNull();
+            assertThat(response.evaluation().referenceAnswer()).isEmpty();
+        }
+
+        @Test
         @DisplayName("AI 评价失败时返回可重试标记")
         void shouldMarkFailedWhenEvaluationFails() {
             InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
@@ -454,8 +616,38 @@ class InterviewServiceTest {
             assertThat(response.status()).isEqualTo(InterviewState.WAITING_ANSWER.name());
             assertThat(response.completed()).isFalse();
             assertThat(response.evaluation()).isNull();
+            assertThat(response.errorCode()).isEqualTo(AiErrorCategory.PROVIDER_ERROR.name());
+            assertThat(response.errorMessage()).isEqualTo("服务异常");
 
             verify(answerMapper).insert(any(InterviewAnswer.class));
+        }
+
+        @Test
+        @DisplayName("重复提交已经评价过的回答时应复用评价，避免唯一键内部错误")
+        void shouldReuseExistingEvaluationOnDuplicateSubmit() {
+            InterviewSession session = buildSession(1L, InterviewState.WAITING_ANSWER, 1);
+            session.setTotalQuestions(1);
+            InterviewQuestion question = buildQuestion(10L, 1, "问题1", "technical");
+            InterviewAnswer answer = buildAnswer(20L, 10L, "不懂");
+            InterviewEvaluation existingEvaluation = buildEvaluation(20L, 10L);
+
+            when(sessionMapper.selectById(1L)).thenReturn(session);
+            when(questionMapper.selectOne(any(QueryWrapper.class))).thenReturn(question);
+            when(answerMapper.selectOne(any(QueryWrapper.class))).thenReturn(answer);
+            when(evaluationMapper.selectOne(any(QueryWrapper.class))).thenReturn(existingEvaluation);
+            when(aiClient.invoke(any())).thenReturn(
+                    AiResult.success("req-summary", SUMMARY_JSON, 100, 50, 200));
+
+            SubmitAnswerResponse response = interviewService.submitAnswer(1L,
+                    new SubmitAnswerRequest("不懂"));
+
+            assertThat(response.evaluation()).isNotNull();
+            assertThat(response.evaluation().score().clarity()).isEqualTo(6);
+            assertThat(response.retryable()).isFalse();
+            ArgumentCaptor<AiRequest> aiRequestCaptor = ArgumentCaptor.forClass(AiRequest.class);
+            verify(aiClient).invoke(aiRequestCaptor.capture());
+            assertThat(aiRequestCaptor.getValue().featureType()).isEqualTo("interview_summary");
+            verify(evaluationMapper, never()).insert(any(InterviewEvaluation.class));
         }
 
         @Test
@@ -670,6 +862,21 @@ class InterviewServiceTest {
         a.setAnswerText(text);
         a.setCreatedAt(LocalDateTime.now());
         return a;
+    }
+
+    private InterviewEvaluation buildEvaluation(Long answerId, Long questionId) {
+        InterviewEvaluation evaluation = new InterviewEvaluation();
+        evaluation.setId(30L);
+        evaluation.setSessionId(1L);
+        evaluation.setQuestionId(questionId);
+        evaluation.setAnswerId(answerId);
+        evaluation.setScoreJson("{\"clarity\":6,\"relevance\":6,\"depth\":5,\"structure\":5,\"evidence\":4,\"accuracy\":4}");
+        evaluation.setStrengthsJson("[\"回答已提交\"]");
+        evaluation.setWeaknessesJson("[\"需要补充依据\"]");
+        evaluation.setSuggestionsJson("[\"补充一个真实例子\"]");
+        evaluation.setReferenceAnswerJson("");
+        evaluation.setCreatedAt(LocalDateTime.now());
+        return evaluation;
     }
 
     private JobDescription buildJd() {

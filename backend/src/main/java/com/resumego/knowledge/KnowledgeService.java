@@ -93,6 +93,7 @@ public class KnowledgeService {
                 doc.id(), doc.title(), doc.sourceType(), doc.processingStatus(),
                 file ? source.originalName() : null,
                 file ? KnowledgeManagedContentService.normalizeExtension(source.extension()) : null,
+                file ? source.sizeBytes() : null,
                 doc.createdAt().toString(), doc.updatedAt().toString());
     }
 
@@ -160,6 +161,7 @@ public class KnowledgeService {
                 doc.id(), doc.title(), doc.sourceType(), doc.processingStatus(),
                 source == null ? null : source.originalName(),
                 source == null ? null : KnowledgeManagedContentService.normalizeExtension(source.extension()),
+                source == null ? null : source.sizeBytes(),
                 doc.createdAt().toString(), doc.updatedAt().toString());
     }
 

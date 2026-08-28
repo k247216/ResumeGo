@@ -9,6 +9,7 @@
       :show-inspector-restore="!inspectorOpen"
       @update-query="store.setSearchQuery"
       @import-file="handleImport"
+      @show-experience-format="experienceFormatGuideOpen = true"
       @create-note="handleCreateNote"
       @restore-navigator="openNavigator"
       @restore-list="openDocumentList"
@@ -36,7 +37,7 @@
         @rename-cancel="renamingFolderId = null"
         @delete-folder="handleDeleteFolder"
         @select-tag="handleTag"
-        @new-tag="nameDialogKind = 'tag'"
+        @new-tag="openNameDialog('tag')"
         @retry-tree="store.loadCategoryTree"
       />
 
@@ -82,6 +83,10 @@
           @rename-title="handleRenameTitle"
         />
         <p v-if="selectedMetadataWarning" class="metadata-warning" data-test="note-metadata-warning">{{ selectedMetadataWarning }}</p>
+        <p v-if="selectedExperienceFormat" class="experience-format-status" :class="'format-' + selectedExperienceFormat.status" data-test="experience-format-status">
+          <strong>{{ selectedExperienceFormat.status === 'READY' ? `已识别 ${selectedExperienceFormat.questionCount} 道面经题目` : selectedExperienceFormat.status === 'PROCESSING' ? '正在等待正文提取' : '真实面经格式未识别' }}</strong>
+          <span>{{ selectedExperienceFormat.message }}</span>
+        </p>
       </div>
 
       <div v-if="inspectorOpen && store.selectedDocument" class="inspector-wrap" :class="{ 'is-overlay': inspectorOverlay }">
@@ -109,6 +114,7 @@
     </div>
 
     <KnowledgeNameDialog v-if="nameDialogKind" :kind="nameDialogKind" :submitting="nameDialogBusy" :error="store.catalogErrorMessage" @close="nameDialogKind = null" @create="handleCreateName" />
+    <KnowledgeExperienceFormatDialog v-if="experienceFormatGuideOpen" @close="experienceFormatGuideOpen = false" />
     <KnowledgeFolderDialog
       v-if="folderDialog"
       :kind="folderDialog.kind"
@@ -137,6 +143,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import KnowledgeCommandBar from '../../components/knowledge/KnowledgeCommandBar.vue'
 import KnowledgeNavigator from '../../components/knowledge/KnowledgeNavigator.vue'
 import KnowledgeDocumentList from '../../components/knowledge/KnowledgeDocumentList.vue'
@@ -145,12 +152,16 @@ import KnowledgeSourceInspector from '../../components/knowledge/KnowledgeSource
 import KnowledgeNameDialog from '../../components/knowledge/KnowledgeNameDialog.vue'
 import KnowledgeFolderDialog from '../../components/knowledge/KnowledgeFolderDialog.vue'
 import KnowledgeDeleteDialog from '../../components/knowledge/KnowledgeDeleteDialog.vue'
+import KnowledgeExperienceFormatDialog from '../../components/knowledge/KnowledgeExperienceFormatDialog.vue'
+import { previewInterviewQuestionSetFromKnowledgeDocument } from '../../api/interview'
 import { useKnowledgeStore } from '../../stores/knowledge'
-import type { KnowledgeDeletionImpact } from '../../types/knowledge'
+import type { KnowledgeCategoryNode, KnowledgeDeletionImpact } from '../../types/knowledge'
 
 const store = useKnowledgeStore()
+const route = useRoute()
 const nameDialogKind = ref<'category' | 'tag' | null>(null)
 const nameDialogBusy = ref(false)
+const experienceFormatGuideOpen = ref(false)
 const PANE_STATE_KEY = 'resumego:knowledge:pane-state'
 function readPaneState(): { navigatorCollapsed: boolean; listCollapsed: boolean; inspectorOpen: boolean } | null {
   try {
@@ -201,6 +212,8 @@ const bulkDeleting = ref(false)
 const bulkDeleteError = ref('')
 const bulkTokens = ref<Record<number, string>>({})
 const viewportWidth = ref(window.innerWidth)
+type ExperienceFormatState = { status: 'READY' | 'PROCESSING' | 'INVALID'; questionCount: number; message: string }
+const experienceFormatByDocumentId = ref<Record<number, ExperienceFormatState>>({})
 
 const hasSearch = computed(() => store.searchQuery.trim().length > 0)
 
@@ -247,6 +260,11 @@ const scopeLabel = computed(() => {
 const selectedMetadataWarning = computed(() => {
   const id = store.selectedDocumentId
   return id != null ? store.noteMetadataWarningsByDocumentId[id] ?? '' : ''
+})
+
+const selectedExperienceFormat = computed(() => {
+  const id = store.selectedDocumentId
+  return id == null ? null : experienceFormatByDocumentId.value[id] ?? null
 })
 
 const selectedContent = computed(() => {
@@ -371,6 +389,7 @@ async function handleSelectDocument(id: number) {
   if (id === store.selectedDocumentId) return
   await readingPane.value?.flushPendingSave()
   performSelectDocument(id)
+  void refreshExperienceFormat(id)
 }
 
 function performSelectDocument(id: number) {
@@ -391,6 +410,11 @@ watch(selectedContent, (content) => {
 
 function openFolderCreate(parentId: number | null) {
   folderDialog.value = { kind: 'create', id: null, name: '', parentId, excludedIds: [] }
+}
+
+function openNameDialog(kind: 'category' | 'tag') {
+  store.clearCatalogError()
+  nameDialogKind.value = kind
 }
 
 /** 行内重命名：选中文件夹名直接在树中进入可编辑状态，不再弹窗。 */
@@ -472,7 +496,8 @@ async function handleCreateName(name: string) {
 
 async function handleImport(file: File) {
   try {
-    await store.importFile(file, selectedFolderId.value)
+    const result = await store.importFile(file, selectedFolderId.value)
+    if (result?.documentId) void refreshExperienceFormat(result.documentId)
   } catch {
     // 错误在 store.importErrorMessage
   }
@@ -483,8 +508,58 @@ async function handleSaveNote(content: string) {
   if (id == null) return
   try {
     await store.saveNoteContent(id, content)
+    void refreshExperienceFormat(id)
   } catch {
     // 错误在 store.noteSaveErrorMessage
+  }
+}
+
+type CategoryRef = Pick<KnowledgeCategoryNode, 'id' | 'name' | 'parentId'>
+
+function normalizedCategoryName(category: CategoryRef) {
+  return category.name.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function documentInRealExperienceFolder(documentId: number): boolean {
+  const category = store.classificationByDocumentId[documentId]?.category as CategoryRef | null | undefined
+  if (!category) return false
+  const byId = new Map(store.categoryTree.map((item) => [item.id, item]))
+  let cursor: CategoryRef | undefined = category
+  const seen = new Set<number>()
+  while (cursor && seen.add(cursor.id)) {
+    if (normalizedCategoryName(cursor) === '真实面经') return true
+    cursor = cursor.parentId == null ? undefined : byId.get(cursor.parentId)
+  }
+  return false
+}
+
+/** 保存/导入后只做格式预览，不创建题集；题集仍在真题演练中首次选择时物化。 */
+async function refreshExperienceFormat(documentId: number) {
+  if (!documentId) return
+  if (!store.classificationByDocumentId[documentId]) {
+    await store.loadClassification(documentId).catch(() => undefined)
+  }
+  if (!documentInRealExperienceFolder(documentId)) {
+    // 文档离开“真实面经”后，不能继续显示旧的识别结果。
+    if (experienceFormatByDocumentId.value[documentId]) {
+      const next = { ...experienceFormatByDocumentId.value }
+      delete next[documentId]
+      experienceFormatByDocumentId.value = next
+    }
+    return
+  }
+  try {
+    const response = await previewInterviewQuestionSetFromKnowledgeDocument(documentId)
+    experienceFormatByDocumentId.value = {
+      ...experienceFormatByDocumentId.value,
+      [documentId]: {
+        status: response.data.status,
+        questionCount: response.data.questionCount,
+        message: response.data.message,
+      },
+    }
+  } catch {
+    // 权限或分类错误不在普通知识文档上显示面经提示。
   }
 }
 
@@ -501,6 +576,7 @@ async function handleSetCategory(categoryId: number | null) {
   if (id == null) return
   try {
     await store.setCategory(id, categoryId)
+    void refreshExperienceFormat(id)
   } catch {
     // 错误按文档隔离
   }
@@ -646,7 +722,10 @@ watch(() => store.documents.map((d) => d.id).join(','), (ids) => {
 watch(() => store.selectedDocumentId, () => {
   loadSelectedContent()
   const id = store.selectedDocumentId
-  if (id != null) void store.loadClassification(id).catch(() => undefined)
+  if (id != null) {
+    void store.loadClassification(id).catch(() => undefined)
+    void refreshExperienceFormat(id)
+  }
 })
 
 function applyResponsive() {
@@ -671,7 +750,14 @@ function applyResponsive() {
 onMounted(() => {
   applyResponsive()
   window.addEventListener('resize', applyResponsive)
-  void store.load().catch(() => undefined)
+  void store.load().then(() => {
+    const rawId = Array.isArray(route.query.documentId) ? route.query.documentId[0] : route.query.documentId
+    const documentId = Number(rawId)
+    if (Number.isInteger(documentId) && documentId > 0 && store.documents.some((document) => document.id === documentId)) {
+      store.select(documentId)
+      openInspector()
+    }
+  }).catch(() => undefined)
   void store.loadCatalog().catch(() => undefined)
   void store.loadCategoryTree().catch(() => undefined)
 })
@@ -689,4 +775,6 @@ onBeforeUnmount(() => {
 .inspector-wrap{position:relative;flex:none;align-self:stretch}
 .inspector-wrap.is-overlay{position:absolute;top:0;right:0;bottom:0;z-index:20;background:var(--surface-solid);box-shadow:-8px 0 24px rgba(0,0,0,.08)}
 .metadata-warning{margin:0 28px 10px;padding:7px 11px;border:1px solid var(--border-default);border-radius:9px;background:var(--danger-soft);color:var(--danger);font-size:12px}
+.experience-format-status{display:flex;align-items:center;gap:9px;margin:0 28px 10px;padding:7px 11px;border:1px solid var(--border-subtle);border-radius:9px;background:var(--bg-subtle);color:var(--muted);font-size:12px}
+.experience-format-status strong{color:var(--ink);font-weight:650}.experience-format-status.format-READY{border-color:color-mix(in srgb,var(--brand) 28%,var(--border-subtle));background:var(--brand-soft)}.experience-format-status.format-READY strong{color:var(--brand)}.experience-format-status.format-INVALID{border-color:color-mix(in srgb,var(--danger) 28%,var(--border-subtle));background:var(--danger-soft)}.experience-format-status.format-INVALID strong{color:var(--danger)}
 </style>

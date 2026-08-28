@@ -43,10 +43,29 @@ public class ExperienceQuestionSource implements InterviewQuestionSource {
                 : LABEL_REAL_QUESTION;
 
         List<String> questions = questionSetRepository.findQuestionTexts(snapshot.questionSetId());
+        questions = applyQuestionOrder(questions, snapshot.questionOrder());
         int limit = Math.min(count, questions.size());
         return questions.subList(0, limit).stream()
                 .map(text -> new QuestionDraft(text, "面经原题", sourceType,
                         "question_set:" + snapshot.questionSetId(), provenance))
                 .toList();
+    }
+
+    /** 面试开始时使用快照中的完整排列，历史记录不会受题集后续排序影响。 */
+    private List<String> applyQuestionOrder(List<String> questions, List<Integer> order) {
+        if (order == null || order.isEmpty()) return questions;
+        if (order.size() != questions.size()) {
+            throw new IllegalArgumentException("题目顺序与题集题数不一致");
+        }
+        boolean[] seen = new boolean[questions.size()];
+        List<String> ordered = new java.util.ArrayList<>(questions.size());
+        for (Integer index : order) {
+            if (index == null || index < 0 || index >= questions.size() || seen[index]) {
+                throw new IllegalArgumentException("题目顺序不是有效的完整排列");
+            }
+            seen[index] = true;
+            ordered.add(questions.get(index));
+        }
+        return List.copyOf(ordered);
     }
 }

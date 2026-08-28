@@ -72,13 +72,19 @@ const metaLabel = computed(() => {
 const linkedTarget = computed(() => {
   const targets = targetsStore.targets
   if (props.event.jobProjectId != null) {
-    return targets.find((target) => target.id === props.event.jobProjectId) ?? null
+    return targets.find((target) => sameNumericId(props.event.jobProjectId, target.id)) ?? null
   }
   if (props.event.jobDescriptionId != null) {
-    return targets.find((target) => target.jobDescriptionId === props.event.jobDescriptionId) ?? null
+    return targets.find((target) => sameNumericId(props.event.jobDescriptionId, target.jobDescriptionId)) ?? null
   }
   return null
 })
+
+function sameNumericId(value: unknown, expected: number | null): boolean {
+  if (value == null || expected == null) return false
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed === expected
+}
 
 function openTarget() {
   if (!linkedTarget.value) return

@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   archiveResume: vi.fn(),
   restoreResume: vi.fn(),
   renameResume: vi.fn(),
+  updateResumeVersionSummary: vi.fn(),
 }))
 const jobApi = vi.hoisted(() => ({ getJobDescription: vi.fn() }))
 const targets = vi.hoisted(() => ({
@@ -104,8 +105,8 @@ describe('ResumeLibraryView（Version Studio）', () => {
     expect(groups[0].text()).toContain('基础简历')
     expect(groups[1].text()).toContain('岗位版本')
     expect(wrapper.findAll('[data-test^="asset-row-"]')).toHaveLength(2)
-    // 岗位表达副本使用克制标记
-    expect(wrapper.get('[data-test="asset-kind-7"]').text()).toBe('岗')
+    // 基础 / 岗位版本通过上方分栏区分，不在资产行重复堆叠标签
+    expect(wrapper.find('[data-test="asset-kind-7"]').exists()).toBe(false)
   })
 
   it('列表失败可重试', async () => {
@@ -148,14 +149,14 @@ describe('ResumeLibraryView（Version Studio）', () => {
 
     // 身份栏
     expect(wrapper.get('[data-test="asset-header"]').text()).toContain('后端简历')
-    expect(wrapper.get('[data-test="asset-kind-label"]').text()).toBe('通用简历')
-    // 版本轨道按 versionNo 升序
+    expect(wrapper.get('[data-test="asset-kind-label"]').text()).toBe('基础简历')
+    // 版本轨道按 versionNo 升序；界面只保留节点与日期，不显示版本标签
     const rail = wrapper.get('[data-test="version-rail"]')
-    expect(rail.text()).toContain('V1')
-    expect(rail.text()).toContain('V2')
+    expect(rail.findAll('.node-dot')).toHaveLength(2)
+    expect(rail.findAll('.node-date')).toHaveLength(2)
     // 正文画布是真实内容
     const previewText = wrapper.get('[data-test="resume-document-preview"]').text()
-    console.log('DEBUG PREVIEW:', previewText.slice(0, 400))
+    expect(previewText.length).toBeGreaterThan(0)
     // 检查器版本信息
     expect(wrapper.get('[data-test="version-meta"]').text()).toContain('手工保存')
   })
@@ -169,8 +170,8 @@ describe('ResumeLibraryView（Version Studio）', () => {
     await wrapper.get('[data-test="rail-version-1"]').trigger('click')
     await flushPromises()
 
-    // 历史版本只读徽标出现；当前版本仍是 V9（currentVersionId 未变）
-    expect(wrapper.find('[data-test="rail-readonly-badge"]').exists()).toBe(true)
+    // 时间轴保持简洁；历史版本的只读语义在检查器操作区表达
+    expect(wrapper.find('[data-test="rail-readonly-badge"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="history-readonly-note"]').text()).toContain('只读')
     // 操作层级：历史版本不提供进入编辑台
     expect(wrapper.find('[data-test="continue-editing"]').exists()).toBe(false)
@@ -192,6 +193,9 @@ describe('ResumeLibraryView（Version Studio）', () => {
     await wrapper.get('[data-test="toggle-compare"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.get('[data-test="compare-legend"]').text()).toContain('内容已删除')
+    expect(wrapper.get('[data-test="compare-legend"]').classes()).not.toContain('muted')
+    expect(wrapper.find('[data-test="resume-document-preview"] .diff-highlight-modified').exists()).toBe(false)
     const summary = wrapper.get('[data-test="change-summary"]')
     expect(summary.text()).toContain('2 处更新')
     expect(summary.text()).toContain('个人简介')
@@ -238,7 +242,7 @@ describe('ResumeLibraryView（Version Studio）', () => {
     const wrapper = mountLibrary()
     await flushPromises()
 
-    await wrapper.get('[data-test="archive-resume"]').trigger('click')
+    await wrapper.get('[data-test="delete-resume"]').trigger('click')
     const dialog = wrapper.get('[data-test="archive-dialog"]')
     await dialog.get('[data-test="archive-confirm"]').trigger('click')
     await flushPromises()
@@ -302,5 +306,24 @@ describe('ResumeLibraryView（Version Studio）', () => {
     expect(usedBy.text()).toContain('腾讯 · Java 后端实习')
     await wrapper.get('[data-test="used-by-target"]').trigger('click')
     expect(routerPush).toHaveBeenCalledWith({ name: 'targets', query: { targetId: '5' } })
+  })
+
+  it('保存版本说明后更新检查器中的当前说明', async () => {
+    api.listResumes.mockResolvedValue({ success: true, data: [generalResume] })
+    api.getResumeVersions.mockResolvedValue({ success: true, data: [generalResume.currentVersion] })
+    api.updateResumeVersionSummary.mockResolvedValue({
+      success: true,
+      data: { ...generalResume.currentVersion, changeSummary: '补充 Redis 项目量化结果' },
+    })
+    const wrapper = mountLibrary()
+    await flushPromises()
+
+    await wrapper.get('[data-test="edit-change-summary"]').trigger('click')
+    await wrapper.get('[data-test="change-summary-input"]').setValue('补充 Redis 项目量化结果')
+    await wrapper.get('[data-test="save-change-summary"]').trigger('click')
+    await flushPromises()
+
+    expect(api.updateResumeVersionSummary).toHaveBeenCalledWith(9, '补充 Redis 项目量化结果')
+    expect(wrapper.get('[data-test="version-note"]').text()).toContain('补充 Redis 项目量化结果')
   })
 })

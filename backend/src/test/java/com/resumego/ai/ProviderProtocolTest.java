@@ -41,6 +41,27 @@ class ProviderProtocolTest {
     }
 
     @Test
+    void acceptsOpenAiCompatibleTextPartsInEvaluationResponse() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("https://provider.test/v1")
+                .defaultHeader("Authorization", "Bearer secret-key");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://provider.test/v1/chat/completions"))
+                .andRespond(withSuccess("""
+                        {"choices":[{"message":{"content":[{"type":"text","text":"{\\"score\\":8}"},{"type":"text","text":"\\n"}]}}]}
+                        """, MediaType.APPLICATION_JSON));
+        AiConfig config = new AiConfig();
+        config.setEndpoint("https://provider.test");
+        config.setModel("compatible-model");
+        config.setApiKey("secret-key");
+
+        AiResult result = new QwenMaxProvider(config, objectMapper, builder.build()).invoke(request());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.content()).isEqualTo("{\"score\":8}\n");
+        server.verify();
+    }
+
+    @Test
     void sendsAnthropicMessagesRequest() {
         RestClient.Builder builder = RestClient.builder().baseUrl("https://provider.test/v1")
                 .defaultHeader("x-api-key", "anthropic-key");

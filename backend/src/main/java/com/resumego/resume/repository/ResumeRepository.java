@@ -255,6 +255,13 @@ public class ResumeRepository {
         return id != null ? id : 0L;
     }
 
+    public void updateVersionChangeSummary(long versionId, String changeSummary) {
+        jdbcTemplate.update(
+                "UPDATE resume_versions SET change_summary = ? WHERE id = ?",
+                changeSummary, versionId
+        );
+    }
+
     public void updateCurrentVersionId(long resumeId, long versionId) {
         jdbcTemplate.update(
                 "UPDATE resumes SET current_version_id = ?, updated_at = NOW(3) WHERE id = ?",

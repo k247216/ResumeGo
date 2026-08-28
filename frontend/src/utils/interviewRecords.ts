@@ -4,9 +4,9 @@ import type { InterviewStatusResponse } from '../types/interview'
 export interface InterviewPlanContext {
   planId: string
   sessionId: number
-  resumeVersionId: number
+  resumeVersionId: number | null
   resumeLabel: string
-  jobDescriptionId: number
+  jobDescriptionId: number | null
   jobLabel: string
   personaIds: number[]
   personaNames: string[]

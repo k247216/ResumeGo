@@ -6,6 +6,7 @@ import type {
   InterviewerPersona,
   InterviewQuestionSetRequest,
   InterviewQuestionSetResponse,
+  InterviewQuestionSetSourcePreviewResponse,
   InterviewStatusResponse,
   MultiSessionSummaryRequest,
   MultiSessionSummaryResponse,
@@ -178,6 +179,24 @@ export async function listInterviewQuestionSets(): Promise<InterviewApiResponse<
 export async function getInterviewQuestionSet(id: number): Promise<InterviewApiResponse<InterviewQuestionSetResponse>> {
   const res = await apiFetch(`${QUESTION_SET_BASE}/${id}`)
   return parseResponse<InterviewQuestionSetResponse>(res, '获取面经题集失败')
+}
+
+/** 将知识库“真实面经”资料按原题登记为可练习题集。 */
+export async function createInterviewQuestionSetFromKnowledgeDocument(
+  documentId: number,
+): Promise<InterviewApiResponse<InterviewQuestionSetResponse>> {
+  const res = await apiFetch(`${QUESTION_SET_BASE}/from-knowledge-document/${documentId}`, {
+    method: 'POST',
+  })
+  return parseResponse<InterviewQuestionSetResponse>(res, '整理真实面经失败')
+}
+
+/** 无副作用预览知识库真实面经格式，不创建题集。 */
+export async function previewInterviewQuestionSetFromKnowledgeDocument(
+  documentId: number,
+): Promise<InterviewApiResponse<InterviewQuestionSetSourcePreviewResponse>> {
+  const res = await apiFetch(`${QUESTION_SET_BASE}/preview-knowledge-document/${documentId}`)
+  return parseResponse<InterviewQuestionSetSourcePreviewResponse>(res, '读取真实面经格式失败')
 }
 
 export async function createInterviewQuestionSet(

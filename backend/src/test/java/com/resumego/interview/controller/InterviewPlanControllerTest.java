@@ -36,6 +36,18 @@ class InterviewPlanControllerTest {
     }
 
     @Test
+    void shouldExposeMissingAiConfigurationWhenCreatingKnowledgePlan() {
+        when(planService.createPlan(any()))
+                .thenThrow(new IllegalStateException("尚未配置 AI 模型服务，请先在设置页添加模型服务"));
+
+        var response = controller().createPlan(request());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().message()).contains("尚未配置 AI 模型服务");
+    }
+
+    @Test
     void shouldListAndGetPlan() {
         when(planService.listMyPlans()).thenReturn(List.of(plan()));
         when(planService.getPlan(1L)).thenReturn(plan());

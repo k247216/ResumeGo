@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InterviewPlanResponse } from '../types/interview'
-import { useInterviewComposer } from './useInterviewComposer'
+import { clampQuestionCount, getQuestionCountBounds, INTERVIEW_QUESTION_LIMITS, useInterviewComposer } from './useInterviewComposer'
 import { createInterviewPlan } from '../api/interview'
 
 vi.mock('../api/interview', () => ({
@@ -128,8 +128,37 @@ describe('useInterviewComposer', () => {
     expect(composer.error.value).toBe('')
   })
 
+  it('面经模式把用户调整后的题目顺序写入开始请求', async () => {
+    vi.mocked(createInterviewPlan).mockResolvedValue({ success: true, data: plan(102) })
+    const composer = useInterviewComposer()
+    composer.switchMode('EXPERIENCE_SIMULATION')
+    composer.experienceDraft.value.questionSetId = 40
+    composer.experienceDraft.value.questionOrder = [2, 0, 1]
+
+    await composer.start(3)
+
+    expect(createInterviewPlan).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'EXPERIENCE_SIMULATION',
+      questionSetId: 40,
+      questionOrder: [2, 0, 1],
+    }))
+  })
+
   it('未选模式直接开始被拒绝', async () => {
     const composer = useInterviewComposer()
     await expect(composer.start()).rejects.toThrow('训练模式')
+  })
+
+  it('三种模式使用独立题量边界，面经上限为 30 且跟随题集实际数量', () => {
+    expect(INTERVIEW_QUESTION_LIMITS.ROLE_BASED).toEqual({ min: 5, max: 15 })
+    expect(INTERVIEW_QUESTION_LIMITS.KNOWLEDGE_TRAINING).toEqual({ min: 1, max: 20 })
+    expect(getQuestionCountBounds('EXPERIENCE_SIMULATION', 24)).toEqual({ min: 10, max: 24 })
+    expect(getQuestionCountBounds('EXPERIENCE_SIMULATION', 6)).toEqual({ min: 1, max: 6 })
+    expect(clampQuestionCount('ROLE_BASED', 3)).toBe(5)
+    expect(clampQuestionCount('ROLE_BASED', 18)).toBe(15)
+    expect(clampQuestionCount('KNOWLEDGE_TRAINING', 0)).toBe(1)
+    expect(clampQuestionCount('KNOWLEDGE_TRAINING', 25)).toBe(20)
+    expect(clampQuestionCount('EXPERIENCE_SIMULATION', 40, 24)).toBe(24)
+    expect(clampQuestionCount('EXPERIENCE_SIMULATION', 40, 48)).toBe(30)
   })
 })

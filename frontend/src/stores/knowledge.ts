@@ -292,6 +292,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
+  /** 清除上一次分类/标签目录操作的局部错误，避免新建弹层复用过期提示。 */
+  function clearCatalogError() {
+    catalogErrorMessage.value = ''
+  }
+
   function upsertCategory(category: KnowledgeCategory) {
     const index = categories.value.findIndex((c) => c.id === category.id)
     if (index >= 0) categories.value[index] = category
@@ -703,6 +708,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     importFile,
     loadContent,
     loadCatalog,
+    clearCatalogError,
     createCategory,
     createTag,
     loadCategoryTree,

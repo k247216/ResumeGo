@@ -54,6 +54,8 @@ class ResumeControllerTest {
         Long forkedSourceVersionId;
         String forkedTitle;
         String forkedContentJson;
+        Long updatedSummaryVersionId;
+        String updatedSummary;
         Long renamedResumeId;
         String renamedTitle;
         final java.util.Map<Long, java.time.LocalDateTime> archivedWrites = new java.util.HashMap<>();
@@ -181,6 +183,11 @@ class ResumeControllerTest {
                                                             List<EvidenceRefDraft> evidenceRefs) {
             // Controller 边界测试只关注入参校验和版本创建结果，证据引用同步由 ResumeServiceTest 覆盖。
         }
+
+        @Override public void updateVersionChangeSummary(long versionId, String summary) {
+            updatedSummaryVersionId = versionId;
+            updatedSummary = summary;
+        }
     }
 
     @Nested
@@ -267,6 +274,21 @@ class ResumeControllerTest {
             assertThat(v.id()).isEqualTo(12L);
             assertThat(v.versionNo()).isEqualTo(3);
             assertThat(repo.insertVersionCount).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("updateVersionSummary 边界")
+    class UpdateVersionSummary {
+
+        @Test
+        @DisplayName("保存用户填写的版本说明")
+        void updateSummary() {
+            ResumeVersionDTO updated = resumeService.updateVersionSummary(10L, "补充 Redis 项目量化结果");
+
+            assertThat(updated.id()).isEqualTo(10L);
+            assertThat(repo.updatedSummaryVersionId).isEqualTo(10L);
+            assertThat(repo.updatedSummary).isEqualTo("补充 Redis 项目量化结果");
         }
     }
 

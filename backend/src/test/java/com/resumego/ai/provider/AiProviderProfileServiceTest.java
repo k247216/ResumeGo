@@ -1,5 +1,6 @@
 package com.resumego.ai.provider;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resumego.ai.runtime.AiRuntimeRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -80,6 +81,32 @@ class AiProviderProfileServiceTest {
         verify(repository).clearDefault(1L);
         verify(repository).setDefault(1L, 4L);
         verify(registry).clearActive();
+    }
+
+    @Test
+    void keepsRuntimeWhenSavingTheAlreadyActiveDefaultProfile() {
+        AiRuntimeRegistry runtime = new AiRuntimeRegistry(new ObjectMapper());
+        AiProviderProfile active = profile(7L);
+        runtime.apply(active, "session-key");
+        AiProviderProfileService runtimeService = new AiProviderProfileService(repository, runtime, probeService);
+        when(repository.findById(1L, 7L)).thenReturn(Optional.of(active));
+
+        runtimeService.setDefault(7L);
+
+        org.assertj.core.api.Assertions.assertThat(runtime.activeRuntime()).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(runtime.activeRuntime().profileId()).isEqualTo(7L);
+    }
+
+    @Test
+    void clearsRuntimeWhenProviderConnectionFieldsChange() {
+        when(repository.findById(1L, 7L)).thenReturn(Optional.of(profile(7L)));
+        when(registry.hasKey(7L)).thenReturn(true);
+        AiProviderProfileRequest changed = new AiProviderProfileRequest(
+                "DeepSeek", "openai-compatible", "https://api.deepseek.com/v1", "deepseek-reasoner");
+
+        service.update(7L, changed);
+
+        verify(registry).clear(7L);
     }
 
     private AiProviderProfile profile(long id) {

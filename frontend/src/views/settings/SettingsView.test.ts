@@ -42,10 +42,67 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('尚未配置')
     const setup = wrapper.get('[data-test="setup-empty"]')
     expect(setup.text()).toContain('尚未配置任何服务')
-    expect(setup.text()).toContain('验证后从服务商获取模型')
+    expect(setup.find('[data-test="add-ai-service"]').text()).toContain('添加 AI 服务')
     // 空态下不出现任何已填好的模型字段
     expect(wrapper.find('input[value="DeepSeek"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="provider-model-select"]').exists()).toBe(false)
+  })
+
+  it('keeps the AI settings page focused on configuration instead of explanatory copy', async () => {
+    const wrapper = mount(SettingsView, {
+      global: { directives: { loading: () => undefined } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="settings-workspace"]').text()).not.toContain('使用路径')
+    expect(wrapper.get('[data-test="settings-workspace"]').text()).not.toContain('只在你主动调用 AI 时生效')
+  })
+
+  it('does not present a saved profile without a key as connected', async () => {
+    listAiProviders.mockResolvedValue([{
+      id: 7,
+      displayName: '本地 DeepSeek',
+      protocolType: 'openai-compatible',
+      baseUrl: 'https://api.deepseek.com/v1',
+      defaultModel: 'deepseek-chat',
+      defaultProfile: true,
+      apiKeyConfigured: false,
+      lastTestedAt: null,
+      lastTestStatus: null,
+      lastTestMessage: null,
+    }])
+    const wrapper = mount(SettingsView, { global: { directives: { loading: () => undefined } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="connected-banner"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('开发模式：密钥只保存在本地服务内存')
+  })
+
+  it('keeps the settings workspace focused on only general and AI configuration', async () => {
+    const wrapper = mount(SettingsView, {
+      global: { directives: { loading: () => undefined } },
+    })
+    await flushPromises()
+
+    expect(wrapper.findAll('.settings-nav button').map((button) => button.text())).toEqual(['常规', 'AI 配置'])
+    expect(wrapper.get('[data-test="settings-workspace"]').classes()).toContain('settings-surface')
+    expect(wrapper.get('[data-test="settings-workspace"]').classes()).toContain('settings-white')
+  })
+
+  it('offers compact provider choices in a single selection surface', async () => {
+    const wrapper = mount(SettingsView, {
+      global: { directives: { loading: () => undefined } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="add-ai-service"]').trigger('click')
+    const choices = wrapper.get('[data-test="provider-preset-grid"]').findAll('button')
+    const choiceText = choices.map((choice) => choice.text()).join(' ')
+    expect(choiceText).toContain('OpenAI')
+    expect(choiceText).toContain('Anthropic')
+    expect(choiceText).toContain('Google Gemini')
+    expect(choiceText).toContain('DeepSeek')
+    expect(wrapper.get('[data-test="provider-preset-grid"]').text()).not.toContain('选择服务商并验证 API Key')
   })
 
   it('offers the common provider presets in the connect flow', async () => {

@@ -9,6 +9,14 @@ public record InterviewQuestionSetRequest(
         String title,
         QuestionSourceType sourceType,
         String sourceNote,
+        String companyName,
+        String targetRole,
+        String companyIconKey,
         List<String> questions
 ) {
+    /** 兼容旧客户端：未提供岗位上下文元数据。 */
+    public InterviewQuestionSetRequest(String title, QuestionSourceType sourceType,
+                                       String sourceNote, List<String> questions) {
+        this(title, sourceType, sourceNote, null, null, null, questions);
+    }
 }

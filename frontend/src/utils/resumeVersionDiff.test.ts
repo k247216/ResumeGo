@@ -17,10 +17,15 @@ describe('resumeVersionDiff', () => {
 
     const changes = diffResumeContent(prev, next)
 
-    expect(changes).toContainEqual({ chapterKey: 'summary', chapterLabel: '个人简介', changeType: 'modified' })
-    expect(changes).toContainEqual({ chapterKey: 'projects', chapterLabel: '项目经历', changeType: 'modified' })
-    expect(changes).toContainEqual({ chapterKey: 'education', chapterLabel: '教育经历', changeType: 'added' })
-    expect(changes).toContainEqual({ chapterKey: 'skills', chapterLabel: '技能', changeType: 'removed' })
+    expect(changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ chapterKey: 'summary', chapterLabel: '个人简介', changeType: 'modified' }),
+      expect.objectContaining({ chapterKey: 'projects', chapterLabel: '项目经历', changeType: 'modified' }),
+      expect.objectContaining({ chapterKey: 'education', chapterLabel: '教育经历', changeType: 'added' }),
+      expect.objectContaining({ chapterKey: 'skills', chapterLabel: '技能', changeType: 'removed' }),
+    ]))
+    expect(changes.find((change) => change.chapterKey === 'summary')?.details).toEqual([
+      { value: '新简介', changeType: 'modified' },
+    ])
   })
 
   it('returns empty array when contents are equivalent', () => {

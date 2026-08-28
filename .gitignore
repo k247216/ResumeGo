@@ -27,3 +27,8 @@ outputs/
 .agent/
 .claude/
 .worktrees/
+
+# Local-only runtime and browser inspection state
+/data/
+/.playwright-cli/
+/agent-bridge/

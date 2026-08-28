@@ -41,12 +41,12 @@ describe('ResumeAssetNavigator', () => {
     expect(heads[1].text()).toContain('1')
   })
 
-  it('资产行只展示标题/时间，岗位表达用克制标记；附真实模版缩略图', () => {
+  it('资产行只展示标题/时间，分栏负责区分类型；附真实模版缩略图', () => {
     const wrapper = mountNavigator()
     const row = wrapper.get('[data-test="asset-row-2"]')
     expect(row.text()).toContain('简历 2')
     expect(row.text()).toContain('今天')
-    expect(wrapper.get('[data-test="asset-kind-2"]').text()).toBe('岗')
+    expect(wrapper.find('[data-test="asset-kind-2"]').exists()).toBe(false)
     // 真实模版微缩渲染缩略图
     expect(wrapper.findAll('.asset-thumb')).toHaveLength(2)
     expect(row.text()).not.toContain('岗位表达副本')
@@ -55,6 +55,7 @@ describe('ResumeAssetNavigator', () => {
   it('选中行使用 aria-current，点击发出 select', async () => {
     const wrapper = mountNavigator()
     expect(wrapper.get('[data-test="asset-row-1"]').attributes('aria-current')).toBe('true')
+    expect(wrapper.get('[data-test="asset-row-1"] .asset-status-dot').classes()).not.toContain('active')
     await wrapper.get('[data-test="asset-row-2"]').trigger('click')
     expect(wrapper.emitted('select')).toEqual([[2]])
   })
@@ -72,11 +73,24 @@ describe('ResumeAssetNavigator', () => {
     expect(wrapper.get('[data-test="archived-entry"]').text()).toContain('回收站')
   })
 
+  it('收藏入口不显示数字徽标但可以切换收藏筛选', async () => {
+    const wrapper = mountNavigator()
+    expect(wrapper.get('[data-test="filter-favorites"]').find('.favorite-count').exists()).toBe(false)
+    await wrapper.get('[data-test="filter-favorites"]').trigger('click')
+    expect(wrapper.emitted('update:filter')).toContainEqual(['favorites'])
+  })
+
   it('空库与失败状态诚实呈现', () => {
     const empty = mountNavigator({ items: [], loading: false, error: '' })
     expect(empty.get('[data-test="resume-library-empty"]').text()).toContain('还没有简历')
 
     const failed = mountNavigator({ items: [], loading: false, error: '读取失败' })
     expect(failed.get('[data-test="resume-library-error"]').text()).toContain('重新加载')
+  })
+
+  it('回收站有内容时提供清空入口', async () => {
+    const wrapper = mountNavigator({ items: [{ ...resume(4), archivedAt: '2026-08-26T12:00:00Z' }], filter: 'archived' })
+    await wrapper.get('[data-test="clear-trash"]').trigger('click')
+    expect(wrapper.emitted('clear-trash')).toHaveLength(1)
   })
 })

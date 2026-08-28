@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resumego.ai.AiClient;
 import com.resumego.ai.AiClientSelector;
+import com.resumego.ai.AiErrorCategory;
 import com.resumego.ai.AiRequest;
 import com.resumego.interview.InterviewMode;
 import com.resumego.interview.QuestionSourceType;
 import com.resumego.interview.context.InterviewContextSnapshot;
 import com.resumego.interview.service.InterviewPromptBuilder;
+import com.resumego.ai.validate.AiOutputValidator;
 import com.resumego.knowledge.dto.KnowledgeContentResponse;
 import com.resumego.knowledge.KnowledgeService;
 import org.slf4j.Logger;
@@ -36,15 +38,18 @@ public class KnowledgeTrainingQuestionSource implements InterviewQuestionSource 
     private final InterviewPromptBuilder promptBuilder;
     private final KnowledgeService knowledgeService;
     private final ObjectMapper objectMapper;
+    private final AiOutputValidator outputValidator;
 
     public KnowledgeTrainingQuestionSource(AiClientSelector aiClientSelector,
                                            InterviewPromptBuilder promptBuilder,
                                            KnowledgeService knowledgeService,
-                                           ObjectMapper objectMapper) {
+                                           ObjectMapper objectMapper,
+                                           AiOutputValidator outputValidator) {
         this.aiClientSelector = aiClientSelector;
         this.promptBuilder = promptBuilder;
         this.knowledgeService = knowledgeService;
         this.objectMapper = objectMapper;
+        this.outputValidator = outputValidator;
     }
 
     @Override
@@ -74,7 +79,7 @@ public class KnowledgeTrainingQuestionSource implements InterviewQuestionSource 
 
         String systemPrompt = promptBuilder.buildKnowledgeQuestionSystemPrompt();
         String userMessage = promptBuilder.buildKnowledgeQuestionUserPrompt(
-                documentContents, count, snapshot.difficulty());
+                documentContents, count, snapshot.difficulty(), snapshot.questionStyle());
 
         AiRequest request = AiRequest.builder()
                 .featureType("interview_knowledge_questions")
@@ -84,6 +89,9 @@ public class KnowledgeTrainingQuestionSource implements InterviewQuestionSource 
                 .build();
         var result = aiClientSelector.getClient().invoke(request);
         if (!result.success()) {
+            if (result.errorCategory() == AiErrorCategory.NOT_CONFIGURED) {
+                throw new IllegalStateException("尚未配置 AI 模型服务，请先在设置页添加模型服务");
+            }
             throw new IllegalStateException("知识训练题目生成失败，请稍后重试");
         }
         return parseDrafts(result.content(), snapshot.knowledgeDocumentIds());
@@ -93,7 +101,7 @@ public class KnowledgeTrainingQuestionSource implements InterviewQuestionSource 
     List<QuestionDraft> parseDrafts(String content, List<Long> selectedDocumentIds) {
         List<QuestionDraft> drafts = new ArrayList<>();
         try {
-            JsonNode root = objectMapper.readTree(content);
+            JsonNode root = objectMapper.readTree(outputValidator.extractJson(content));
             JsonNode questions = root.path("questions");
             for (JsonNode node : questions) {
                 String text = node.path("questionText").asText("");

@@ -1,68 +1,113 @@
-# ResumeGo
+# 职达 Career OS
 
-> 职达——本地优先、证据驱动的 AI 求职工作台。
+[![Release](https://img.shields.io/github/v/release/k247216/ResumeRefineHelper?display_name=tag&sort=semver)](https://github.com/k247216/ResumeRefineHelper/releases)
+[![License](https://img.shields.io/github/license/k247216/ResumeRefineHelper)](LICENSE)
+[![Vue](https://img.shields.io/badge/Vue-3-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6db33f?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Electron](https://img.shields.io/badge/Electron-37-47848f?logo=electron&logoColor=white)](https://www.electronjs.org/)
 
-ResumeGo 面向正在准备实习、校招或初级岗位的求职者。它围绕一个真实目标岗位，帮助用户整理能力证据、维护简历版本、获得可追溯的修改建议、进行模拟面试，并把反馈带回下一轮准备。
+> 一个本地优先的个人职业资产操作系统：把知识、求职管线、简历版本和面试反馈连接成下一步行动。
 
-## 当前状态
+职达（ResumeGo）不是一次性生成简历的 AI 工具。它围绕用户自己的职业事实建立长期资产，在本地管理岗位机会、知识资料、简历表达和面试训练，让每一次练习都能沉淀为下一次更好的准备。
 
-项目正在从 Web 原型重置为可长期维护的个人桌面产品。当前已经具备 Electron 最小桌面链路：应用可启动内置 Java 运行时与 H2 文件工作区，并在设置页安全配置常见模型服务。安装签名、图标、Windows 实机验证和正式发布流程仍未完成。
+## v2.0 做了什么
 
-## 产品原则
+- **Workspace 工作台**：打开软件即可看到下一场真实安排、当前目标、关联简历、最近复盘和下一步行动。
+- **Career Pipeline 求职管线**：同时维护多家公司/岗位，独立记录阶段、JD、简历版本、面试和日程。
+- **Knowledge Base 知识库**：导入和编辑本地 Markdown、PDF、TXT，支持目录、标签、搜索、预览和真实面经格式解析。
+- **Resume System 简历库**：基础简历与岗位表达分离，版本不可变、可对比、可归档，并可明确绑定求职目标。
+- **Interview Engine 面试引擎**：自由面试、知识训练、真题演练三种来源清晰的模式，保存开始时的上下文快照并生成复盘。
+- **本地 AI 配置**：支持 OpenAI 兼容协议、Anthropic Messages、Gemini，以及 DeepSeek、GLM、通义千问等常用服务。
+- **桌面运行**：Electron + 内置 Spring Boot/H2 工作区，数据默认保存在自己的电脑上。
 
-- 围绕个人职业资产组织（求职管线、简历版本、知识库、面试训练、成长反馈），不堆砌彼此割裂的功能入口。
-- 用户经历是事实来源；AI 不得编造经历、技能、数字或荣誉。
-- AI 建议必须说明依据，并由用户决定是否采纳。
-- 简历修改产生新版本，不静默覆盖原内容。
-- 简历、联系方式和面试内容默认保存在本地。
-- 即使 AI 暂时不可用，用户仍能查看、编辑、导出和删除自己的数据。
+## 产品闭环
 
-## 技术概览
+```text
+Knowledge Base
+      ↓
+职业事实与能力资产
+      ↓
+Career Pipeline → Resume Version → Interview Engine
+                                      ↓
+                               Feedback / Review
+                                      ↓
+                                 Workspace Action
+```
 
-- 前端：Vue 3、TypeScript、Vite、Element Plus
-- 后端：Java 21、Spring Boot、MyBatis-Plus、Flyway
-- 服务端兼容数据库：MySQL
-- 桌面容器：Electron
-- 桌面本地存储：H2 文件数据库
+知识资产是长期积累层；求职管线、简历版本和面试记录都保持独立。岗位切换不会偷偷切换简历，简历更新也不会改写已经完成的面试历史；面试开始时会保存当时使用的岗位、简历、资料或题集快照。
 
-桌面化采用渐进式迁移：优先复用现有 Vue 和 Spring Boot 能力，再逐步处理本地存储、进程管理、系统集成、安装包和更新。
+## 隐私和 AI 边界
 
-## 文档
+- 简历、联系方式、面试回答、知识原文和本地数据库默认不上传。
+- API Key 只通过桌面端的本地安全存储进入后端运行期，不进入普通日志、快照或导出文件。
+- AI 不编造用户经历、技能、数字或真实面经；没有足够资料时会明确提示证据不足。
+- AI 建议不会静默覆盖简历，用户可以查看依据、建议稿并决定是否采纳。
+- 没有配置 AI 时，知识整理、简历编辑、导入、导出和历史浏览仍可使用；面试启动会给出设置入口。
 
-- [当前基线](docs/architecture/baseline.md)
-- [产品定义](docs/product/product.md)
-- [产品路线图](docs/product/roadmap.md)
-- [架构说明](docs/architecture/architecture.md)
-- [开发与完成标准](docs/architecture/development.md)
-- [隐私与 AI 边界](docs/architecture/privacy-and-ai.md)
-- [关键决策](docs/decisions.md)
-- [设计 QA 记录](docs/design-qa.md)
+## 快速开始（开发）
 
-## 开发验证
-
-前端：
+环境要求：Node.js 22、JDK 21、Maven。
 
 ```bash
-cd frontend
+git clone https://github.com/k247216/ResumeRefineHelper.git
+cd ResumeRefineHelper/frontend
 npm install
-npm run build
+npm run dev
 ```
 
-后端：
-
-```bash
-cd backend
-mvn test
-```
-
-本仓库仍处于产品重置阶段。公开发布前需要完成桌面打包、隐私检查、数据迁移和安装包验证。
-
-桌面开发启动与当前平台未签名开发包：
+打开 Vite 输出的本地地址即可使用 Web 开发模式。需要完整桌面链路时：
 
 ```bash
 cd frontend
 npm run desktop:start
+```
+
+首次使用请在左侧“设置”中配置一个模型服务。密钥只保存在本机；配置完成后再进入面试房间即可调用真实回答和评价。
+
+## 验证和打包
+
+```bash
+# 前端单元测试与生产构建
+cd frontend
+npm test -- --run
+npm run build
+
+# 后端测试
+cd ../backend
+mvn test
+
+# 当前操作系统的 Electron 开发包
+cd ../frontend
 npm run desktop:pack
 ```
 
-`desktop:pack` 会构建当前操作系统对应的精简 Java 运行时。macOS 与 Windows 包需分别在对应系统构建；详细说明见 [桌面开发与打包](docs/operations/desktop-development.md)。
+打包产物写入 `output/desktop/`。macOS 与 Windows 的精简 Java 运行时不能跨平台生成，请在对应系统分别运行打包命令；Windows portable 包使用：
+
+```bash
+npm run desktop:pack:win
+```
+
+## 文档入口
+
+- [当前架构基线](docs/architecture/baseline.md)
+- [产品范围与非目标](docs/product/product.md)
+- [V2 路线图](docs/product/roadmap.md)
+- [模块架构](docs/architecture/architecture.md)
+- [隐私与 AI 规则](docs/architecture/privacy-and-ai.md)
+- [桌面开发与打包](docs/operations/desktop-development.md)
+- [关键产品决策](docs/decisions.md)
+- [界面 QA 记录](docs/design-qa.md)
+
+## 当前状态
+
+v2.0 是职达 Career OS 的产品化开发线，重点完成了求职管线、知识库、简历库、三模式面试引擎和本地桌面运行链路。语音面试、日历同步、Skill/MCP、Agent 和投递辅助属于后续阶段，不会伪装成当前已完成能力。
+
+欢迎通过 [Issue](https://github.com/k247216/ResumeRefineHelper/issues) 反馈真实使用中的问题或提出改进建议。涉及用户数据的改动，请优先说明数据归属、删除方式和离线降级行为。
+
+## 项目标签
+
+`career-os` `resume` `interview-practice` `knowledge-base` `vue3` `spring-boot` `electron` `local-first` `ai`
+
+## License
+
+项目使用 [MIT License](LICENSE)。第三方依赖各自的许可证以其发布信息为准。

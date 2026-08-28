@@ -29,6 +29,7 @@
         label="导入资料"
         @file-selected="$emit('import-file', $event)"
       />
+      <button type="button" class="bar-btn" data-test="knowledge-experience-format" @click="$emit('show-experience-format')"><el-icon><Document /></el-icon><span>面经格式</span></button>
       <button type="button" class="bar-btn" data-test="knowledge-command-create-note" @click="$emit('create-note')"><el-icon><EditPen /></el-icon><span>新建笔记</span></button>
     </div>
   </header>
@@ -36,7 +37,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { EditPen, Menu, Operation, Search, Tickets } from '@element-plus/icons-vue'
+import { Document, EditPen, Menu, Operation, Search, Tickets } from '@element-plus/icons-vue'
 import BookIcon from '../BookIcon.vue'
 import KnowledgeImportControl from './KnowledgeImportControl.vue'
 
@@ -52,6 +53,7 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'update-query', q: string): void
   (e: 'import-file', file: File): void
+  (e: 'show-experience-format'): void
   (e: 'create-note'): void
   (e: 'restore-navigator'): void
   (e: 'restore-list'): void

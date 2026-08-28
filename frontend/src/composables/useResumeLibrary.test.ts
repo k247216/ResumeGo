@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Resume } from '../types/resume'
 import { useResumeLibrary } from './useResumeLibrary'
 import { archiveResume, forkResumeVersion, listResumes, renameResume, restoreResume } from '../api/resume'
+import { resumeFavoriteStorageKey } from '../utils/resumeFavorite'
 
 vi.mock('../api/resume', () => ({
   listResumes: vi.fn(),
@@ -34,6 +35,7 @@ const expression = resume(2, { title: '腾讯岗位表达', kind: 'JOB_EXPRESSIO
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
 })
 
 /** 模拟服务端：列表数据可变，load() 每次读取当前列表 */
@@ -83,6 +85,18 @@ describe('useResumeLibrary', () => {
     lib.filter.value.keyword = '腾讯'
     expect(lib.visibleItems.value.map((item) => item.id)).toEqual([2])
     expect(vi.mocked(listResumes)).toHaveBeenCalledTimes(1)
+  })
+
+  it('收藏筛选只展示本地标记的资产，并保持服务端列表契约', async () => {
+    mockServerList([generalV2, expression])
+    localStorage.setItem(resumeFavoriteStorageKey(generalV2.id), 'true')
+    const lib = useResumeLibrary()
+    lib.filter.value.kind = 'favorites'
+    await lib.load()
+
+    expect(vi.mocked(listResumes)).toHaveBeenLastCalledWith(undefined, false)
+    expect(lib.visibleItems.value.map((item) => item.id)).toEqual([generalV2.id])
+    expect(lib.selectedResumeId.value).toBe(generalV2.id)
   })
 
   it('fork 后刷新并选中新资产', async () => {

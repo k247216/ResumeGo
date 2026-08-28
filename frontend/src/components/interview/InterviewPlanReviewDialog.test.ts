@@ -14,9 +14,9 @@ const summary: InterviewPlanReviewSummary = {
       { key: 'clarity', label: '表达清晰度', value: 7.5, color: '#3b82f6' },
       { key: 'relevance', label: '岗位相关性', value: 8, color: '#10b981' },
       { key: 'depth', label: '技术深度', value: 6.5, color: '#f59e0b' },
-      { key: 'accuracy', label: '回答准确性', value: 8, color: '#8b5cf6' },
+      { key: 'evidence', label: '证据具体性', value: 8, color: '#8b5cf6' },
     ],
-    strongest: { key: 'accuracy', label: '回答准确性', value: 8, color: '#8b5cf6' },
+    strongest: { key: 'evidence', label: '证据具体性', value: 8, color: '#8b5cf6' },
     weakest: { key: 'depth', label: '技术深度', value: 6.5, color: '#f59e0b' },
   },
   rounds: [{

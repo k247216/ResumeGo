@@ -17,7 +17,7 @@ describe('summarizeQuestionScores', () => {
     expect(summarizeQuestionScores(scores)).toMatchObject({
       average: 7.4,
       displayAverage: '7.4',
-      strongest: { key: 'accuracy', value: 8.5 },
+      strongest: { key: 'evidence', value: 8.5 },
       weakest: { key: 'depth', value: 6 },
     })
   })

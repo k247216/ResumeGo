@@ -149,7 +149,9 @@ public class ResumeService {
     @Transactional
     public ResumeDTO archiveResume(long resumeId) {
         requireExistingResume(resumeId);
-        resumeRepository.updateArchivedAt(CurrentUser.DEMO_USER_ID, resumeId, java.time.LocalDateTime.now());
+        if (resumeRepository.findArchivedAtById(CurrentUser.DEMO_USER_ID, resumeId) == null) {
+            resumeRepository.updateArchivedAt(CurrentUser.DEMO_USER_ID, resumeId, java.time.LocalDateTime.now());
+        }
         return buildResumeResponse(CurrentUser.DEMO_USER_ID, resumeId);
     }
 
@@ -262,6 +264,17 @@ public class ResumeService {
         resumeRepository.updateCurrentVersionId(resumeId, newVersionId);
 
         return resumeRepository.findVersionById(newVersionId);
+    }
+
+    @Transactional
+    public ResumeVersionDTO updateVersionSummary(long versionId, String changeSummary) {
+        ResumeVersionDTO version = resumeRepository.findVersionByIdForUser(CurrentUser.DEMO_USER_ID, versionId);
+        if (version == null) {
+            throw new IllegalArgumentException("简历版本不存在");
+        }
+        String normalized = changeSummary == null ? null : changeSummary.trim();
+        resumeRepository.updateVersionChangeSummary(versionId, normalized == null || normalized.isBlank() ? null : normalized);
+        return resumeRepository.findVersionByIdForUser(CurrentUser.DEMO_USER_ID, versionId);
     }
 
     private Map<String, Object> prepareContentWithProjectEvidence(Map<String, Object> rawContent) {

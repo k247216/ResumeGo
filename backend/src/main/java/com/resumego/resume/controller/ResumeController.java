@@ -8,6 +8,7 @@ import com.resumego.resume.dto.ResumeDTO;
 import com.resumego.resume.dto.ResumeVersionDTO;
 import com.resumego.resume.dto.UpdateResumeAssetRequest;
 import com.resumego.resume.dto.UpdateResumeTargetJobRequest;
+import com.resumego.resume.dto.UpdateResumeVersionSummaryRequest;
 import com.resumego.resume.service.ResumeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -109,6 +110,19 @@ public class ResumeController {
             return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(version));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/resume-versions/{versionId}/summary")
+    public ResponseEntity<ApiResponse<ResumeVersionDTO>> updateVersionSummary(
+            @PathVariable Long versionId,
+            @Valid @RequestBody UpdateResumeVersionSummaryRequest request) {
+        try {
+            ResumeVersionDTO version = resumeService.updateVersionSummary(
+                    versionId, request == null ? null : request.changeSummary());
+            return ResponseEntity.ok(ApiResponse.ok(version));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
         }
     }
 

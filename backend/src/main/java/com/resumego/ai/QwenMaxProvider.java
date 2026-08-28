@@ -96,18 +96,38 @@ public class QwenMaxProvider implements AiClient {
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode choices = root.get("choices");
             if (choices != null && choices.isArray() && choices.size() > 0) {
-                JsonNode message = choices.get(0).get("message");
-                if (message != null) {
-                    JsonNode content = message.get("content");
-                    if (content != null) {
-                        return content.asText();
-                    }
-                }
+                JsonNode choice = choices.get(0);
+                JsonNode message = choice.get("message");
+                JsonNode content = message == null ? null : message.get("content");
+                String text = extractContentText(content);
+                if (text != null) return text;
+                // Some OpenAI-compatible gateways still return the legacy completion
+                // shape. Supporting it keeps evaluation usable without weakening the
+                // structured-output validation that follows this transport layer.
+                JsonNode legacyText = choice.get("text");
+                if (legacyText != null && legacyText.isTextual()) return legacyText.asText();
             }
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Provider 返回格式无效", e);
         }
         throw new IllegalStateException("Provider 返回格式无效");
+    }
+
+    /**
+     * OpenAI-compatible providers may return message.content as either plain text
+     * or an array of text parts. Preserve every text part in order so a reasoning
+     * gateway cannot silently turn a valid evaluation into an empty response.
+     */
+    private String extractContentText(JsonNode content) {
+        if (content == null || content.isNull()) return null;
+        if (content.isTextual()) return content.asText();
+        if (!content.isArray()) return null;
+        StringBuilder text = new StringBuilder();
+        for (JsonNode part : content) {
+            JsonNode value = part.isTextual() ? part : part.get("text");
+            if (value != null && value.isTextual()) text.append(value.asText());
+        }
+        return text.isEmpty() ? null : text.toString();
     }
 
     /**

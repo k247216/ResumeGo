@@ -215,6 +215,9 @@ public class InterviewPromptBuilder {
             sb.append("=== 候选人简历（用于生成参考回答） ===\n");
             sb.append(toJsonString(resumeContent));
             sb.append("\n\n");
+        } else {
+            sb.append("=== 上下文限制 ===\n");
+            sb.append("本次练习没有可用的候选人简历。referenceAnswer 必须返回空字符串，不得编造用户经历；反馈只基于题目、回答和已提供的资料。\n\n");
         }
 
         appendCompanyProfile(sb, companyProfile, "回答评价");
@@ -421,7 +424,8 @@ public class InterviewPromptBuilder {
                     "clarity": "1-10 的整数，表达清晰度",
                     "relevance": "1-10 的整数，与问题和岗位要求的相关性",
                     "depth": "1-10 的整数，技术深度和思考深度",
-                    "accuracy": "1-10 的整数，事实与技术准确性"
+                    "structure": "1-10 的整数，回答结构是否完整、层次是否清楚",
+                    "evidence": "1-10 的整数，是否有具体可核实的事实、动作和结果"
                   },
                   "strengths": ["优点1", "优点2"],
                   "weaknesses": ["不足1"],
@@ -490,10 +494,21 @@ public class InterviewPromptBuilder {
 
     /** 知识训练出题用户消息：资料内容截断拼接，避免超长。 */
     public String buildKnowledgeQuestionUserPrompt(java.util.Map<Long, String> documentContents, int count, String difficulty) {
+        return buildKnowledgeQuestionUserPrompt(documentContents, count, difficulty, null);
+    }
+
+    /** 知识训练出题用户消息：提问风格作为训练节奏提示，不能改变资料来源边界。 */
+    public String buildKnowledgeQuestionUserPrompt(java.util.Map<Long, String> documentContents,
+                                                   int count,
+                                                   String difficulty,
+                                                   String questionStyle) {
         StringBuilder sb = new StringBuilder();
         sb.append("请基于以下知识资料出 ").append(count).append(" 道题");
         if (difficulty != null && !difficulty.isBlank()) {
             sb.append("，难度方向：").append(difficulty);
+        }
+        if (questionStyle != null && !questionStyle.isBlank()) {
+            sb.append("，提问风格：").append(questionStyle);
         }
         sb.append("\n");
         for (java.util.Map.Entry<Long, String> entry : documentContents.entrySet()) {

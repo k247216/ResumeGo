@@ -5,6 +5,7 @@ import com.resumego.interview.context.InterviewContextSnapshot;
 import com.resumego.interview.repository.InterviewQuestionSetRepository;
 import com.resumego.ai.AiClient;
 import com.resumego.ai.AiClientSelector;
+import com.resumego.ai.AiErrorCategory;
 import com.resumego.ai.AiResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +44,10 @@ class InterviewQuestionSourceTest {
     @BeforeEach
     void setUp() {
         experienceSource = new ExperienceQuestionSource(questionSetRepository);
-        knowledgeSource = new KnowledgeTrainingQuestionSource(aiClientSelector, new com.resumego.interview.service.InterviewPromptBuilder(new com.fasterxml.jackson.databind.ObjectMapper()), knowledgeService, new com.fasterxml.jackson.databind.ObjectMapper());
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        knowledgeSource = new KnowledgeTrainingQuestionSource(aiClientSelector,
+                new com.resumego.interview.service.InterviewPromptBuilder(mapper), knowledgeService, mapper,
+                new com.resumego.ai.validate.AiOutputValidator(mapper));
         roleSource = new RoleBasedQuestionSource();
     }
 
@@ -78,6 +82,23 @@ class InterviewQuestionSourceTest {
         });
         assertThat(drafts.get(0).text()).isEqualTo("讲讲 JVM 内存结构");
         assertThat(drafts.get(1).text()).isEqualTo("Redis 持久化");
+    }
+
+    @Test
+    @DisplayName("面经来源：使用开始时快照中的题目顺序")
+    void experienceUsesSnapshotQuestionOrder() {
+        when(questionSetRepository.findQuestionTexts(40L)).thenReturn(List.of(
+                "第一题", "第二题", "第三题"));
+
+        InterviewContextSnapshot snapshot = new InterviewContextSnapshot(
+                "1", "EXPERIENCE_SIMULATION", null, null, null, null, null, null,
+                null, null, 40L, "腾讯面经", "IMPORTED_EXPERIENCE", null, null,
+                3, null, null, null, null, null, "v1", "v1", List.of(2, 0, 1));
+
+        List<QuestionDraft> drafts = experienceSource.prepare(snapshot, 2);
+
+        assertThat(drafts).extracting(QuestionDraft::text)
+                .containsExactly("第三题", "第一题");
     }
 
     @Test
@@ -147,6 +168,24 @@ class InterviewQuestionSourceTest {
     }
 
     @Test
+    @DisplayName("知识来源：兼容模型常见的 fenced JSON 响应")
+    void knowledgeAcceptsFencedJson() {
+        when(knowledgeService.getContent(30L))
+                .thenReturn(new com.resumego.knowledge.dto.KnowledgeContentResponse(30L, "Redis 使用快照持久化。"));
+        when(aiClientSelector.getClient()).thenReturn(aiClient);
+        when(aiClient.invoke(any())).thenReturn(new AiResult(
+                "req-fenced", true,
+                "```json\n{\"questions\":[{\"questionText\":\"Redis 快照何时触发？\",\"questionType\":\"基础\",\"sourceDocumentId\":30,\"quote\":\"Redis 使用快照持久化\"}]}\n```",
+                10, 20, 5L, null, null));
+
+        List<QuestionDraft> drafts = knowledgeSource.prepare(knowledgeSnapshot(List.of(30L)), 1);
+
+        assertThat(drafts).hasSize(1);
+        assertThat(drafts.get(0).text()).contains("Redis");
+        assertThat(drafts.get(0).provenanceLabel()).isEqualTo(KnowledgeTrainingQuestionSource.LABEL_SOURCED);
+    }
+
+    @Test
     @DisplayName("知识来源：AI 失败抛出稳定错误")
     void knowledgeFailsStablyWhenAiFails() {
         when(knowledgeService.getContent(30L))
@@ -157,6 +196,22 @@ class InterviewQuestionSourceTest {
         assertThatThrownBy(() -> knowledgeSource.prepare(knowledgeSnapshot(List.of(30L)), 5))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("知识训练题目生成失败");
+    }
+
+    @Test
+    @DisplayName("知识训练未配置 AI 时返回明确的配置引导")
+    void knowledgeReportsMissingAiConfiguration() {
+        when(knowledgeService.getContent(30L))
+                .thenReturn(new com.resumego.knowledge.dto.KnowledgeContentResponse(30L, "内容"));
+        when(aiClientSelector.getClient()).thenReturn(aiClient);
+        when(aiClient.invoke(any())).thenReturn(AiResult.failure(
+                "req-not-configured", AiErrorCategory.NOT_CONFIGURED,
+                "尚未配置 AI 模型服务", 0L));
+
+        assertThatThrownBy(() -> knowledgeSource.prepare(knowledgeSnapshot(List.of(30L)), 5))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("尚未配置 AI 模型服务")
+                .hasMessageContaining("设置页");
     }
 
     @Test

@@ -60,4 +60,58 @@ describe('InterviewRoomSidebar', () => {
     expect(wrapper.emitted('back')).toHaveLength(1)
     expect(wrapper.emitted('switch-session')).toEqual([[30]])
   })
+
+  it('shows ordered interviewer rounds only for role-based rooms', () => {
+    const active = round(31, 'WAITING_ANSWER', '技术负责人')
+    const wrapper = mount(InterviewRoomSidebar, {
+      props: {
+        mode: 'ROLE_BASED',
+        activeSession: active,
+        activePersona: persona,
+        activePersonaStyle: persona.style,
+        activeModelLabel: 'deepseek-chat',
+        activeStrategyLabel: '项目追问',
+        planSessions: [round(30, 'COMPLETED', 'HR'), active],
+        activeSessionId: 31,
+        completedQuestionSteps: [1],
+        viewingHistoryIndex: null,
+        reviewMode: false,
+        actionLoading: false,
+      },
+      global: { stubs: { ElIcon: { template: '<span><slot /></span>' } } },
+    })
+
+    expect(wrapper.find('.sidebar-persona-card').exists()).toBe(false)
+    expect(wrapper.find('[data-test="interview-room-personas"]').exists()).toBe(true)
+    expect(wrapper.find('.persona-avatar').exists()).toBe(true)
+    expect(wrapper.find('.round-switch-button').exists()).toBe(false)
+    expect(wrapper.text()).toContain('技术负责人')
+    expect(wrapper.text()).toContain('HR')
+    expect(wrapper.text()).not.toContain('模型')
+  })
+
+  it('keeps knowledge rooms focused on the full progress axis without a model card', () => {
+    const wrapper = mount(InterviewRoomSidebar, {
+      props: {
+        mode: 'KNOWLEDGE_TRAINING',
+        activeSession: round(31, 'WAITING_ANSWER', '知识训练'),
+        activePersona: null,
+        activePersonaStyle: '',
+        activeModelLabel: 'deepseek-chat',
+        activeStrategyLabel: '深入',
+        planSessions: [round(31, 'WAITING_ANSWER', '知识训练')],
+        activeSessionId: 31,
+        completedQuestionSteps: [],
+        viewingHistoryIndex: null,
+        reviewMode: false,
+        actionLoading: false,
+      },
+      global: { stubs: { ElIcon: { template: '<span><slot /></span>' } } },
+    })
+
+    expect(wrapper.find('.sidebar-persona-card').exists()).toBe(false)
+    expect(wrapper.get('.sidebar-progress').text()).toContain('第 2 题')
+    expect(wrapper.find('.sidebar-runtime-meta').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('deepseek-chat')
+  })
 })

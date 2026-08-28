@@ -14,7 +14,7 @@
           放弃
         </button>
         <button class="save-button" type="button" :disabled="(!dirty && !blank) || saving" @click="$emit('save-draft')">
-          {{ saving ? '保存中...' : (blank ? '创建简历' : '保存为新版本') }}
+          {{ saving ? '保存中...' : (blank ? '创建简历' : dirty ? '保存为新版本' : '已保存') }}
         </button>
       </div>
     </header>
@@ -163,14 +163,20 @@ const activeSection = computed(() => {
 }
 
 .toolbar-actions .save-button {
-  border-color: var(--brand, #10a878);
-  background: var(--brand, #10a878);
+  border-color: #17181a;
+  background: #17181a;
   color: #fff;
 }
 
+.toolbar-actions .save-button:hover:not(:disabled) {
+  border-color: #2d2e30;
+  background: #2d2e30;
+}
+
 .toolbar-actions .save-button:disabled {
-  border-color: var(--muted, #cbd5e1);
-  background: var(--muted, #cbd5e1);
+  border-color: var(--line, #dbe3ef);
+  background: var(--surface-solid, #fff);
+  color: var(--muted, #7c8aa2);
 }
 
 .editor-focus-area {

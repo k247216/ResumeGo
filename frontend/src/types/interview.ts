@@ -25,8 +25,8 @@ export interface InterviewerPersona {
 }
 
 export interface StartInterviewRequest {
-  resumeVersionId: number
-  jobDescriptionId: number
+  resumeVersionId: number | null
+  jobDescriptionId: number | null
   questionCount: number
   personaId: number
 }
@@ -50,17 +50,23 @@ export interface KnowledgeTrainingPlanRequest {
   mode: 'KNOWLEDGE_TRAINING'
   knowledgeDocumentIds: number[]
   difficulty?: string
+  questionStyle?: string
   questionCount: number
   focusTags?: string[]
   supplement?: string
 }
+
+export type InterviewReviewMode = 'PER_QUESTION' | 'END_OF_SESSION' | 'SOURCE_ONLY'
 
 /** 面经模拟：只使用本地题集；AI 追问单独标源 */
 export interface ExperienceSimulationPlanRequest {
   mode: 'EXPERIENCE_SIMULATION'
   questionSetId: number
   personaIds?: number[]
+  /** 题集原始题目索引的用户排序；为空时沿用题集顺序。 */
+  questionOrder?: number[]
   followUpIntensity?: string
+  reviewMode?: InterviewReviewMode
   questionCount: number
   focusTags?: string[]
   supplement?: string
@@ -84,6 +90,12 @@ export interface InterviewQuestionSetResponse {
   title: string
   sourceType: QuestionSetSourceType
   sourceNote?: string | null
+  companyName?: string | null
+  targetRole?: string | null
+  companyIconKey?: string | null
+  /** 若题集由知识库真实面经资料物化而来，指向原始文档。 */
+  sourceDocumentId?: number | null
+  questionCount?: number | null
   archived: boolean
   archivedAt?: string | null
   createdAt?: string
@@ -92,10 +104,25 @@ export interface InterviewQuestionSetResponse {
   items?: InterviewQuestionSetItem[] | null
 }
 
+export type InterviewExperiencePreviewStatus = 'READY' | 'PROCESSING' | 'INVALID'
+
+export interface InterviewQuestionSetSourcePreviewResponse {
+  documentId: number
+  status: InterviewExperiencePreviewStatus
+  questionCount: number
+  message: string
+  companyName?: string | null
+  targetRole?: string | null
+  companyIconKey?: string | null
+}
+
 export interface InterviewQuestionSetRequest {
   title: string
   sourceType: QuestionSetSourceType
   sourceNote?: string
+  companyName?: string
+  targetRole?: string
+  companyIconKey?: string
   questions: string[]
 }
 
@@ -136,6 +163,10 @@ export interface InterviewQuestion {
   questionIndex: number
   questionText: string
   questionType?: string | null
+  /** ai_generated / system_defined / manual；复盘时用于区分题目来源。 */
+  source?: string | null
+  sourceReference?: string | null
+  provenanceLabel?: string | null
 }
 
 export interface PerQuestionScore {
@@ -144,6 +175,10 @@ export interface PerQuestionScore {
   clarity: number
   relevance: number
   depth: number
+  /** 新版五维评分；历史记录可能缺失。 */
+  structure?: number
+  evidence?: number
+  /** 旧版字段，使用 evidence 作为展示回退。 */
   accuracy: number
 }
 
@@ -176,6 +211,8 @@ export interface ScoreDetail {
   clarity: number
   relevance: number
   depth: number
+  structure?: number
+  evidence?: number
   accuracy: number
 }
 
@@ -188,6 +225,8 @@ export interface SubmitAnswerResponse {
   evaluation?: EvaluationSummary | null
   completed: boolean
   retryable: boolean
+  errorCode?: string | null
+  errorMessage?: string | null
 }
 
 export type InterviewApiResponse<T> = ApiResponse<T>
@@ -223,6 +262,11 @@ export interface SessionHistoryItem {
   questionType: string
   answerText: string
   evaluation: EvaluationSummary | null
+  source?: string | null
+  sourceReference?: string | null
+  provenanceLabel?: string | null
+  /** 回答落库时间，用于房间内显示用户提交时间。 */
+  submittedAt?: string | null
 }
 
 // ========== 成长趋势 ==========

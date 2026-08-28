@@ -110,7 +110,8 @@ export function useResumeEditor() {
       version = version ?? versions.value.find((item) => item.id === context.versionId) ?? versions.value[0] ?? null
       if (!version) throw new Error('该简历还没有可编辑版本')
       resumeId.value = resolvedResumeId
-      resumeTitle.value = `简历 #${resolvedResumeId}`
+      // 编辑台只展示用户可理解的岗位/姓名语义，不暴露内部资产 ID。
+      resumeTitle.value = deriveTitle(version.content)
       blank.value = false
       selectedVersionId.value = version.id
       replaceDraft(version.content)
@@ -121,16 +122,17 @@ export function useResumeEditor() {
     }
   }
 
-  async function save() {
+  async function save(changeSummary?: string) {
     if (!dirty.value || saving.value) return
     saving.value = true
     errorMessage.value = ''
+    const summary = typeof changeSummary === 'string' ? changeSummary.trim() : ''
     try {
       if (blank.value) {
         const response = await createResume({
           title: deriveTitle(draft.value),
           content: clone(draft.value),
-          changeSummary: '创建本地简历初始版本',
+          ...(summary ? { changeSummary: summary } : {}),
           targetJobDescriptionId: null,
         })
         resumeId.value = response.data.id
@@ -142,7 +144,7 @@ export function useResumeEditor() {
         if (!resumeId.value) throw new Error('缺少简历标识，无法保存')
         const response = await createResumeVersion(resumeId.value, {
           content: clone(draft.value),
-          changeSummary: `人工编辑：基于 ${versionLabel.value} 保存`,
+          ...(summary ? { changeSummary: summary } : {}),
         })
         versions.value = (await getResumeVersions(resumeId.value)).data
         selectedVersionId.value = response.data.id

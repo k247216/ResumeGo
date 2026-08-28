@@ -114,3 +114,14 @@ export async function createResumeVersion(
   return parseResponse<ResumeVersion>(res, '保存简历新版本失败')
 }
 
+export async function updateResumeVersionSummary(
+  versionId: number,
+  changeSummary: string,
+): Promise<ApiResponse<ResumeVersion>> {
+  const res = await apiFetch(`${VERSION_BASE}/${versionId}/summary`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ changeSummary }),
+  })
+  return parseResponse<ResumeVersion>(res, '更新版本说明失败')
+}

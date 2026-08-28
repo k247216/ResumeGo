@@ -6,11 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import KnowledgeLibraryView from './KnowledgeLibraryView.vue'
 
+vi.mock('vue-router', () => ({
+  useRoute: vi.fn(() => reactive({ query: {} })),
+}))
+
 vi.mock('../../stores/knowledge', () => ({ useKnowledgeStore: vi.fn() }))
 vi.mock('../../api/knowledgeDesktop', () => ({
   openKnowledgeSource: vi.fn().mockResolvedValue({ ok: true }),
   revealKnowledgeSource: vi.fn().mockResolvedValue({ ok: true }),
 }))
+const interviewApi = vi.hoisted(() => ({ previewInterviewQuestionSetFromKnowledgeDocument: vi.fn() }))
+vi.mock('../../api/interview', () => interviewApi)
 
 import { useKnowledgeStore } from '../../stores/knowledge'
 
@@ -74,6 +80,7 @@ function storeStub(overrides: Record<string, unknown> = {}) {
     importFile: vi.fn().mockResolvedValue(undefined),
     loadContent: vi.fn().mockResolvedValue(undefined),
     loadCatalog: vi.fn().mockResolvedValue(undefined),
+    clearCatalogError: vi.fn(),
     createCategory: vi.fn().mockResolvedValue(undefined),
     createTag: vi.fn().mockResolvedValue(undefined),
     loadCategoryTree: vi.fn().mockResolvedValue(undefined),
@@ -142,8 +149,45 @@ describe('KnowledgeLibraryView', () => {
     expect(wrapper.find('[data-test="stub-navigator"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="stub-list"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="knowledge-command-search"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="knowledge-experience-format"]').exists()).toBe(true)
     // ReadingPane 未 stub → 真实渲染
     expect(wrapper.find('[data-test="knowledge-reading-pane"]').exists()).toBe(true)
+  })
+
+  it('opens the real-interview format guide from the knowledge command bar', async () => {
+    const wrapper = mountView(storeStub())
+    await flushPromises()
+    await wrapper.get('[data-test="knowledge-experience-format"]').trigger('click')
+    expect(wrapper.find('[data-test="knowledge-experience-format-dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="knowledge-experience-format-template"]').text()).toContain('company:')
+  })
+
+  it('shows the parsed question count after a real-interview document is refreshed', async () => {
+    interviewApi.previewInterviewQuestionSetFromKnowledgeDocument.mockResolvedValue({
+      success: true,
+      data: { documentId: 2, status: 'READY', questionCount: 3, message: '已按真实面经格式识别，选择真题演练后即可使用' },
+    })
+    const store = storeStub({
+      classificationByDocumentId: {
+        2: { category: { id: 5, name: '真实面经', parentId: null }, tags: [] },
+      },
+      categoryTree: [{ id: 5, name: '真实面经', parentId: null }],
+    })
+    const wrapper = mountView(store)
+    await flushPromises()
+    store.selectedDocumentId = 2
+    await flushPromises()
+    expect(wrapper.get('[data-test="experience-format-status"]').text()).toContain('已识别 3 道面经题目')
+  })
+
+  it('opens the document requested by the knowledge route query', async () => {
+    const route = await import('vue-router')
+    vi.mocked(route.useRoute).mockReturnValue(reactive({ query: { documentId: '2' } }) as never)
+    const store = storeStub()
+    const wrapper = mountView(store)
+    await flushPromises()
+    expect(store.select).toHaveBeenCalledWith(2)
+    expect(wrapper.find('[data-test="stub-inspector"]').exists()).toBe(true)
   })
 
   it('searches from the command bar and shows results scope', async () => {

@@ -32,6 +32,11 @@ class InterviewQuestionSetServiceTest {
         return new InterviewQuestionSetRequest(title, type, note, questions);
     }
 
+    private InterviewQuestionSetRequest request(String title, QuestionSourceType type, String note,
+                                                String company, String role, String icon, List<String> questions) {
+        return new InterviewQuestionSetRequest(title, type, note, company, role, icon, questions);
+    }
+
     @Test
     @DisplayName("创建题集：返回有序题目详情")
     void shouldCreateSetWithOrderedQuestions() {
@@ -45,6 +50,19 @@ class InterviewQuestionSetServiceTest {
                 .containsExactly(0, 1);
         assertThat(response.items()).extracting(InterviewQuestionSetResponse.QuestionItem::questionText)
                 .containsExactly("讲讲 JVM", "Redis 持久化");
+    }
+
+    @Test
+    @DisplayName("创建题集：保留公司、岗位和图标元数据")
+    void shouldRoundTripQuestionSetContextMetadata() {
+        InterviewQuestionSetResponse response = service.create(request(
+                "腾讯面经", QuestionSourceType.IMPORTED_EXPERIENCE, "用户整理",
+                "腾讯", "Java 后端实习", "tencent", List.of("讲讲 JVM")));
+
+        assertThat(response.companyName()).isEqualTo("腾讯");
+        assertThat(response.targetRole()).isEqualTo("Java 后端实习");
+        assertThat(response.companyIconKey()).isEqualTo("tencent");
+        assertThat(response.questionCount()).isEqualTo(1);
     }
 
     @Test
@@ -149,15 +167,24 @@ class InterviewQuestionSetServiceTest {
             QuestionSetRow base = rows.get(id);
             LocalDateTime archivedAt = archivedAtBySet.get(id);
             return new QuestionSetRow(base.id(), base.title(), base.sourceType(), base.sourceNote(),
+                    base.companyName(), base.targetRole(), base.companyIconKey(), base.questionCount(),
                     archivedAt != null, archivedAt, base.createdAt(), base.updatedAt());
         }
 
         @Override
         public long createSet(long userId, String title, QuestionSourceType sourceType,
                               String sourceNote, List<String> questions) {
+            return createSet(userId, title, sourceType, sourceNote, null, null, null, questions);
+        }
+
+        @Override
+        public long createSet(long userId, String title, QuestionSourceType sourceType,
+                              String sourceNote, String companyName, String targetRole,
+                              String companyIconKey, List<String> questions) {
             createCalls++;
             long id = nextId++;
-            rows.put(id, new QuestionSetRow(id, title, sourceType, sourceNote, false,
+            rows.put(id, new QuestionSetRow(id, title, sourceType, sourceNote,
+                    companyName, targetRole, companyIconKey, questions.size(), false,
                     null, LocalDateTime.now(), LocalDateTime.now()));
             items.put(id, new java.util.ArrayList<>(questions));
             return id;
@@ -184,9 +211,17 @@ class InterviewQuestionSetServiceTest {
         @Override
         public void replaceSet(long userId, long setId, String title, QuestionSourceType sourceType,
                                String sourceNote, List<String> questions) {
+            replaceSet(userId, setId, title, sourceType, sourceNote, null, null, null, questions);
+        }
+
+        @Override
+        public void replaceSet(long userId, long setId, String title, QuestionSourceType sourceType,
+                               String sourceNote, String companyName, String targetRole,
+                               String companyIconKey, List<String> questions) {
             replacedSetId = setId;
             QuestionSetRow base = rows.get(setId);
-            rows.put(setId, new QuestionSetRow(setId, title, sourceType, sourceNote, base.archived(),
+            rows.put(setId, new QuestionSetRow(setId, title, sourceType, sourceNote,
+                    companyName, targetRole, companyIconKey, questions.size(), base.archived(),
                     base.archivedAt(), base.createdAt(), LocalDateTime.now()));
             items.put(setId, new java.util.ArrayList<>(questions));
         }

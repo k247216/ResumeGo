@@ -11,6 +11,7 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -44,10 +45,14 @@ public class AiProviderProfileService {
     }
 
     public AiProviderProfileResponse update(long id, AiProviderProfileRequest input) {
-        getEntity(id);
+        AiProviderProfile existing = getEntity(id);
         AiProviderProfileRequest request = normalize(input);
         repository.update(CurrentUser.DEMO_USER_ID, id, request);
-        if (registry.hasKey(id)) registry.clear(id);
+        // Keep the in-memory key when only presentation data changes. If the
+        // endpoint/protocol/model changes, the old client must not be reused.
+        if (registry.hasKey(id) && connectionFieldsChanged(existing, request)) {
+            registry.clear(id);
+        }
         return response(getEntity(id));
     }
 
@@ -56,10 +61,19 @@ public class AiProviderProfileService {
         getEntity(id);
         // A default switch must never leave the previous provider active. The caller may
         // explicitly load the new profile's key after this transaction completes.
-        registry.clearActive();
+        AiRuntimeRegistry.ActiveRuntime active = registry.activeRuntime();
+        if (active == null || active.profileId() != id) {
+            registry.clearActive();
+        }
         repository.clearDefault(CurrentUser.DEMO_USER_ID);
         repository.setDefault(CurrentUser.DEMO_USER_ID, id);
         return response(getEntity(id));
+    }
+
+    private boolean connectionFieldsChanged(AiProviderProfile existing, AiProviderProfileRequest request) {
+        return !Objects.equals(existing.protocolType(), request.protocolType())
+                || !Objects.equals(existing.baseUrl(), request.baseUrl())
+                || !Objects.equals(existing.defaultModel(), request.defaultModel());
     }
 
     public void delete(long id) {

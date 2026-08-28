@@ -59,10 +59,25 @@ class InterviewModeRepositoryTest {
         assertThat(meta).isNotNull();
         assertThat(meta.title()).isEqualTo("腾讯面经");
         assertThat(meta.sourceType()).isEqualTo(QuestionSourceType.IMPORTED_EXPERIENCE);
+        assertThat(meta.companyName()).isNull();
+        assertThat(meta.questionCount()).isEqualTo(3);
 
         List<String> questions = repository.findQuestionTexts(setId);
         assertThat(questions).containsExactly("讲讲 JVM 内存结构", "Redis 持久化机制", "MySQL 索引下推");
         assertThat(repository.findQuestionTexts(setId)).isEqualTo(questions);
+    }
+
+    @Test
+    void questionSetStoresContextMetadataAndCount() {
+        long setId = repository.createSet(
+                1L, "腾讯技术一面", QuestionSourceType.IMPORTED_EXPERIENCE, "用户手动整理",
+                "腾讯", "Java 后端实习", "tencent", List.of("题一", "题二"));
+
+        InterviewQuestionSetRepository.QuestionSetRow row = repository.findSetById(1L, setId);
+        assertThat(row.companyName()).isEqualTo("腾讯");
+        assertThat(row.targetRole()).isEqualTo("Java 后端实习");
+        assertThat(row.companyIconKey()).isEqualTo("tencent");
+        assertThat(row.questionCount()).isEqualTo(2);
     }
 
     @Test

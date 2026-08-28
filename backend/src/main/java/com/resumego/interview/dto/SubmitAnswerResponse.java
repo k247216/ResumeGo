@@ -13,7 +13,10 @@ public record SubmitAnswerResponse(
         InterviewQuestionDTO nextQuestion,
         EvaluationSummary evaluation,
         boolean completed,
-        boolean retryable
+        boolean retryable,
+        /** AI 失败或输出校验失败时供前端展示的可理解错误（成功时为空）。 */
+        String errorCode,
+        String errorMessage
 ) {
     /**
      * 评价摘要（提交回答后返回）。
@@ -32,8 +35,13 @@ public record SubmitAnswerResponse(
                 int clarity,
                 int relevance,
                 int depth,
+                int structure,
+                int evidence,
                 int accuracy
         ) {
+            public ScoreDetail(int clarity, int relevance, int depth, int accuracy) {
+                this(clarity, relevance, depth, 0, accuracy, accuracy);
+            }
         }
     }
 }

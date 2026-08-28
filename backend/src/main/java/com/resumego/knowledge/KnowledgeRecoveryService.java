@@ -300,6 +300,7 @@ public class KnowledgeRecoveryService {
                 : KnowledgeManagedContentService.normalizeExtension(source.extension());
         return new KnowledgeDocumentResponse(doc.id(), doc.title(), doc.sourceType(),
                 doc.processingStatus(), source == null ? null : source.originalName(), extension,
+                source == null ? null : source.sizeBytes(),
                 doc.createdAt().toString(), doc.updatedAt().toString());
     }
 

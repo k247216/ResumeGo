@@ -40,6 +40,10 @@ public class InterviewPlanController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.fail("请求参数无效，请检查输入"));
+        } catch (IllegalStateException e) {
+            // AI 未配置或题目来源不可用时，保留可行动的提示给前端配置引导。
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.fail(e.getMessage()));
         }
     }
 

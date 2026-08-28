@@ -350,6 +350,7 @@ public class KnowledgeRepository {
             rs.getString("source_type"),
             rs.getString("processing_status"),
             rs.getString("source_file"),
+            rs.getObject("size_bytes") == null ? null : rs.getLong("size_bytes"),
             rs.getTimestamp("created_at").toLocalDateTime().toString(),
             rs.getTimestamp("updated_at").toLocalDateTime().toString(),
             rs.getString("matched_field"),
@@ -558,6 +559,7 @@ public class KnowledgeRepository {
     public List<KnowledgeSearchRow> search(long userId, String pattern, java.util.Collection<Long> categoryIds, Long tagId) {
         StringBuilder sql = new StringBuilder("""
                 SELECT d.id, d.title, d.source_type, d.processing_status, sf.original_name AS source_file,
+                       sf.size_bytes,
                        d.created_at, d.updated_at,
                        CASE WHEN LOWER(d.title) LIKE LOWER(?) ESCAPE '!' THEN 'TITLE' ELSE 'CONTENT' END AS matched_field,
                        c.content

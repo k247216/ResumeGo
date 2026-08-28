@@ -34,10 +34,20 @@ public sealed interface InterviewStartContext permits
     record KnowledgeTraining(
             List<Long> knowledgeDocumentIds,
             String difficulty,
+            String questionStyle,
             Integer questionCount,
             List<String> focusTags,
             String supplement
     ) implements InterviewStartContext {
+        /** 兼容旧调用方：未配置提问风格时保持 null。 */
+        public KnowledgeTraining(List<Long> knowledgeDocumentIds,
+                                 String difficulty,
+                                 Integer questionCount,
+                                 List<String> focusTags,
+                                 String supplement) {
+            this(knowledgeDocumentIds, difficulty, null, questionCount, focusTags, supplement);
+        }
+
         @Override
         public InterviewMode mode() {
             return InterviewMode.KNOWLEDGE_TRAINING;
@@ -48,11 +58,23 @@ public sealed interface InterviewStartContext permits
     record ExperienceSimulation(
             Long questionSetId,
             List<Long> personaIds,
+            List<Integer> questionOrder,
             String followUpIntensity,
+            String reviewMode,
             Integer questionCount,
             List<String> focusTags,
             String supplement
     ) implements InterviewStartContext {
+        /** 兼容旧调用方：未配置答题回顾方式时保持 null。 */
+        public ExperienceSimulation(Long questionSetId,
+                                    List<Long> personaIds,
+                                    String followUpIntensity,
+                                    Integer questionCount,
+                                    List<String> focusTags,
+                                    String supplement) {
+            this(questionSetId, personaIds, null, followUpIntensity, null, questionCount, focusTags, supplement);
+        }
+
         @Override
         public InterviewMode mode() {
             return InterviewMode.EXPERIENCE_SIMULATION;

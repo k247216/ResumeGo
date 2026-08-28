@@ -3,6 +3,7 @@ package com.resumego.interview.controller;
 import com.resumego.common.ApiResponse;
 import com.resumego.interview.dto.InterviewQuestionSetRequest;
 import com.resumego.interview.dto.InterviewQuestionSetResponse;
+import com.resumego.interview.dto.InterviewQuestionSetSourcePreviewResponse;
 import com.resumego.interview.service.InterviewQuestionSetService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,41 @@ public class InterviewQuestionSetController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<InterviewQuestionSetResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.ok(questionSetService.list()));
+    }
+
+    /** 将“真实面经”知识库资料按原题登记为可练习题集。 */
+    @PostMapping("/from-knowledge-document/{documentId}")
+    public ResponseEntity<ApiResponse<InterviewQuestionSetResponse>> createFromKnowledgeDocument(
+            @PathVariable Long documentId) {
+        if (documentId == null || documentId <= 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("知识文档 ID 必须为正数"));
+        }
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(ApiResponse.ok(questionSetService.createFromKnowledgeDocument(documentId)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    /** 预览知识库面经格式；无副作用，不会创建题集。 */
+    @GetMapping("/preview-knowledge-document/{documentId}")
+    public ResponseEntity<ApiResponse<InterviewQuestionSetSourcePreviewResponse>> previewKnowledgeDocument(
+            @PathVariable Long documentId) {
+        if (documentId == null || documentId <= 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("知识文档 ID 必须为正数"));
+        }
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(questionSetService.previewKnowledgeDocument(documentId)));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+        }
     }
 
     @GetMapping("/{setId}")

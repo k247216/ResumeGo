@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.mockito.ArgumentCaptor;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -144,6 +146,11 @@ class InterviewPlanServiceTest {
                         && session.getPlanId().equals(100L)
                         && session.getRoundOrder().equals(2)
         ));
+
+        ArgumentCaptor<InterviewPlan> savedPlan = ArgumentCaptor.forClass(InterviewPlan.class);
+        verify(planMapper).insert(savedPlan.capture());
+        assertThat(savedPlan.getValue().getPersonaPlanJson())
+                .isEqualTo("[{\"personaId\":1,\"personaName\":\"技术面试官\"},{\"personaId\":2,\"personaName\":\"HR 面试官\"}]");
     }
 
     @Test

@@ -322,6 +322,12 @@ public class MockAiClient implements AiClient {
         int relevanceScore = clampScore(relevance + dimensionOffset(normalized, "relevance"), evidenceCap);
         int depthScore = clampScore(depth + dimensionOffset(normalized, "depth") + (metricSignals > 0 ? 1 : 0), evidenceCap);
         int accuracyScore = clampScore(accuracy + dimensionOffset(normalized, "accuracy"), evidenceCap);
+        int structureScore = clampScore(
+                3 + Math.min(4, structureSignals / 2) + Math.min(2, ownershipSignals / 2)
+                        - Math.min(2, vagueSignals / 2), evidenceCap);
+        int evidenceScore = clampScore(
+                3 + Math.min(4, metricSignals) + Math.min(2, ownershipSignals)
+                        + Math.min(1, actionSignals / 3) - Math.min(2, vagueSignals / 2), evidenceCap);
 
         if (clarityScore == 8 && relevanceScore == 7 && depthScore == 6 && accuracyScore == 8) {
             depthScore = Math.max(1, depthScore - 1);
@@ -331,7 +337,9 @@ public class MockAiClient implements AiClient {
                 "clarity", clarityScore,
                 "relevance", relevanceScore,
                 "depth", depthScore,
-                "accuracy", accuracyScore
+                "structure", structureScore,
+                "evidence", evidenceScore,
+                "accuracy", evidenceScore
         );
     }
 

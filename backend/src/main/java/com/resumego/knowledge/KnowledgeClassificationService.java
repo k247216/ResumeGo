@@ -389,6 +389,33 @@ public class KnowledgeClassificationService {
                 tags.stream().map(this::toTagResponse).toList());
     }
 
+    /**
+     * 判断当前用户的文档是否位于指定名称的分类及其后代分类中。
+     * 分类名称只用于产品边界校验（例如“真实面经”），不跨用户查询，也不把
+     * 文档标题或正文当作分类依据。
+     */
+    public boolean isDocumentUnderCategoryNamed(long documentId, String categoryName) {
+        KnowledgeDocumentClassificationResponse classification = getDocumentClassification(documentId);
+        if (classification.category() == null || categoryName == null || categoryName.isBlank()) {
+            return false;
+        }
+        String expected = categoryName.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        Map<Long, KnowledgeCategory> categories = repository.listCategories(userId()).stream()
+                .collect(java.util.stream.Collectors.toMap(KnowledgeCategory::id, category -> category));
+        Long cursor = classification.category().id();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        while (cursor != null && seen.add(cursor)) {
+            KnowledgeCategory category = categories.get(cursor);
+            if (category == null) return false;
+            String normalized = category.normalizedName() == null
+                    ? category.name().trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT)
+                    : category.normalizedName();
+            if (expected.equals(normalized)) return true;
+            cursor = category.parentId();
+        }
+        return false;
+    }
+
     // ---- search ----
 
     /**
@@ -431,7 +458,7 @@ public class KnowledgeClassificationService {
         String lowerQuery = query.toLowerCase(Locale.ROOT);
         KnowledgeDocumentResponse document = new KnowledgeDocumentResponse(
                 row.documentId(), row.title(), row.sourceType(), row.processingStatus(), row.sourceFile(),
-                rowExtension(row), row.createdAt(), row.updatedAt());
+                rowExtension(row), row.sizeBytes(), row.createdAt(), row.updatedAt());
         if ("CONTENT".equals(row.matchedField()) && row.content() != null) {
             int hit = indexOfIgnoreCase(row.content(), lowerQuery);
             if (hit >= 0) {

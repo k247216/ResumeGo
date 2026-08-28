@@ -9,7 +9,7 @@ describe('InterviewModePicker', () => {
     expect(wrapper.findAll('[data-test^="mode-"]')).toHaveLength(3)
     expect(wrapper.get('[data-test="mode-ROLE_BASED"]').text()).toContain('岗位模拟')
     expect(wrapper.get('[data-test="mode-KNOWLEDGE_TRAINING"]').text()).toContain('知识训练')
-    expect(wrapper.get('[data-test="mode-EXPERIENCE_SIMULATION"]').text()).toContain('面经模拟')
+    expect(wrapper.get('[data-test="mode-EXPERIENCE_SIMULATION"]').text()).toContain('真题演练')
     const text = wrapper.text()
     expect(text).not.toContain('规划中')
     expect(text).not.toContain('敬请期待')

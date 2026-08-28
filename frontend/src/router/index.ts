@@ -40,6 +40,7 @@ const router = createRouter({
       path: '/interview',
       name: 'interview',
       component: () => import('../views/InterviewView.vue'),
+      meta: { fill: true },
     },
     {
       path: '/settings',

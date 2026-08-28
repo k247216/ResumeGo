@@ -83,7 +83,7 @@ class InterviewControllerTest {
     @DisplayName("提交回答成功与失败时应返回统一协议结构")
     void shouldMapSubmitAnswerResponses() {
         SubmitAnswerResponse answer = new SubmitAnswerResponse(1L, "WAITING_ANSWER", 1, 3,
-                null, null, false, false);
+                null, null, false, false, null, null);
         when(interviewService.submitAnswer(any(), any())).thenReturn(answer);
         assertThat(controller().submitAnswer(1L, new SubmitAnswerRequest("回答")).getStatusCode())
                 .isEqualTo(HttpStatus.OK);

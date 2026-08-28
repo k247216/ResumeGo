@@ -20,7 +20,10 @@ import com.resumego.interview.entity.InterviewerPersona;
 import com.resumego.interview.mapper.InterviewPlanMapper;
 import com.resumego.interview.mapper.InterviewSessionMapper;
 import com.resumego.interview.mapper.InterviewerPersonaMapper;
+import com.resumego.interview.source.InterviewQuestionSource;
+import com.resumego.interview.source.QuestionDraft;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +50,8 @@ public class InterviewPlanService {
     private final InterviewService interviewService;
     private final InterviewGrowthService growthService;
     private final List<InterviewContextValidator> contextValidators;
+    @Autowired(required = false)
+    private List<InterviewQuestionSource> questionSources = List.of();
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -63,8 +68,10 @@ public class InterviewPlanService {
         plan.setResumeVersionId(snapshot.resumeVersionId());
         plan.setJobDescriptionId(snapshot.jobDescriptionId());
         plan.setTitle("多轮模拟面试");
-        plan.setQuestionCount(request.questionCount() != null ? request.questionCount() : 5);
-        plan.setPersonaPlanJson(writeJson(personaPlan(context.mode(), snapshot)));
+        plan.setQuestionCount(snapshot.questionCount() != null
+                ? snapshot.questionCount()
+                : defaultQuestionCount(context.mode()));
+        plan.setPersonaPlanJson(writeJson(personaPlan(snapshot)));
         plan.setFocusTagsJson(writeJson(request.focusTags() != null ? request.focusTags() : List.of()));
         plan.setSupplementText(request.supplement());
         plan.setCreatedAt(now);
@@ -87,13 +94,23 @@ public class InterviewPlanService {
                 rounds.add(toRound(created, personaId, roundOrder));
             }
         }
-        // 知识训练与面经模式的轮次创建在问题来源适配器就绪后进行（Task 3），计划先落库并携带快照。
+        if (context.mode() != InterviewMode.ROLE_BASED) {
+            InterviewQuestionSource source = questionSources.stream()
+                    .filter(candidate -> candidate.supports(context.mode()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("没有可用的面试题目来源: " + context.mode()));
+            List<QuestionDraft> drafts = source.prepare(snapshot, plan.getQuestionCount());
+            InterviewStatusResponse created = interviewService.createSourceInterview(plan, snapshot, drafts);
+            bindSessionToPlan(created.sessionId(), plan.getId(), 1);
+            rounds.add(toRound(created, snapshot.personaIds() == null || snapshot.personaIds().isEmpty()
+                    ? null : snapshot.personaIds().get(0), 1));
+        }
 
         return buildResponse(plan, rounds);
     }
 
-    private Map<String, Object> personaPlan(InterviewMode mode, InterviewContextSnapshot snapshot) {
-        // 快照已包含 persona 顺序；persona_plan_json 保持既有结构以兼容现有读取方
+    private List<Map<String, Object>> personaPlan(InterviewContextSnapshot snapshot) {
+        // 数据库约束要求 persona_plan_json 为数组；每个元素保留创建时的人设顺序快照。
         List<Map<String, Object>> plan = new ArrayList<>();
         if (snapshot.personaIds() != null) {
             for (int index = 0; index < snapshot.personaIds().size(); index++) {
@@ -105,7 +122,14 @@ public class InterviewPlanService {
                 plan.add(row);
             }
         }
-        return Map.of("personas", plan);
+        return plan;
+    }
+
+    private int defaultQuestionCount(InterviewMode mode) {
+        return switch (mode) {
+            case ROLE_BASED, KNOWLEDGE_TRAINING -> 5;
+            case EXPERIENCE_SIMULATION -> 10;
+        };
     }
 
     private InterviewContextSnapshot validateContext(InterviewStartContext context) {

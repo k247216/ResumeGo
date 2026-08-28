@@ -106,7 +106,20 @@ async function restoreBackup(backupId: string) {
 }
 const hasProfiles = computed(() => profiles.value.length > 0)
 const selected = computed(() => profiles.value.find((profile) => profile.id === selectedId.value) ?? null)
-const active = computed(() => profiles.value.find((profile) => profile.defaultProfile) ?? null)
+// “默认”只是展示顺序，不代表当前运行期一定可调用。桌面端重启后密钥会
+// 重新从安全存储装载，浏览器端则可能把密钥装载到另一个 profile；设置页和
+// 面试房间必须使用同一套优先级，避免列表显示“待输入密钥”但实际已有可用模型。
+const active = computed(() => profiles.value.find((profile) => profile.defaultProfile && profile.apiKeyConfigured)
+  ?? profiles.value.find((profile) => profile.apiKeyConfigured)
+  ?? profiles.value.find((profile) => profile.defaultProfile)
+  ?? profiles.value[0]
+  ?? null)
+const providerStatus = computed(() => {
+  if (!active.value) return { label: '未配置', tone: 'idle' }
+  if (!active.value.apiKeyConfigured) return { label: '待输入密钥', tone: 'idle' }
+  if (active.value.lastTestStatus === 'failed') return { label: '连接异常', tone: 'warning' }
+  return { label: '可用', tone: 'ready' }
+})
 const form = reactive({
   displayName: '',
   protocolType: 'openai-compatible' as AiProtocol,
@@ -114,6 +127,12 @@ const form = reactive({
   defaultModel: '',
   apiKey: '',
 })
+
+function protocolLabel(protocol: AiProtocol | undefined): string {
+  if (protocol === 'anthropic') return 'Anthropic Messages'
+  if (protocol === 'gemini') return 'Google Gemini'
+  return 'OpenAI 兼容'
+}
 
 function choosePreset(id: string) {
   const preset = aiProviderPresets.find((item) => item.id === id)
@@ -155,7 +174,8 @@ function cancelAdd() {
 function editProfile(profile: AiProviderProfile) {
   selectedId.value = profile.id
   addingNew.value = false
-  connected.value = true
+  // 未装载密钥时必须停留在配置态，不能把“已保存配置”误显示成可调用。
+  connected.value = profile.apiKeyConfigured
   showAdvanced.value = false
   form.displayName = profile.displayName
   form.protocolType = profile.protocolType
@@ -176,7 +196,11 @@ async function loadProfiles() {
         })))
       : loaded
     if (profiles.value.length && selectedId.value === null && !addingNew.value) {
-      editProfile(profiles.value[0]!)
+      const preferred = profiles.value.find((profile) => profile.defaultProfile && profile.apiKeyConfigured)
+        ?? profiles.value.find((profile) => profile.apiKeyConfigured)
+        ?? profiles.value.find((profile) => profile.defaultProfile)
+        ?? profiles.value[0]
+      editProfile(preferred!)
     }
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '读取模型配置失败')
@@ -212,15 +236,18 @@ async function save() {
       ? await updateAiProvider(selectedId.value, input)
       : await createAiProvider(input)
     profile = await setDefaultAiProvider(profile.id)
+    let runtimeConfigured = profile.apiKeyConfigured
     if (form.apiKey.trim()) {
       if (window.resumeGoDesktop) await window.resumeGoDesktop.saveApiKey(profile.id, form.apiKey)
       else await applyWebSessionKey(profile.id, form.apiKey)
+      runtimeConfigured = true
     } else if (window.resumeGoDesktop && selectedId.value) {
       await window.resumeGoDesktop.applyApiKey(profile.id)
+      runtimeConfigured = true
     }
     selectedId.value = profile.id
     addingNew.value = false
-    connected.value = true
+    connected.value = runtimeConfigured
     form.apiKey = ''
     await loadProfiles()
     ElMessage.success('模型配置已保存并设为默认')
@@ -338,8 +365,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="settings-view">
-    <PageHeader eyebrow="本地设置" title="设备与模型服务" subtitle="简历与求职目标保存在本机；AI 仅在你主动使用功能时调用所选服务。">
+  <section class="settings-view settings-surface settings-white" data-test="settings-workspace">
+    <PageHeader eyebrow="本地设置" title="设置">
       <template #actions>
         <div class="runtime-badge"><span></span>{{ isDesktop ? '桌面安全模式' : 'Web 开发模式' }}</div>
       </template>
@@ -348,7 +375,7 @@ onMounted(async () => {
     <div class="settings-body">
       <nav class="settings-nav">
         <button type="button" :class="{ selected: activeSection === 'general' }" @click="activeSection = 'general'">常规</button>
-        <button type="button" :class="{ selected: activeSection === 'ai' }" @click="activeSection = 'ai'">AI 模型服务</button>
+        <button type="button" :class="{ selected: activeSection === 'ai' }" @click="activeSection = 'ai'">AI 配置</button>
       </nav>
 
       <main class="settings-content">
@@ -401,12 +428,12 @@ onMounted(async () => {
         <section v-show="activeSection === 'ai'" class="ai-section">
           <div class="ai-head">
             <div>
-              <p class="eyebrow">AI 模型</p>
-              <h2>使用你自己的 API</h2>
+              <p class="eyebrow">AI 服务</p>
+              <h2>API 配置</h2>
             </div>
-            <span :class="['provider-state', active?.apiKeyConfigured ? 'ready' : '']">
-              <template v-if="active?.apiKeyConfigured"><i class="connected-dot" aria-hidden="true"></i>{{ active.displayName }} 可用</template>
-              <template v-else>尚未配置</template>
+            <span :class="['provider-state', providerStatus.tone]">
+              <i v-if="providerStatus.tone !== 'idle'" class="connected-dot" aria-hidden="true"></i>
+              {{ active ? `${active.displayName} · ${providerStatus.label}` : providerStatus.label }}
             </span>
           </div>
 
@@ -415,7 +442,6 @@ onMounted(async () => {
             <div v-if="!addingNew" class="setup-empty" data-test="setup-empty">
               <div class="setup-copy">
                 <strong>尚未配置任何服务</strong>
-                <p>AI 功能只会在你主动使用时调用已配置的服务。你只需要一个兼容 OpenAI、Anthropic 或 Gemini 的 API 服务商：填入服务商与 API Key，验证后从服务商获取模型即可开始。</p>
               </div>
               <button type="button" class="setup-add" data-test="add-ai-service" @click="startAdd">＋ 添加 AI 服务</button>
             </div>
@@ -423,13 +449,22 @@ onMounted(async () => {
             <div v-else class="provider-form connect-form" data-test="connect-form">
               <!-- 第 1 步：服务商 + API Key + 验证 -->
               <div v-if="!connected" class="connect-step">
-                <p class="step-label">第 1 步 · 选择服务商并验证 API Key</p>
-                <label>服务商
-                  <select :value="presetId" @change="choosePreset(($event.target as HTMLSelectElement).value)">
+                <div class="provider-picker-field">
+                  <span class="field-label">服务商</span>
+                  <div class="provider-preset-grid" data-test="provider-preset-grid">
+                    <button
+                      v-for="preset in aiProviderPresets" :key="preset.id" type="button"
+                      :class="['preset-option', { selected: presetId === preset.id }]"
+                      @click="choosePreset(preset.id)"
+                    >
+                      <strong>{{ preset.label }}</strong><small>{{ protocolLabel(preset.protocolType) }}</small>
+                    </button>
+                  </div>
+                  <select class="provider-native-select" :value="presetId" aria-label="服务商" tabindex="-1" @change="choosePreset(($event.target as HTMLSelectElement).value)">
                     <option value="" disabled>选择服务商</option>
                     <option v-for="preset in aiProviderPresets" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
                   </select>
-                </label>
+                </div>
                 <label>配置名称<input v-model="form.displayName" maxlength="80" placeholder="例如：我的 DeepSeek" /></label>
                 <label>API Key
                   <input v-model="form.apiKey" type="password" autocomplete="off" placeholder="粘贴 API Key" />
@@ -469,7 +504,7 @@ onMounted(async () => {
                     :disabled="fetchingModels" @click="verifyAndContinue"
                   >{{ fetchingModels ? '验证中…' : '验证并继续' }}</button>
                   <template v-else>
-                    <button type="button" :disabled="fetchingModels" @click="verifyAndContinue">{{ fetchingModels ? '验证中…' : '重新验证' }}</button>
+                    <button type="button" class="primary" :disabled="fetchingModels" @click="verifyAndContinue">{{ fetchingModels ? '验证中…' : '重新验证' }}</button>
                     <button type="button" class="primary" data-test="save-config" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存配置' }}</button>
                   </template>
                 </div>
@@ -542,13 +577,22 @@ onMounted(async () => {
               <template v-if="addingNew">
                 <!-- 第 1 步：服务商 + API Key + 验证 -->
                 <div v-if="!connected" class="connect-step">
-                  <p class="step-label">第 1 步 · 选择服务商并验证 API Key</p>
-                  <label>服务商
-                    <select :value="presetId" @change="choosePreset(($event.target as HTMLSelectElement).value)">
+                  <div class="provider-picker-field">
+                    <span class="field-label">服务商</span>
+                    <div class="provider-preset-grid" data-test="provider-preset-grid">
+                      <button
+                        v-for="preset in aiProviderPresets" :key="preset.id" type="button"
+                        :class="['preset-option', { selected: presetId === preset.id }]"
+                        @click="choosePreset(preset.id)"
+                      >
+                        <strong>{{ preset.label }}</strong><small>{{ protocolLabel(preset.protocolType) }}</small>
+                      </button>
+                    </div>
+                    <select class="provider-native-select" :value="presetId" aria-label="服务商" tabindex="-1" @change="choosePreset(($event.target as HTMLSelectElement).value)">
                       <option value="" disabled>选择服务商</option>
                       <option v-for="preset in aiProviderPresets" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
                     </select>
-                  </label>
+                  </div>
                   <label>配置名称<input v-model="form.displayName" maxlength="80" placeholder="例如：我的 DeepSeek" /></label>
                   <label>API Key
                     <input v-model="form.apiKey" type="password" autocomplete="off" placeholder="粘贴 API Key" />
@@ -588,7 +632,7 @@ onMounted(async () => {
                       :disabled="fetchingModels" @click="verifyAndContinue"
                     >{{ fetchingModels ? '验证中…' : '验证并继续' }}</button>
                     <template v-else>
-                      <button type="button" :disabled="fetchingModels" @click="verifyAndContinue">{{ fetchingModels ? '验证中…' : '重新验证' }}</button>
+                      <button type="button" class="primary" :disabled="fetchingModels" @click="verifyAndContinue">{{ fetchingModels ? '验证中…' : '重新验证' }}</button>
                       <button type="button" class="primary" data-test="save-config" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存配置' }}</button>
                     </template>
                   </div>
@@ -702,17 +746,23 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.settings-view{display:flex;flex-direction:column;height:100%;min-height:0}
-.settings-body{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr);border-top:1px solid var(--border-subtle)}
+.settings-view{display:flex;flex-direction:column;height:100%;min-height:0;background:var(--surface-solid);border:1px solid var(--border-subtle);border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(20,24,22,.03)}
+.settings-view :deep(.page-header){padding-left:18px;padding-right:18px}
+.settings-white{background:#fff;color:#111}
+.settings-white .settings-body,.settings-white .settings-content{background:#fff}
+.settings-white .settings-nav{background:#fff}
+.settings-white .settings-nav button{color:#555}
+.settings-white .settings-nav button.selected{background:#f3f3f1;color:#111}
+.settings-body{flex:1;min-height:0;display:grid;grid-template-columns:176px minmax(0,1fr);border-top:1px solid var(--border-subtle);background:var(--surface-solid)}
 
 /* ── 左列：节导航 ── */
-.settings-nav{min-height:0;overflow-y:auto;border-right:1px solid var(--border-subtle);padding:14px 12px 24px}
+.settings-nav{min-height:0;overflow-y:auto;border-right:1px solid var(--border-subtle);padding:18px 12px 24px;background:var(--bg-subtle)}
 .settings-nav button{display:block;width:100%;text-align:left;border:0;border-radius:var(--radius-control);background:transparent;color:var(--copy);padding:10px 12px;font-size:13px;font-weight:500;cursor:pointer}
 .settings-nav button:hover{background:var(--bg-hover)}
 .settings-nav button.selected{background:var(--bg-selected);color:var(--brand);font-weight:600}
 
 /* ── 右列：内容 ── */
-.settings-content{min-height:0;overflow-y:auto;padding:22px 30px 48px}
+.settings-content{min-height:0;overflow-y:auto;padding:26px 34px 48px;background:var(--surface-solid)}
 .section-title{margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--muted)}
 .general-section{padding:0 4px;max-width:760px}
 .flat-row{display:flex;align-items:baseline;gap:14px;padding:15px 2px}
@@ -744,6 +794,7 @@ onMounted(async () => {
 .ai-head h2{margin:5px 0 0;font-size:22px;font-weight:650;letter-spacing:-.02em;color:var(--ink)}
 .provider-state{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;font-weight:600}
 .provider-state.ready{color:var(--brand)}
+.provider-state.warning{color:var(--danger)}
 
 .connected-dot{flex:0 0 auto;display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand)}
 
@@ -753,14 +804,24 @@ onMounted(async () => {
 .setup-copy{display:grid;gap:6px}
 .setup-copy strong{color:var(--ink);font-size:15px;font-weight:650}
 .setup-copy p{margin:0;color:var(--muted);font-size:13px;line-height:1.65}
-.setup-add{justify-self:start;padding:10px 18px;border:0;border-radius:var(--radius-control);background:var(--brand);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
-.setup-add:hover{background:var(--accent-hover)}
+.setup-add{justify-self:start;padding:10px 18px;border:0;border-radius:var(--radius-control);background:#111;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.setup-add:hover{background:#2b2b2b}
 
 /* ── 连接引导表单 ── */
-.connect-form{max-width:560px;padding:6px 0 0}
+.connect-form{max-width:680px;padding:6px 0 0}
 .connect-step{display:grid;gap:15px}
 .step-label{margin:0;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em}
 .connected-banner{display:inline-flex;align-items:center;gap:8px;justify-self:start;padding:9px 13px;border-radius:var(--radius-control);background:var(--accent-soft);color:var(--brand);font-size:13px;font-weight:600}
+.provider-picker-field{display:grid;gap:9px}
+.field-label{color:var(--copy);font-size:13px;font-weight:600}
+.provider-preset-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:10px;border:1px solid var(--border-default);border-radius:14px;background:#fafaf8}
+.preset-option{display:grid;gap:4px;min-height:56px;padding:10px 11px;border:1px solid transparent;border-radius:10px;background:#fff;color:var(--copy);text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.preset-option:hover{border-color:#b7b7b0;background:#fff;box-shadow:0 2px 8px rgba(20,24,22,.06)}
+.preset-option.selected{border-color:#111;background:#111;color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.12)}
+.preset-option strong{font-size:12px;font-weight:650;line-height:1.2}
+.preset-option small{overflow:hidden;color:var(--muted);font-size:10px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
+.preset-option.selected small{color:#c8c8c4}
+.provider-native-select{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;white-space:nowrap!important}
 .advanced-block{display:grid;gap:15px;margin-top:2px;padding-top:15px;border-top:1px solid var(--border-subtle)}
 .advanced-toggle{justify-self:start;padding:4px 2px;border:0;background:transparent;color:var(--brand);font-size:12px;font-weight:600;cursor:pointer}
 .advanced-fields{display:grid;gap:15px}
@@ -772,7 +833,7 @@ onMounted(async () => {
 .ai-grid{display:grid;grid-template-columns:240px minmax(0,1fr);gap:0}
 .profile-list{min-height:320px;padding:6px 16px 24px 0;border-right:1px solid var(--border-subtle)}
 .profile-list button{width:100%;border:0;text-align:left}
-.new-profile{margin-bottom:12px;padding:10px 12px;border-radius:var(--radius-control)!important;background:var(--accent-soft);color:var(--brand);font-weight:600}
+.new-profile{margin-bottom:12px;padding:10px 12px;border-radius:var(--radius-control)!important;background:#111;color:#fff;font-weight:600}
 .profile-item{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:3px 0;padding:11px 12px;border-radius:var(--radius-control);background:transparent;color:var(--copy);cursor:pointer}
 .profile-item:hover{background:var(--bg-hover)}
 .profile-item.selected{background:var(--bg-selected);color:var(--ink)}
@@ -797,8 +858,8 @@ onMounted(async () => {
 .form-actions button{padding:9px 15px;border:1px solid var(--border-default);border-radius:var(--radius-control);background:var(--bg-surface);color:var(--copy);font-weight:600;font-size:13px;cursor:pointer}
 .form-actions button:hover{background:var(--bg-hover)}
 .form-actions button:disabled{cursor:not-allowed;opacity:.5}
-.form-actions .primary{border-color:var(--brand);background:var(--brand);color:#fff}
-.form-actions .primary:hover{background:var(--accent-hover)}
+.form-actions .primary{border-color:#111;background:#111;color:#fff}
+.form-actions .primary:hover{background:#2b2b2b}
 .form-actions .danger{border-color:var(--danger-soft);color:var(--danger)}
 .test-result{padding:10px 12px;border-radius:var(--radius-control);background:var(--bg-hover);color:var(--muted);font-size:13px}
 .test-result.success{background:var(--accent-soft);color:var(--brand)}
@@ -816,6 +877,7 @@ onMounted(async () => {
   .profile-list{min-height:0;padding:0 0 14px;border-right:0;border-bottom:1px solid var(--border-subtle)}
   .provider-form{padding:16px 0 0}
   .ai-head{align-items:flex-start;flex-direction:column}
+  .provider-preset-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .form-row{grid-template-columns:1fr}
 }
 </style>

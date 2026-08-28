@@ -41,6 +41,14 @@ public class InterviewQuestion {
     @TableField("source")
     private String source;
 
+    /** 题目来源的稳定引用（题集条目或知识文档片段），随会话保存。 */
+    @TableField("source_reference")
+    private String sourceReference;
+
+    /** 面向用户的来源说明，例如“真实面经原题”或“资料中未找到依据”。 */
+    @TableField("provenance_label")
+    private String provenanceLabel;
+
     @TableField("generation_ai_invocation_id")
     private Long generationAiInvocationId;
 

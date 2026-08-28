@@ -9,8 +9,9 @@ import {
   restoreResume,
 } from '../api/resume'
 import type { Resume, ResumeVersion } from '../types/resume'
+import { isResumeFavorite } from '../utils/resumeFavorite'
 
-export type ResumeLibraryKindFilter = 'all' | 'general' | 'expression' | 'archived'
+export type ResumeLibraryKindFilter = 'all' | 'general' | 'expression' | 'favorites' | 'archived'
 
 export interface ResumeLibraryFilter {
   kind: ResumeLibraryKindFilter
@@ -31,6 +32,7 @@ export function useResumeLibrary() {
   const errorMessage = ref('')
   const versionError = ref('')
   const filter = ref<ResumeLibraryFilter>({ kind: 'all', keyword: '' })
+  const favoriteRevision = ref(0)
 
   /** 别名：资产语义命名 */
   const items = resumes
@@ -41,22 +43,31 @@ export function useResumeLibrary() {
 
   /** 关键词标题过滤（客户端，不产生额外请求） */
   const visibleItems = computed(() => {
+    void favoriteRevision.value
     const keyword = filter.value.keyword.trim().toLowerCase()
-    if (!keyword) return resumes.value
-    return resumes.value.filter((resume) => resume.title.toLowerCase().includes(keyword))
+    const base = filter.value.kind === 'favorites'
+      ? resumes.value.filter((resume) => isResumeFavorite(resume.id))
+      : resumes.value
+    if (!keyword) return base
+    return base.filter((resume) => resume.title.toLowerCase().includes(keyword))
   })
+
+  function refreshFavorites() {
+    favoriteRevision.value += 1
+  }
 
   async function load() {
     loading.value = true
     errorMessage.value = ''
     try {
-      const kind = filter.value.kind === 'general'
-        ? 'GENERAL'
-        : filter.value.kind === 'expression' ? 'JOB_EXPRESSION' : undefined
+    const kind = filter.value.kind === 'general'
+      ? 'GENERAL'
+      : filter.value.kind === 'expression' ? 'JOB_EXPRESSION' : undefined
       const archived = filter.value.kind === 'archived' ? true : false
       const response = await listResumes(kind, archived)
       resumes.value = response.data
-      const current = resumes.value.find((resume) => resume.id === selectedResumeId.value) ?? resumes.value[0] ?? null
+      const selectable = filter.value.kind === 'favorites' ? visibleItems.value : resumes.value
+      const current = selectable.find((resume) => resume.id === selectedResumeId.value) ?? selectable[0] ?? null
       if (current) await selectResume(current.id)
       else {
         selectedResumeId.value = null
@@ -162,6 +173,7 @@ export function useResumeLibrary() {
     error,
     versionError,
     filter,
+    refreshFavorites,
     load,
     selectResume,
     select,

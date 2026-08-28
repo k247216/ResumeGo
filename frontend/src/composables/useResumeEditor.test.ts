@@ -41,4 +41,16 @@ describe('useResumeEditor', () => {
     await editor.save()
     expect(api.createResumeVersion).toHaveBeenCalledWith(2, expect.objectContaining({ content: expect.objectContaining({ summary: '新简介' }) }))
   })
+
+  it('passes a user-authored change summary when saving a new version', async () => {
+    const version = { id: 3, resumeId: 2, versionNo: 1, content: { summary: '旧简介' }, createdByType: 'user', createdAt: '2026-08-19' }
+    api.getResumeVersion.mockResolvedValue({ data: version })
+    api.getResumeVersions.mockResolvedValue({ data: [version] })
+    api.createResumeVersion.mockResolvedValue({ data: { ...version, id: 4, versionNo: 2, content: { summary: '新简介' }, changeSummary: '补充 Redis 项目量化结果' } })
+    const editor = useResumeEditor()
+    await editor.load({ versionId: 3 })
+    editor.updateParagraph('summary', 0, '新简介')
+    await editor.save('补充 Redis 项目量化结果')
+    expect(api.createResumeVersion).toHaveBeenCalledWith(2, expect.objectContaining({ changeSummary: '补充 Redis 项目量化结果' }))
+  })
 })

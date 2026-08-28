@@ -83,12 +83,13 @@ import TargetDashboard, {
   type TargetDashboardAction,
 } from '../../components/workbench/TargetDashboard.vue'
 import { useTargetsStore } from '../../stores/targets'
-import type { CreateJobProjectRequest, JobProject } from '../../types/project'
+import { TARGET_STAGE_LABELS, type CreateJobProjectRequest, type JobProject } from '../../types/project'
 import type { CreateJobDescriptionRequest, JobDescription } from '../../types/job'
 import type { Resume, ResumeVersion } from '../../types/resume'
 import type { InterviewPlanResponse } from '../../types/interview'
 import type { ScheduleEvent } from '../../types/schedule'
 import { buildResumeEditorLocation } from '../../utils/editorRoute'
+import { companyMark } from '../../constants/companyBrands'
 import { buildTargetInterviewLocation } from '../../utils/interviewRoute'
 
 const targetsStore = useTargetsStore()
@@ -138,16 +139,28 @@ const agendaEvents = computed<AgendaEventView[]>(() => {
     .map((event) => {
       const target = resolveEventTarget(event)
       const job = target ? jobsByTarget.value[target.id] ?? null : null
+      // Legacy/imported schedule rows can carry the company in the event title
+      // without a JD binding. Reuse the same packaged brand mark in that case,
+      // without inventing a role or target relationship.
+      const companyLabel = job?.companyName
+        || inferCompanyFromTitle(event.title)
+        || inferCompanyFromTitle(target?.name ?? '')
+      const mark = companyMark(companyLabel)
       return {
         id: String(event.id),
-        title: event.title,
+        title: stripCompanyPrefix(event.title, companyLabel),
         eventType: event.eventType,
         timeLabel: formatEventTime(event.startTime),
         relativeLabel: relativeEventLabel(event.startTime),
         dayLabel: dayLabelFor(event.startTime),
-        companyLabel: job?.companyName ?? '',
-        roleLabel: job?.jobTitle ?? '',
+        companyLabel,
+        // JD 可能被归档或暂时读取失败，但日程仍然明确绑定了求职目标；
+        // 使用目标名称作为安静的次级信息，避免一条安排显示岗位、另一条却空白。
+        roleLabel: job?.jobTitle ?? target?.name ?? '',
+        targetName: target?.name ?? '',
         countdownLabel: remainingLabel(event.startTime),
+        logoUrl: mark.icon,
+        logoColor: mark.color,
       }
     })
 })
@@ -165,10 +178,28 @@ const selectedEvent = computed(() => agendaEvents.value.find((event) => event.id
 
 function resolveEventTarget(event: ScheduleEvent): JobProject | null {
   if (event.jobProjectId != null) {
-    return targetsStore.targets.find((target) => target.id === event.jobProjectId) ?? null
+    return targetsStore.targets.find((target) => sameNumericId(event.jobProjectId, target.id)) ?? null
   }
   if (event.jobDescriptionId === null) return null
-  return targetsStore.targets.find((target) => target.jobDescriptionId === event.jobDescriptionId) ?? null
+  return targetsStore.targets.find((target) => sameNumericId(event.jobDescriptionId, target.jobDescriptionId)) ?? null
+}
+
+function sameNumericId(value: unknown, expected: number | null): boolean {
+  if (value == null || expected == null) return false
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed === expected
+}
+
+function inferCompanyFromTitle(title: string): string {
+  const knownCompanies = ['腾讯', '字节跳动', '美团', '阿里巴巴', '阿里云', '百度', '网易', '京东', '华为', '小米']
+  return knownCompanies.find((company) => title.includes(company)) ?? ''
+}
+
+function stripCompanyPrefix(title: string, company: string): string {
+  const value = title.trim()
+  if (!company || !value.startsWith(company)) return title
+  const rest = value.slice(company.length).replace(/^\s*[·•|｜:/-]\s*/, '').trim()
+  return rest || title
 }
 
 // ── Detail：跟随选中的安排 → 其目标；无安排时回退到最近活跃目标；完全没有目标时为空态 ──
@@ -184,10 +215,10 @@ const detailTarget = computed<JobProject | null>(() => {
   if (event) {
     const source = scheduleEvents.value.find((item) => String(item.id) === event.id)
     if (source?.jobProjectId != null) {
-      return targetsStore.targets.find((item) => item.id === source.jobProjectId) ?? null
+      return targetsStore.targets.find((item) => sameNumericId(source.jobProjectId, item.id)) ?? null
     }
     if (source?.jobDescriptionId != null) {
-      return targetsStore.targets.find((item) => item.jobDescriptionId === source.jobDescriptionId) ?? null
+      return targetsStore.targets.find((item) => sameNumericId(source.jobDescriptionId, item.jobDescriptionId)) ?? null
     }
     return null
   }
@@ -227,9 +258,19 @@ const detailNextAction = computed<{ text: string; button: string; hint?: string;
   const target = detailTarget.value
   if (!target) return null
   if (!target.resumeVersionId) return { text: '先为这个目标选择一份简历', button: '选择简历', action: 'select-resume' }
-  if (!detailFeedback.value) return { text: '面试前完成一次针对当前目标的模拟面试', button: '开始模拟面试', hint: '预计 20 分钟', action: 'open-interview' }
+  // 首页建议只把用户带到真实的面试主页；目标上下文在准备页再次确认，
+  // 避免把“开始模拟”误路由到一个与首页记录无关的旧配置态。
+  if (!detailFeedback.value) return { text: '面试前完成一次针对当前目标的模拟面试', button: '开始模拟面试', hint: '预计 20 分钟', action: 'open-interview-home' }
   return { text: '复看最近一次模拟反馈，确认薄弱点', button: '查看完整报告', action: 'open-feedback' }
 })
+
+function feedbackSessionId(plan: InterviewPlanResponse | null): number | null {
+  if (!plan?.rounds?.length) return null
+  const completed = [...plan.rounds]
+    .filter((round) => round.completed)
+    .sort((left, right) => right.roundOrder - left.roundOrder)
+  return (completed[0] ?? [...plan.rounds].sort((left, right) => right.roundOrder - left.roundOrder)[0])?.sessionId ?? null
+}
 
 const detail = computed<DetailView>(() => {
   const event = selectedEvent.value
@@ -241,12 +282,14 @@ const detail = computed<DetailView>(() => {
         kind: 'event',
         note: '',
         companyLabel: job?.companyName ?? '',
-        roleLabel: job?.jobTitle ?? '',
+        roleLabel: job?.jobTitle ?? target.name,
         targetName: target.name,
         targetLinked: true,
         targetId: target.id,
         readiness: buildReadiness(),
         nextAction: detailNextAction.value,
+        stageLabel: TARGET_STAGE_LABELS[target.stage] ?? target.stage,
+        feedbackSessionId: feedbackSessionId(detailFeedback.value),
       }
     }
     return {
@@ -269,12 +312,14 @@ const detail = computed<DetailView>(() => {
     kind: 'target',
     note: focusedTargetId.value ? '刚录入的求职目标' : '当前没有选中的安排',
     companyLabel: detailJob.value?.companyName ?? '',
-    roleLabel: detailJob.value?.jobTitle ?? '',
+    roleLabel: detailJob.value?.jobTitle ?? target.name,
     targetName: target.name,
     targetLinked: false,
     targetId: target.id,
     readiness: buildReadiness(),
     nextAction: detailNextAction.value,
+    stageLabel: TARGET_STAGE_LABELS[target.stage] ?? target.stage,
+    feedbackSessionId: feedbackSessionId(detailFeedback.value),
   }
 })
 
@@ -311,7 +356,7 @@ function buildReadiness(): ReadinessRow[] {
 function targetMatchesEvent(target: JobProject | null, event: AgendaEventView): boolean {
   if (!target?.jobDescriptionId) return false
   const source = scheduleEvents.value.find((item) => String(item.id) === event.id)
-  return source?.jobDescriptionId === target.jobDescriptionId
+  return sameNumericId(source?.jobDescriptionId, target.jobDescriptionId)
 }
 
 function resumeStateFor(target: JobProject | null): { ready: boolean; meta: string; subMeta: string } {
@@ -334,11 +379,14 @@ function formatShortDate(value: string): string {
 const recentActivity = computed<RecentActivityItem[]>(() => {
   return interviewPlans.value
     .filter((plan) => plan.completed && plan.summary?.overallSummary)
-    .sort((left, right) => planTimestamp(right) - planTimestamp(left))
+    // 面试主页的“最近”以真正完成的会话为准，而不是计划的 updatedAt。
+    // 一个计划可能在复盘、重新绑定资料时被更新，但并不代表它是最近练习。
+    .sort((left, right) => latestPlanSessionId(right) - latestPlanSessionId(left) || planTimestamp(right) - planTimestamp(left))
     .slice(0, 1)
     .map((plan) => {
       const target = targetsStore.targets.find((item) => item.jobDescriptionId === plan.jobDescriptionId)
       const job = target ? jobsByTarget.value[target.id] ?? null : null
+      const latestRound = [...(plan.rounds ?? [])].sort((left, right) => right.roundOrder - left.roundOrder)[0]
       return {
         id: plan.planId,
         dateLabel: formatPlanDate(plan.updatedAt || plan.createdAt),
@@ -346,6 +394,8 @@ const recentActivity = computed<RecentActivityItem[]>(() => {
         title: plan.title || '模拟面试',
         summary: plan.summary!.overallSummary,
         targetId: target?.id ?? null,
+        sessionId: latestRound?.sessionId ?? null,
+        mode: plan.mode,
       }
     })
 })
@@ -404,13 +454,28 @@ function handleSelectEvent(id: string) {
   selectedEventId.value = id
 }
 
-function handleTargetAction(action: TargetDashboardAction, targetId?: number) {
+function handleTargetAction(action: TargetDashboardAction, targetId?: number, sessionId?: number) {
   targetMaterialError.value = ''
   if (action === 'add-job') { jobDialogOpen.value = true; return }
   if (action === 'open-schedule') { void router.push({ name: 'schedule' }); return }
+  if (action === 'open-knowledge') { void router.push({ name: 'knowledge' }); return }
+  if (action === 'open-resumes') { void router.push({ name: 'resumes' }); return }
+  if (action === 'open-interview-home') { void router.push({ name: 'interview' }); return }
   if (action === 'open-target') { void router.push({ name: 'targets', query: targetId ? { targetId: String(targetId) } : {} }); return }
   if (action === 'select-resume') { resumeDialogOpen.value = true; return }
-  if (action === 'open-interview' || action === 'open-feedback') { openTargetInterview(targetId); return }
+  if (action === 'open-feedback') {
+    if (sessionId) {
+      // 复盘必须带上完成时的会话快照，不能只按当前目标重新打开准备页。
+      void router.push({ name: 'interview', query: { view: 'review', sessionId: String(sessionId) } })
+    } else if (targetId) {
+      // 没有可回放会话时回到该目标的面试主页，不伪造一个复盘地址。
+      openTargetInterview(targetId)
+    } else {
+      void router.push({ name: 'interview' })
+    }
+    return
+  }
+  if (action === 'open-interview') { openTargetInterview(targetId); return }
   if (action === 'open-editor') { openTargetEditor(targetId); return }
   if (action === 'link-target') { openLinkDialog(targetId); return }
 }
@@ -565,7 +630,12 @@ function toIsoLocal(date: Date): string {
 }
 
 function formatEventTime(value: string): string {
-  return value.slice(11, 16)
+  // Schedule data can come from ISO timestamps or the local SQL representation.
+  // Parse the clock portion explicitly so the minute is always visible and
+  // malformed/legacy values do not leak arbitrary string slices into the UI.
+  const match = value.match(/(?:T|\s|^)(\d{1,2}):(\d{2})/)
+  if (!match) return ''
+  return `${match[1].padStart(2, '0')}:${match[2]}`
 }
 
 function relativeEventLabel(value: string): string {
@@ -590,18 +660,23 @@ function dayLabelFor(value: string): string {
   return `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-// 静态倒计时：只作 secondary metadata，不做 live ticker；小时粒度符合 Detail 头部文案。
+// 静态倒计时：只作 secondary metadata，不做 live ticker；按分钟呈现，避免只显示小时造成误差。
 function remainingLabel(startTime: string): string {
   const diff = new Date(startTime).getTime() - Date.now()
   if (!Number.isFinite(diff) || diff <= 0) return ''
-  const hours = Math.floor(diff / 3600000)
-  const minutes = Math.floor((diff % 3600000) / 60000)
-  return hours > 0 ? `还有 ${hours} 小时` : minutes > 0 ? `还有 ${minutes} 分钟` : ''
+  const totalMinutes = Math.max(1, Math.ceil(diff / 60000))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return hours > 0 ? `还有 ${hours} 小时 ${minutes} 分钟` : `还有 ${minutes} 分钟`
 }
 
 function planTimestamp(plan: InterviewPlanResponse) {
   const value = Date.parse(plan.updatedAt || plan.createdAt || '')
   return Number.isNaN(value) ? plan.planId : value
+}
+
+function latestPlanSessionId(plan: InterviewPlanResponse): number {
+  return (plan.rounds ?? []).reduce((latest, round) => Math.max(latest, Number(round.sessionId) || 0), 0)
 }
 
 function formatPlanDate(value?: string) {

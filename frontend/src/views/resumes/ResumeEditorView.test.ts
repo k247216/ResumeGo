@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import ResumeEditorView from './ResumeEditorView.vue'
@@ -31,5 +32,19 @@ describe('ResumeEditorView', () => {
     expect(text).not.toContain('岗位推荐')
     expect(text).not.toContain('岗位库')
     expect(text).not.toContain('AI 建议')
+  })
+
+  it('opens an optional change-summary prompt before saving', async () => {
+    const wrapper = mount(ResumeEditorView, {
+      global: {
+        stubs: {
+          EditorSidebar: { template: '<aside>简历模块</aside>' },
+          EditorCanvas: { template: '<main><button data-test="emit-save" @click="$emit(\'save-draft\')">保存</button></main>' },
+          EditorPreviewPanel: { template: '<section>实时预览</section>' },
+        },
+      },
+    })
+    await wrapper.get('[data-test="emit-save"]').trigger('click')
+    expect(wrapper.get('[data-test="save-summary-dialog"]').text()).toContain('本次修改说明')
   })
 })

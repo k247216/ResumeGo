@@ -101,8 +101,19 @@ describe('WorkbenchView', () => {
     const wrapper = mountWorkspace()
     await flushPromises()
     expect(wrapper.find('[data-test="target-dashboard"]').exists()).toBe(true)
-    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('还没有求职目标')
+    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('今天没有安排')
     expect(wrapper.get('[data-test="agenda-pane"]').text()).toContain('近期没有安排')
+  })
+
+  it('opens the interview home from the tool index instead of target-scoped setup', async () => {
+    targetStore.targets = [target()]
+    primeJobs({ 6: job() })
+    mocks.listResumes.mockResolvedValue({ success: true, data: [{ id: 8, title: '通用中文简历', currentVersion: { id: 21, versionNo: 4 } }] })
+    const wrapper = mountWorkspace()
+    await flushPromises()
+
+    await wrapper.get('[data-test="tool-index"] .tool-item:nth-child(3)').trigger('click')
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'interview' })
   })
 
   it('aggregates schedule events across all targets as grouped rail rows with the nearest selected', async () => {
@@ -124,20 +135,92 @@ describe('WorkbenchView', () => {
     await flushPromises()
 
     const pane = wrapper.get('[data-test="agenda-pane"]')
-    expect(pane.text()).toContain('3 场安排')
+    expect(pane.text()).toContain('查看全部日程')
     expect(pane.text()).not.toContain('已过期的旧安排')
     const rows = wrapper.findAll('[data-test="agenda-row"]')
     expect(rows).toHaveLength(3)
-    expect(rows[0].find('.row-title').text()).toBe('字节跳动 · 笔试')
-    expect(rows[1].find('.row-title').text()).toBe('腾讯 · 技术面')
-    expect(rows[2].find('.row-title').text()).toBe('行测')
+    expect(rows[0].find('.row-title').text()).toContain('字节跳动 · 笔试')
+    expect(rows[1].find('.row-title').text()).toContain('腾讯 · 技术面')
+    expect(rows[2].find('.row-title').text()).toContain('行测')
 
     expect(wrapper.get('[data-test="detail-title"]').text()).toBe('字节跳动 · 笔试')
     // 关联目标行 = 目标公司 · 岗位，岗位不再重复出现在头部（去重契约）
     const linked = wrapper.get('[data-test="detail-linked-target"]')
     expect(linked.text()).toContain('字节跳动 · 后端实习')
-    expect(linked.text()).toContain('目标详情')
     expect(wrapper.get('[data-test="detail-pane"]').text()).toContain('后端实习')
+  })
+
+  it('keeps the target name visible when a bound event has no readable JD payload', async () => {
+    targetStore.targets = [target({ name: '腾讯 Java 后端实习' })]
+    mocks.getJob.mockRejectedValue(new Error('岗位描述暂不可用'))
+    mocks.listScheduleEvents.mockResolvedValue({
+      success: true,
+      data: [{
+        id: 15,
+        title: '技术一面',
+        eventType: 'interview',
+        startTime: tomorrowTime(),
+        endTime: null,
+        notes: null,
+        jobDescriptionId: 6,
+        jobProjectId: 3,
+        createdAt: '',
+        updatedAt: '',
+      }],
+    })
+
+    const wrapper = mountWorkspace()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="agenda-target"]').text()).toBe('腾讯 Java 后端实习')
+    expect(wrapper.get('.next-role').text()).toBe('腾讯 Java 后端实习')
+  })
+
+  it('normalizes stringified schedule binding ids from a local API response', async () => {
+    targetStore.targets = [target({ name: '腾讯 Java 后端实习' })]
+    mocks.getJob.mockRejectedValue(new Error('岗位描述暂不可用'))
+    mocks.listScheduleEvents.mockResolvedValue({
+      success: true,
+      data: [{
+        id: 16,
+        title: '技术二面',
+        eventType: 'interview',
+        startTime: tomorrowTime(),
+        endTime: null,
+        notes: null,
+        jobDescriptionId: '6' as unknown as number,
+        jobProjectId: '3' as unknown as number,
+        createdAt: '',
+        updatedAt: '',
+      }],
+    })
+
+    const wrapper = mountWorkspace()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="agenda-target"]').text()).toBe('腾讯 Java 后端实习')
+    expect(wrapper.find('[data-test="detail-linked-target"]').exists()).toBe(true)
+  })
+
+  it('shows the next-interview countdown with both hours and remaining minutes', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-29T10:00:00'))
+    const start = new Date(Date.now() + 92 * 60 * 1000)
+    const pad = (value: number) => String(value).padStart(2, '0')
+    const startTime = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}T${pad(start.getHours())}:${pad(start.getMinutes())}:00`
+    mocks.listResumes.mockResolvedValue({ success: true, data: [{ id: 8, title: '通用简历', currentVersion: { id: 9, versionNo: 1 } }] })
+    mocks.listScheduleEvents.mockResolvedValue({
+      success: true,
+      data: [{ id: 15, title: '技术面', eventType: 'interview', startTime, endTime: null, notes: null, jobDescriptionId: null, createdAt: '', updatedAt: '' }],
+    })
+
+    try {
+      const wrapper = mountWorkspace()
+      await flushPromises()
+      expect(wrapper.get('.next-countdown').text()).toBe('1 小时 32 分钟')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('switches the detail identity, preparation state, and next action when another event is selected', async () => {
@@ -163,13 +246,12 @@ describe('WorkbenchView', () => {
 
     const linked = wrapper.get('[data-test="detail-linked-target"]')
     expect(linked.text()).toContain('腾讯 · Java 后端实习')
-    expect(linked.text()).toContain('目标详情')
     expect(wrapper.get('[data-test="detail-pane"]').text()).toContain('Java 后端实习')
     expect(wrapper.get('[data-test="readiness-resume"]').text()).toContain('腾讯版简历 · V4')
     expect(wrapper.get('[data-test="readiness-resume"]').text()).toContain('7/15 更新')
     const next = wrapper.get('[data-test="detail-next"]')
     expect(next.text()).toContain('模拟面试')
-    expect(next.text()).toContain('预计 20 分钟')
+    expect(next.text()).toContain('面试前完成一次针对当前目标的模拟面试')
     expect(mocks.getResumeVersion).toHaveBeenCalledWith(21)
   })
 
@@ -237,7 +319,7 @@ describe('WorkbenchView', () => {
     expect(mocks.listScheduleEvents).toHaveBeenCalled()
   })
 
-  it('routes interview preparation with the selected target context', async () => {
+  it('routes preparation to the selected target and interview details to the interview home', async () => {
     targetStore.targets = [target(), target({ id: 4, name: '字节跳动 后端实习', jobDescriptionId: 7, resumeVersionId: 30, updatedAt: '2026-08-15T00:00:00' })]
     primeJobs({ 6: job(), 7: job({ id: 7, companyName: '字节跳动', jobTitle: '后端实习' }) })
     primeVersions({ 30: version({ id: 30, resumeId: 9, versionNo: 2 }) })
@@ -258,10 +340,10 @@ describe('WorkbenchView', () => {
     await flushPromises()
     await wrapper.get('[data-test="next-button"]').trigger('click')
 
-    expect(mocks.routerPush).toHaveBeenCalledWith({
-      name: 'interview',
-      query: { from: 'target', targetId: '3', versionId: '21', jobId: '6' },
-    })
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'targets', query: { targetId: '3' } })
+    mocks.routerPush.mockClear()
+    await wrapper.get('[data-test="view-schedule"]').trigger('click')
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'interview' })
   })
 
   it('falls back to the most recent active target when there are no arrangements', async () => {
@@ -270,11 +352,12 @@ describe('WorkbenchView', () => {
     const wrapper = mountWorkspace()
     await flushPromises()
 
-    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('当前没有选中的安排')
-    const identity = wrapper.get('[data-test="detail-identity"]')
-    expect(identity.text()).toContain('字节跳动')
-    expect(wrapper.get('[data-test="readiness-resume"]').text()).toContain('未选择简历')
-    expect(wrapper.get('[data-test="detail-next"]').text()).toContain('选择简历')
+    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('还没有安排面试')
+    expect(wrapper.find('[data-test="detail-identity"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="readiness-resume"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="detail-next"]').exists()).toBe(false)
+    await wrapper.get('[data-test="detail-empty-action"]').trigger('click')
+    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'schedule' })
   })
 
   it('creates a linked target from the empty-state job entry', async () => {
@@ -288,7 +371,7 @@ describe('WorkbenchView', () => {
     const wrapper = mountWorkspace()
     await flushPromises()
 
-    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('还没有求职目标')
+    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('今天没有安排')
     await wrapper.get('[data-test="detail-empty-action"]').trigger('click')
     await wrapper.get('[data-test="job-title"]').setValue('前端实习')
     await wrapper.get('[data-test="job-company"]').setValue('美团')
@@ -298,9 +381,9 @@ describe('WorkbenchView', () => {
 
     expect(mocks.createJob).toHaveBeenCalledWith({ jobTitle: '前端实习', companyName: '美团', rawText: expect.stringContaining('岗位描述') })
     expect(targetStore.create).toHaveBeenCalledWith({ name: '美团 · 前端实习', jobDescriptionId: 77 })
-    expect(wrapper.get('[data-test="detail-empty"]').text()).toContain('刚录入的求职目标')
-    expect(wrapper.get('[data-test="detail-identity"]').text()).toContain('美团')
-    expect(wrapper.get('[data-test="detail-next"]').text()).toContain('选择简历')
+    expect(wrapper.get('[data-test="detail-empty-copy"]').text()).toContain('为当前求职计划添加一场面试')
+    expect(wrapper.find('[data-test="detail-identity"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="detail-empty-action"]').text()).toContain('查看日程')
   })
 
   it('links the selected resume version to the detail target', async () => {
@@ -315,8 +398,8 @@ describe('WorkbenchView', () => {
     const wrapper = mountWorkspace()
     await flushPromises()
 
-    expect(wrapper.get('[data-test="detail-next"]').text()).toContain('选择简历')
-    await wrapper.get('[data-test="next-button"]').trigger('click')
+    expect(wrapper.get('[data-test="next-button"]').text()).toContain('开始准备')
+    await wrapper.get('[data-test="readiness-resume"] .object-action').trigger('click')
     await wrapper.get('[data-test="resume-version"]').setValue('21')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
@@ -339,7 +422,8 @@ describe('WorkbenchView', () => {
     await flushPromises()
 
     const activity = wrapper.get('[data-test="recent-activity"]')
-    expect(activity.text()).toContain('字节跳动 · 笔试')
+    expect(activity.text()).toContain('自由面试 · 笔试')
+    expect(activity.text()).toContain('字节跳动')
     expect(activity.text()).toContain('行测基础扎实')
     expect(activity.text()).not.toContain('腾讯 · 技术面')
     await wrapper.get('[data-test="activity-row"] .activity-report').trigger('click')
@@ -347,6 +431,32 @@ describe('WorkbenchView', () => {
       name: 'interview',
       query: { from: 'target', targetId: '4', versionId: '30', jobId: '7' },
     })
+  })
+
+  it('orders recent activity by the latest completed interview session, not plan update time', async () => {
+    targetStore.targets = [target(), target({ id: 4, name: '字节跳动 后端实习', jobDescriptionId: 7, resumeVersionId: 30 })]
+    primeJobs({ 6: job(), 7: job({ id: 7, companyName: '字节跳动', jobTitle: '后端实习' }) })
+    mocks.listInterviewPlans.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          planId: 9, resumeVersionId: 21, jobDescriptionId: 6, title: '腾讯技术面', questionCount: 5, focusTags: [],
+          rounds: [{ sessionId: 120, personaId: 1, personaName: '面试官 A', personaTitle: '技术面试官', roundOrder: 1, status: 'COMPLETED', currentQuestionIndex: 5, totalQuestions: 5, completed: true }],
+          completed: true, updatedAt: '2026-08-18T14:00:00Z', summary: { overallSummary: '腾讯的较早计划，但会话实际更晚完成。', overallScore: 0, crossStrengths: [], crossWeaknesses: [], suggestions: [], sessions: [] },
+        },
+        {
+          planId: 8, resumeVersionId: 30, jobDescriptionId: 7, title: '字节技术面', questionCount: 4, focusTags: [],
+          rounds: [{ sessionId: 110, personaId: 1, personaName: '面试官 B', personaTitle: '技术面试官', roundOrder: 1, status: 'COMPLETED', currentQuestionIndex: 4, totalQuestions: 4, completed: true }],
+          completed: true, updatedAt: '2026-08-19T09:00:00Z', summary: { overallSummary: '字节计划更新时间更新，但会话更早完成。', overallScore: 0, crossStrengths: [], crossWeaknesses: [], suggestions: [], sessions: [] },
+        },
+      ],
+    })
+    const wrapper = mountWorkspace()
+    await flushPromises()
+
+    const activity = wrapper.get('[data-test="recent-activity"]')
+    expect(activity.text()).toContain('腾讯的较早计划')
+    expect(activity.text()).not.toContain('字节计划更新时间')
   })
 
   it('shows a retryable error instead of pretending the workspace is empty', async () => {

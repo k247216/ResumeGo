@@ -19,6 +19,8 @@ export interface KnowledgeDocument {
   processingStatus: KnowledgeProcessingStatus
   sourceFile: string | null
   sourceExtension: string | null
+  /** 原始来源文件大小；NOTE 没有来源文件时为 null。 */
+  sizeBytes?: number | null
   createdAt: string
   updatedAt: string
 }
