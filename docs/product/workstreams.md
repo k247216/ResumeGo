@@ -6,7 +6,7 @@ Controller: Core Controller
 
 Integration branch: `main`（唯一长期分支，由 Core Controller 集成）
 
-Dispatch baseline: `6a93f8e`
+Dispatch baseline: `f4877b1`
 
 本文件是 V2 外部 Agent 的唯一任务状态入口。只有位于 `docs/tasks/v2/ready/` 且状态为 `READY` 的任务可以开始。执行者领取任务时，将对应任务卡全文交给该 Agent；不得只转述标题。
 
@@ -52,8 +52,8 @@ Dispatch baseline: `6a93f8e`
 | V2-F2-FE-03 | 文件式直接编辑与面板持久化 | `INTEGRATED` | `ab9ec58` | `codex/v2-career-os` | Obsidian 式直接编辑、真实类型图标/标签、自定义选择框、工具栏字号、收起状态本地持久化 | V2-F2-BE-06、BE-07 | 已集成 |
 | V2-F2-QA-01 | Knowledge F2 纵向验收 | `READY` | `a039833` | `codex/v2-f2-qa-01-library-acceptance` | 集成/E2E/桌面验收资产 | V2-F2-FE-02 | 6 |
 | V2-R1-ARCH-01 | 简历/面试/工作台产品契约 | `INTEGRATED` | `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md` | 不创建代码分支 | Resume 谱系、Interview 三模式、Workspace 行动边界 | 用户已批准混合简历模型 | 已冻结 |
-| V2-R1-RESUME-01 | 简历资产、版本谱系与简历库 | `READY` | `6a93f8e` 或 Controller 指定后继 | `codex/v2-r1-resume-asset-library` | Resume 后端/迁移、resume types/API/composable、简历库页面 | ARCH-01 | 下一项 |
-| V2-I1-INTERVIEW-01 | 三模式模拟面试引擎 | `QUEUED` | Resume 集成后冻结 | `codex/v2-i1-three-mode-interview` | Interview 后端/迁移、三模式页面与测试 | RESUME-01；Pipeline/Schedule 契约修复 | Resume 后 |
+| V2-R1-RESUME-01 | 简历资产、版本谱系与简历库 | `READY` | `f4877b1` | `codex/v2-r1-resume-asset-library` | Resume 后端/迁移、resume types/API/composable、简历库页面 | ARCH-01 | 下一项 |
+| V2-I1-INTERVIEW-01 | 三模式模拟面试引擎 | `QUEUED` | Resume 集成后冻结 | `codex/v2-i1-three-mode-interview` | Interview 后端/迁移、三模式页面与测试 | RESUME-01 | Resume 后 |
 | V2-W1-WORKSPACE-01 | Workspace 确定性行动入口 | `CORE_RESERVED` | Resume/Interview 集成后冻结 | `codex/v2-w1-workspace-action` | 行动投影、首页及跨模块集成测试 | Resume、Interview、Pipeline、Knowledge、Schedule | 最后 |
 
 ## 并行与所有权规则

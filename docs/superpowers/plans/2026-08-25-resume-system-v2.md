@@ -8,7 +8,7 @@
 
 **Tech Stack:** Vue 3、TypeScript、Vitest、Spring Boot、JdbcTemplate/MyBatis-Plus、Flyway、H2/MySQL
 
-**Spec:** `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`
+**Spec:** `docs/superpowers/specs/2026-08-25-resume-interview-workspace-contract.md`；视觉与交互实现同时遵守 `docs/superpowers/specs/2026-08-25-resume-library-version-studio-design.md`
 
 ## Global Constraints
 
@@ -19,6 +19,8 @@
 - 所有 ID 操作校验当前用户，跨用户按不存在处理。
 - 不记录简历正文、联系方式、AI Key 或真实用户数据到日志和测试夹具。
 - 不修改 Workspace、Interview、Knowledge、Schedule 页面。
+- 视觉目标固定为 `docs/design/v2-resume-library-version-studio-target.png`；图中示例业务数据不得写死。
+- 全局 DesktopShell、导航入口和全局 token 不在本任务重构范围；页面必须同时消费现有浅色/暗色语义 token。
 
 ---
 
@@ -128,8 +130,8 @@ git commit -m "feat(resume): support explicit expression copies"
 **Files:**
 - Modify: `frontend/src/types/resume.ts`
 - Modify: `frontend/src/api/resume.ts`
-- Create: `frontend/src/composables/useResumeLibrary.ts`
-- Create: `frontend/src/composables/useResumeLibrary.test.ts`
+- Modify: `frontend/src/composables/useResumeLibrary.ts`
+- Modify: `frontend/src/composables/useResumeLibrary.test.ts`
 
 **Interfaces:**
 - Produces: `ResumeKind = 'GENERAL' | 'JOB_EXPRESSION'`.
@@ -167,12 +169,20 @@ git commit -m "feat(resume): add library asset state"
 ### Task 4: 重构简历库为真实资产工作区
 
 **Files:**
-- Create: `frontend/src/components/resume-library/ResumeAssetList.vue`
+- Create: `frontend/src/components/resume-library/ResumeAssetNavigator.vue`
+- Create: `frontend/src/components/resume-library/ResumeAssetHeader.vue`
 - Create: `frontend/src/components/resume-library/ResumeAssetWorkspace.vue`
+- Create: `frontend/src/components/resume-library/ResumeVersionRail.vue`
+- Create: `frontend/src/components/resume-library/ResumeCompareToolbar.vue`
+- Create: `frontend/src/components/resume-library/ResumeChangeSummary.vue`
+- Create: `frontend/src/components/resume-library/ResumeDocumentPreview.vue`
 - Create: `frontend/src/components/resume-library/ResumeVersionInspector.vue`
 - Create: `frontend/src/components/resume-library/ResumeForkDialog.vue`
 - Create: `frontend/src/components/resume-library/ResumeArchiveDialog.vue`
-- Create: `frontend/src/components/resume-library/ResumeAssetList.test.ts`
+- Create: `frontend/src/utils/resumeVersionDiff.ts`
+- Create: `frontend/src/utils/resumeVersionDiff.test.ts`
+- Create: `frontend/src/components/resume-library/ResumeAssetNavigator.test.ts`
+- Create: `frontend/src/components/resume-library/ResumeVersionRail.test.ts`
 - Create: `frontend/src/components/resume-library/ResumeVersionInspector.test.ts`
 - Modify: `frontend/src/views/resumes/ResumeLibraryView.vue`
 - Modify: `frontend/src/views/resumes/ResumeLibraryView.test.ts`
@@ -181,42 +191,58 @@ git commit -m "feat(resume): add library asset state"
 - Consumes: Task 3 composable and API.
 - Produces: Library → Workspace → Inspector 页面；页面只组合状态和路由。
 - Routes: 编辑使用现有 `resume-editor` 路由和明确 `versionId`; 预览使用现有预览能力，不在库页复制编辑器。
+- Produces: `diffResumeVersions(base: ResumeContent | null, target: ResumeContent): ResumeVersionDiff`。
+- `ResumeVersionDiff` 固定为 `{ state: 'initial' | 'unchanged' | 'changed'; changes: ResumeSectionChange[] }`。
+- `ResumeSectionKey` 固定覆盖 `basicInfo | summary | workExperience | education | projects | skills | skillCategories | certifications | languages | githubProjects | qrCodes | customSections`。
+- `ResumeSectionChange` 固定为 `{ section: ResumeSectionKey; label: string; kind: 'added' | 'modified' | 'removed' }`；比较前对数组和对象执行稳定序列化，不比较对象引用。
+- `ResumeVersionRail` props 为 `versions: ResumeVersion[]`、`selectedVersionId: number | null`、`currentVersionId: number | null`；emit 为 `select(versionId: number)`。
+- `ResumeVersionInspector` props 为 `resume: Resume`、`version: ResumeVersion`、`isCurrent: boolean`、真实引用摘要；emit 为 `edit`、`fork`、`rename`、`archive`、`close`。
 
-- [ ] **Step 1: 写页面行为 RED 测试**
+- [ ] **Step 1: 写页面行为和版本差异 RED 测试**
 
-测试真实用户结果：通用/岗位表达标签；V1/V2 是版本而非独立简历；历史版本只读；创建副本弹窗显示源标题和 Vn；fork 后源资产不变；归档确认；空/失败/重试；窄 Inspector 可关闭。
+测试真实用户结果：通用/岗位表达分组；V1/V2 是版本而非独立简历；版本轨道按 `versionNo` 递增；历史版本只读；V1 无伪对比；章节新增/修改/删除由两个真实 `ResumeContent` 确定性计算；创建副本弹窗显示源标题和 Vn；fork 后源资产不变；归档确认；空/失败/重试；窄 Inspector 可关闭。
 
 ```bash
 cd frontend
-npx vitest run src/views/resumes/ResumeLibraryView.test.ts src/components/resume-library
+npx vitest run src/views/resumes/ResumeLibraryView.test.ts src/components/resume-library src/utils/resumeVersionDiff.test.ts
 ```
 
-- [ ] **Step 2: 实现 Asset List**
+- [ ] **Step 2: 实现 Asset Navigator 与资产身份栏**
 
-列表行只展示标题、种类、当前 Vn 和更新时间；不显示完整简历缩略图，不把绿色用于装饰。搜索和过滤不制造客户端假关联。
+实现视觉规格的窄资产导航：`全部/通用/岗位版本`、按 kind 分组、真实数量、标题、当前 Vn 和更新时间。选中态用窄色条与浅背景；不显示完整简历缩略图，不把绿色用于装饰。搜索和过滤不制造客户端假关联。资产身份栏只展示真实标题、类型和已有操作。
 
-- [ ] **Step 3: 实现 Workspace 与 Inspector**
+- [ ] **Step 3: 实现紧凑版本轨道与确定性对比**
 
-Workspace 主操作为继续编辑；次操作为预览和创建岗位表达副本。Inspector 展示完整版本历史、来源版本与真实引用摘要；数据缺失显示诚实空态。
+版本轨道高度不超过 96px，节点直径不超过 10px，按 `versionNo` 单调递增；选中态不得使用大白圆或大光环。历史版本只读。实现 `resumeVersionDiff.ts` 纯函数，先覆盖章节级新增/修改/删除；V1、无变化和字段缺失均返回明确状态，不调用 AI、不生成伪差异。
 
-- [ ] **Step 4: 实现 fork/归档流程**
+- [ ] **Step 4: 实现正文预览、变化摘要与 Inspector**
+
+用真实 `ResumeContent` 生成只读正文，中央画布为第一视觉主体；变化摘要支持折叠并与对比结果一致。Inspector 展示版本元数据、来源、真实 Pipeline 引用和当前可用操作；没有公开引用数据时诚实省略或提示不可查询。当前版本可进入编辑台，历史版本不得普通保存。
+
+- [ ] **Step 5: 实现 fork/归档流程**
 
 操作包含 loading、失败和重试；成功后更新列表并选中真实返回对象，不使用乐观伪 ID。
 
-- [ ] **Step 5: 运行前端验证**
+- [ ] **Step 6: 完成响应式、主题和可访问状态**
+
+在 1440、1280、1024 三档实现视觉规格：宽屏三栏；中宽关闭/收窄 Inspector；窄桌面将资产导航和 Inspector 变为侧面板/抽屉。所有颜色消费语义 token；支持暗色、键盘选择、`aria-selected`、可见焦点和 `prefers-reduced-motion`。
+
+- [ ] **Step 7: 运行前端验证**
 
 ```bash
 cd frontend
-npx vitest run src/composables/useResumeLibrary.test.ts src/views/resumes/ResumeLibraryView.test.ts src/components/resume-library
+npx vitest run src/composables/useResumeLibrary.test.ts src/views/resumes/ResumeLibraryView.test.ts src/components/resume-library src/utils/resumeVersionDiff.test.ts
 npm run build
 ```
 
 预期：全部退出 0。
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 8: 视觉核对与提交**
+
+在 1440×1024、1280×800、1024×768 的浅色与暗色状态截图。将 1440×1024 浅色截图与 `docs/design/v2-resume-library-version-studio-target.png` 并排核对：正文必须是第一视觉主体，版本轨道不超过 96px，左右窄栏不挤压正文，页面无卡片堆砌。只修复可见差异，不修改全局导航或其他页面。
 
 ```bash
-git add frontend/src/components/resume-library frontend/src/views/resumes/ResumeLibraryView.vue frontend/src/views/resumes/ResumeLibraryView.test.ts
+git add frontend/src/components/resume-library frontend/src/utils/resumeVersionDiff.ts frontend/src/utils/resumeVersionDiff.test.ts frontend/src/views/resumes/ResumeLibraryView.vue frontend/src/views/resumes/ResumeLibraryView.test.ts
 git commit -m "feat(resume): redesign local asset library"
 ```
 
@@ -224,7 +250,7 @@ git commit -m "feat(resume): redesign local asset library"
 
 **Files:**
 - Modify: `docs/testing/v2-final-test-matrix.md`
-- Create: `docs/agent-messages/from-dsh/20260825-delivery-resume-system-v2.md`
+- Create: `docs/tasks/v2/deliveries/V2-R1-RESUME-01-delivery.md`
 
 **Interfaces:**
 - Consumes: Tasks 1–4.
@@ -251,4 +277,4 @@ npm run build
 
 - [ ] **Step 4: 交付而不自行集成**
 
-报告最终提交、迁移版本、接口、测试命令/退出码/数量、未执行项和风险。Core Controller 负责审查、集成和全量回归。
+报告最终提交、迁移版本、接口、测试命令/退出码/数量、视觉截图路径、未执行项和风险。外部实现 Agent 不通过 DSH 通道交付；Core Controller 直接从仓库文档和提交记录审查、集成并执行必要回归。
