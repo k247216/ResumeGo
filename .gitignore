@@ -32,3 +32,4 @@ outputs/
 /data/
 /.playwright-cli/
 /agent-bridge/
+/design-qa.md
