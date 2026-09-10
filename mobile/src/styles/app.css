@@ -4,10 +4,10 @@
 
 :root {
   /* 语义 token（浅色），与桌面端一致 */
-  --canvas: #f4f4f1;
+  --canvas: #edf5f4;
   --surface: #ffffff;
-  --surface-subtle: #f9f9f7;
-  --surface-hover: #f1f1ee;
+  --surface-subtle: #f8faf9;
+  --surface-hover: #eef6f4;
   --bg-selected: rgba(22, 139, 104, .09);
   --ink: #171717;
   --copy: #6e6e6a;
@@ -28,7 +28,7 @@
 
   /* 圆角 / 间距刻度，与桌面端一致 */
   --radius-control: 10px;
-  --radius-panel: 16px;
+  --radius-panel: 22px;
   --radius-large: 22px;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 20px; --space-6: 24px; --space-7: 32px; --space-8: 40px;
@@ -52,9 +52,15 @@
   /* 移动端专属 */
   --tabbar-h: 62px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, .04);
+  --shadow-card: 0 1px 0 rgba(17, 19, 21, .03);
   --shadow-lift: 0 12px 32px rgba(16, 24, 40, .10);
   --shadow-sheet: 0 -18px 50px rgba(16, 24, 40, .18);
+
+  /* 参考图风格的语义色：颜色只表达状态，不作为装饰噪音。 */
+  --pastel-mint: #d9ece9;
+  --pastel-pink: #f5d7e6;
+  --pastel-yellow: #f6e5ad;
+  --pastel-lilac: #dfd3ed;
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
     'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
@@ -88,6 +94,10 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow-lift: 0 12px 32px rgba(0, 0, 0, .45);
   --shadow-sheet: 0 -18px 50px rgba(0, 0, 0, .55);
+  --pastel-mint: #24443f;
+  --pastel-pink: #4a2c3d;
+  --pastel-yellow: #4b4021;
+  --pastel-lilac: #40344d;
   color-scheme: dark;
 }
 
@@ -114,6 +124,10 @@
   --danger-soft: rgba(180, 62, 53, .09);
   --warning: #a66f1a;
   --warning-soft: rgba(166, 111, 26, .12);
+  --pastel-mint: #d7eee7;
+  --pastel-pink: #f5d9e6;
+  --pastel-yellow: #f7e7b4;
+  --pastel-lilac: #e1d6ef;
 }
 
 * { box-sizing: border-box; }
@@ -206,6 +220,35 @@ button { font-family: inherit; }
 }
 .card:active { transform: scale(.985); }
 .card.archived { opacity: .6; filter: saturate(.55); }
+
+/* 参考图风格的白色工作区与语义色卡片。 */
+.workspace-card {
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.metric-card {
+  border: 0;
+  border-radius: 18px;
+  padding: 16px;
+}
+.action-arrow {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+}
+.action-arrow:active { transform: scale(.94); }
+.pastel-mint { background: var(--pastel-mint); }
+.pastel-pink { background: var(--pastel-pink); }
+.pastel-yellow { background: var(--pastel-yellow); }
+.pastel-lilac { background: var(--pastel-lilac); }
 @keyframes card-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
@@ -668,10 +711,12 @@ button { font-family: inherit; }
   grid-template-columns: repeat(4, 1fr);
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  border-top: 1px solid var(--line-subtle);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-top: 0;
+  border-radius: 22px 22px 0 0;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 -8px 26px rgba(17, 19, 21, .05);
 }
 .tab {
   position: relative;
@@ -685,19 +730,23 @@ button { font-family: inherit; }
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: color .16s ease-out;
+  transition: color .16s ease-out, transform .16s var(--ease-out);
 }
-.tab svg { width: 22px; height: 22px; }
-.tab.on { color: var(--brand); }
+.tab svg,
+.tab span { position: relative; z-index: 1; }
+.tab svg { width: 21px; height: 21px; }
+.tab.on { color: var(--ink); }
 .tab.on::before {
   content: '';
   position: absolute;
-  top: 7px;
-  width: 20px;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--brand);
+  top: 6px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--ink);
 }
+.tab.on svg { color: var(--surface); }
+.tab.on span { margin-top: 2px; font-weight: 700; }
 .tab .badge {
   position: absolute;
   top: 6px;

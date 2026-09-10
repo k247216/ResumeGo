@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { getTheme, setTheme } from './theme'
+import { getTheme, setTheme, THEME_OPTIONS } from './theme'
 
 describe('移动端主题', () => {
   beforeEach(() => {
@@ -12,5 +12,9 @@ describe('移动端主题', () => {
 
     expect(getTheme()).toBe('mint')
     expect(document.documentElement.dataset.theme).toBe('mint')
+  })
+
+  it('保留浅色、薄荷绿、深色三种主题选项', () => {
+    expect(THEME_OPTIONS.map((item) => item.value)).toEqual(['light', 'mint', 'dark'])
   })
 })
