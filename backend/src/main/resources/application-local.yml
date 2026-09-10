@@ -12,6 +12,11 @@ spring:
     enabled: true
     locations: classpath:db/migration-h2
     baseline-on-migrate: false
+    # V4/V5 曾被误删（见 commit 3fef480，只在 dd15847 中补回了 MySQL 版），
+    # 导致 H2 版本号出现断层。现已将 V4/V5 还原；但对在"断层期"用 v2.0.0
+    # 全新安装过的数据库而言，V4/V5 会被判定为"已解析但未应用"而卡住启动。
+    # 允许乱序应用，使两类历史库都能平滑升级到最新版本。
+    out-of-order: true
 
 mybatis-plus:
   configuration:

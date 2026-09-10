@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ScheduleView from './ScheduleView.vue'
 import ScheduleSourcesDialog from '../../components/schedule/ScheduleSourcesDialog.vue'
 import type { ScheduleEvent } from '../../types/schedule'
@@ -55,6 +55,11 @@ function pad(value: number): string {
   return String(value).padStart(2, '0')
 }
 
+// 用例把可见月固定成 2026-08（见下方 mock 的 visibleMonth），"今天"也必须一并锚定，
+// 否则 dayKey()/时间轴面板会跟随真实日期漂移，跨月后整组用例必然失败。
+// 只伪造 Date，保留真实定时器，避免 flushPromises 依赖的 setTimeout 被冻结。
+const FIXED_NOW = new Date(2026, 7, 25, 10, 0, 0)
+
 function dayKey(offsetDays = 0): string {
   const date = new Date()
   date.setDate(date.getDate() + offsetDays)
@@ -96,6 +101,8 @@ async function openDayPanel(wrapper: ReturnType<typeof mount>, offsetDays = 0) {
 
 describe('ScheduleView', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(FIXED_NOW)
     localStorage.clear()
     vi.clearAllMocks()
     // visibleMonth 用真实 ref，保证视图对月份切换的响应式更新
@@ -112,6 +119,10 @@ describe('ScheduleView', () => {
     externalMock.externalEvents.value = []
     targets.targets = []
     targets.load.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders the calendar card and defaults to the unified agenda with an empty state', async () => {

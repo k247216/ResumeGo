@@ -94,6 +94,28 @@ class H2FileWorkspaceMigrationTest {
         }
     }
 
+    @Test
+    void keepsH2MigrationVersionsContiguous() {
+        Flyway flyway = Flyway.configure()
+                .dataSource("jdbc:h2:mem:migration-contiguity;DB_CLOSE_DELAY=-1", "sa", "")
+                .locations("classpath:db/migration-h2")
+                .load();
+
+        var versions = java.util.Arrays.stream(flyway.info().all())
+                .filter(info -> info.getVersion() != null)
+                .map(info -> Integer.parseInt(info.getVersion().getVersion()))
+                .sorted()
+                .toList();
+
+        assertThat(versions).isNotEmpty();
+        for (int index = 0; index < versions.size(); index++) {
+            assertThat(versions.get(index))
+                    .as("本地 H2 迁移版本必须从 V1 起连续；删掉中间任意脚本都会让已安装的数据库"
+                            + "在启动时抛 FlywayValidateException: applied migration not resolved locally")
+                    .isEqualTo(index + 1);
+        }
+    }
+
     private boolean tableExists(java.sql.Connection connection, String tableName) throws Exception {
         try (var result = connection.getMetaData().getTables(null, null, tableName, new String[]{"TABLE"})) {
             return result.next();

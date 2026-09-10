@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createScheduleEvent,
   deleteScheduleEvent,
@@ -28,7 +28,18 @@ const baseEvent = {
 }
 
 describe('useSchedule', () => {
-  beforeEach(() => vi.clearAllMocks())
+  // 用例中的事件固定落在 2026-08，"今天"必须一并锚定，否则 visibleMonth 会跟随
+  // 真实日期漂移，跨月后 monthEvents 断言必然失败。
+  // 只伪造 Date，保留真实定时器。
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 7, 25, 10, 0, 0))
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it('loads events around the visible month and groups them by day', async () => {
     vi.mocked(listScheduleEvents).mockResolvedValue({
