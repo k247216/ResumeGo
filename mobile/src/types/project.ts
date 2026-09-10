@@ -4,6 +4,16 @@ export type TargetStage =
   | 'applied' | 'exam' | 'interview' | 'hr' | 'offer'
   | 'pool' | 'screened_out' | 'rejected' | 'closed'
 
+/** 结果标记与流程阶段分离：阶段表示当前推进位置，结果表示为什么结束。 */
+export type TargetOutcome =
+  | 'pool'
+  | 'exam_failed'
+  | 'interview_failed'
+  | 'hr_failed'
+  | 'resume_failed'
+  | 'rejected'
+  | 'closed'
+
 /** 流程主线顺序 */
 export const TARGET_STAGE_ORDER: readonly TargetStage[] = [
   'applied', 'exam', 'interview', 'hr', 'offer',
@@ -28,6 +38,16 @@ export const TARGET_STAGE_LABELS: Record<TargetStage, string> = {
 
 const FLOW_RANK: Record<string, number> = { applied: 1, exam: 2, interview: 3, hr: 4, offer: 5 }
 export const TERMINAL_STAGES: readonly TargetStage[] = ['offer', 'pool', 'screened_out', 'rejected', 'closed']
+
+export const TARGET_OUTCOME_LABELS: Record<TargetOutcome, string> = {
+  pool: '泡池子',
+  exam_failed: '笔试未通过',
+  interview_failed: '面试第 N 轮未通过',
+  hr_failed: 'HR 面未通过',
+  resume_failed: '简历未通过',
+  rejected: '已拒绝',
+  closed: '已放弃',
+}
 
 export function stageFlowRank(stage: TargetStage): number {
   return FLOW_RANK[stage] ?? 0
@@ -71,6 +91,11 @@ export interface JobProject {
   notes: string | null
   /** 每个岗位可独立设置面试轮次；旧数据缺失时按 2 轮兼容。 */
   interviewRounds?: number
+  /** 当前进行到第几面；仅当 stage === interview 时有效。 */
+  interviewRound?: number
+  /** 结束原因，与流程阶段分开保存，避免丢失“第几面挂”等信息。 */
+  outcome?: TargetOutcome | null
+  outcomeRound?: number | null
   createdAt: string
   updatedAt: string
 }

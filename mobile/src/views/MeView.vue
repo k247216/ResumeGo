@@ -2,17 +2,21 @@
 import { ref } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import AppIcon from '../components/AppIcon.vue'
+import Sheet from '../components/Sheet.vue'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { exportBackup, importBackup, resetToSeed } from '../data/store'
-import { getTheme, toggleTheme, type Theme } from '../data/theme'
+import { getTheme, setTheme, THEME_OPTIONS, type Theme } from '../data/theme'
 
 const theme = ref<Theme>(getTheme())
+const themeOpen = ref(false)
 const fileRef = ref<HTMLInputElement | null>(null)
 
-function onToggleTheme() {
-  theme.value = toggleTheme()
-  toast(theme.value === 'dark' ? '已切换暗色' : '已切换浅色')
+function chooseTheme(value: Theme) {
+  theme.value = value
+  setTheme(value)
+  themeOpen.value = false
+  toast(`已切换${THEME_OPTIONS.find((option) => option.value === value)?.label ?? '主题'}`)
 }
 
 async function onExport() {
@@ -72,15 +76,15 @@ async function onReset() {
         <strong>我的职业空间</strong>
         <small>数据只保留在这台设备</small>
       </div>
-      <span class="me-version">移动端 · v0.2.2</span>
+      <span class="me-version">移动端 · v0.2.3</span>
     </section>
 
     <p class="section-kicker">外观</p>
     <div class="list">
-      <button class="setting-row" @click="onToggleTheme">
+      <button class="setting-row" @click="themeOpen = true">
         <span class="sr-ic"><AppIcon name="layers" :size="18" /></span>
         <span class="s-label">主题</span>
-        <span class="s-value">{{ theme === 'dark' ? '暗色' : '浅色' }} ›</span>
+        <span class="s-value">{{ THEME_OPTIONS.find((option) => option.value === theme)?.label }} ›</span>
       </button>
     </div>
 
@@ -107,9 +111,28 @@ async function onReset() {
       <div class="setting-row" style="cursor: default">
         <span class="sr-ic"><AppIcon name="user" :size="18" /></span>
         <span class="s-label">职达 · 移动端</span>
-        <span class="s-value">v0.2.2</span>
+        <span class="s-value">v0.2.3</span>
       </div>
       <p class="about-note">求职目标、日程、简历记录默认不上传云端；提醒在设备本地触发，无需推送服务器。<br>备份仅含文本记录，简历 PDF/MD 需在新设备重新导入。</p>
     </div>
+
+    <Sheet v-if="themeOpen" title="选择主题" @close="themeOpen = false">
+      <p class="theme-intro">让工作区适合你今天的专注状态。</p>
+      <div class="theme-options" role="radiogroup" aria-label="主题选项">
+        <button
+          v-for="option in THEME_OPTIONS"
+          :key="option.value"
+          class="theme-option"
+          :class="{ on: theme === option.value }"
+          role="radio"
+          :aria-checked="theme === option.value"
+          @click="chooseTheme(option.value)"
+        >
+          <span class="theme-swatch" :class="`theme-${option.value}`" aria-hidden="true"><i /></span>
+          <span class="theme-option-copy"><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span>
+          <AppIcon v-if="theme === option.value" name="check" :size="17" class="theme-check" />
+        </button>
+      </div>
+    </Sheet>
   </div>
 </template>

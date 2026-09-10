@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { JobProject, TargetStage } from '../types/project'
-import { TARGET_STAGE_COLORS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage } from '../types/project'
+import { TARGET_STAGE_COLORS, isTerminalStage, normalizeTargetStage } from '../types/project'
+import { outcomeLabelOf } from '../data/store'
 import { companyMark } from '../constants/companyBrands'
 import StagePipeline from './StagePipeline.vue'
 import AppIcon from './AppIcon.vue'
@@ -15,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'open'): void
   (e: 'stage', stage: TargetStage): void
+  (e: 'round', round: number): void
   (e: 'menu', anchor: MouseEvent): void
   (e: 'link-resume'): void
 }>()
@@ -54,17 +56,17 @@ function recentLabel(): string {
         <small>{{ target.targetRole || target.industry || '求职目标' }}<template v-if="target.location"> · {{ target.location }}</template></small>
       </div>
       <div class="head-side">
-        <button class="stage-pill" :style="pillStyle" @click.stop="emit('open')">{{ TARGET_STAGE_LABELS[stage] }}</button>
+        <button class="stage-pill" :style="pillStyle" @click.stop="emit('open')">{{ outcomeLabelOf(target) }}</button>
         <button class="menu-trigger" aria-label="更多操作" @click.stop="emit('menu', $event)"><AppIcon name="more" :size="18" /></button>
       </div>
     </header>
 
-    <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :interview-rounds="target.interviewRounds" @change="(s) => emit('stage', s)" />
+    <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :interview-rounds="target.interviewRounds" :interview-round="target.interviewRound" @change="(s) => emit('stage', s)" @round="(r) => emit('round', r)" />
 
     <div class="chip-row">
       <button v-if="resumeLabel" class="chip" @click.stop="emit('open')"><AppIcon name="file" :size="14" /> {{ resumeLabel }}</button>
       <button v-else class="chip dashed" @click.stop="emit('link-resume')"><AppIcon name="plus" :size="13" /> 绑定简历</button>
-      <span v-if="locked" class="chip-meta">已标记「{{ TARGET_STAGE_LABELS[stage] }}」· 锁定</span>
+      <span v-if="locked" class="chip-meta">已标记「{{ outcomeLabelOf(target) }}」· 锁定</span>
     </div>
 
     <footer class="card-foot">

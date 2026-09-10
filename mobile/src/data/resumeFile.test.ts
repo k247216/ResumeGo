@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('./fileStore', () => ({
   getFile: vi.fn(async (key: string) => key === 'resume-md' ? { text: async () => '# 张三\n\n- Java / Spring Boot' } : null),
-  objectUrl: vi.fn(async () => null),
+  objectUrl: vi.fn(async (key: string) => key === 'resume-image' ? 'blob:image' : null),
 }))
 
 import { previewResume } from './resumeFile'
@@ -23,5 +23,14 @@ describe('简历文件预览', () => {
       size: 0, fileKey: 'missing', note: null, createdAt: new Date().toISOString(),
     })
     expect(preview.kind).toBe('none')
+  })
+
+  it('图片简历可以直接生成图片预览', async () => {
+    const preview = await previewResume({
+      id: 3, resumeId: 1, versionNo: 3, fileName: 'resume.png', mime: 'image/png',
+      size: 12, fileKey: 'resume-image', note: null, createdAt: new Date().toISOString(),
+    })
+    expect(preview.kind).toBe('image')
+    expect(preview.url).toBe('blob:image')
   })
 })

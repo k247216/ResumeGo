@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
-import type { JobProject, StageEvent, TargetStage } from '../types/project'
-import { isTerminalStage, normalizeTargetStage, stageFlowRank } from '../types/project'
+import type { JobProject, StageEvent, TargetOutcome, TargetStage } from '../types/project'
+import { isTerminalStage, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
 import type { ScheduleEvent } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
 
@@ -9,6 +9,10 @@ export const DEFAULT_INTERVIEW_ROUNDS = 2
 export function normalizeInterviewRounds(value: unknown): number {
   const rounds = Number(value)
   return Number.isFinite(rounds) ? Math.min(8, Math.max(1, Math.round(rounds))) : DEFAULT_INTERVIEW_ROUNDS
+}
+function normalizeInterviewRound(value: unknown, rounds: number): number {
+  const current = Number(value)
+  return Number.isFinite(current) ? Math.min(rounds, Math.max(1, Math.round(current))) : 1
 }
 
 // 文件型简历：版本＝用户上传的一份 .md / .pdf 原文件；二进制在 IndexedDB，这里只留元数据。
@@ -69,9 +73,9 @@ function seed(): DbShape {
     seq: 100,
     reminders: { 21: 30, 22: 60 },
     targets: [
-      { id: 1, name: '字节跳动 · 前端开发', status: 'active', stage: 'interview', jobDescriptionId: 1, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-2), industry: '互联网', targetRole: '前端', location: '北京', notes: '', interviewRounds: 2, createdAt: daysFromNow(-20), updatedAt: now },
-      { id: 2, name: '腾讯 · 后端开发', status: 'active', stage: 'applied', jobDescriptionId: null, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-5), industry: '互联网', targetRole: '后端', location: '深圳', notes: '', interviewRounds: 3, createdAt: daysFromNow(-8), updatedAt: now },
-      { id: 3, name: '美团 · 算法工程师', status: 'active', stage: 'offer', jobDescriptionId: null, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-1), industry: '本地生活', targetRole: '算法', location: '上海', notes: '', interviewRounds: 1, createdAt: daysFromNow(-40), updatedAt: now },
+      { id: 1, name: '字节跳动 · 前端开发', status: 'active', stage: 'interview', jobDescriptionId: 1, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-2), industry: '互联网', targetRole: '前端', location: '北京', notes: '', interviewRounds: 2, interviewRound: 1, outcome: null, outcomeRound: null, createdAt: daysFromNow(-20), updatedAt: now },
+      { id: 2, name: '腾讯 · 后端开发', status: 'active', stage: 'applied', jobDescriptionId: null, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-5), industry: '互联网', targetRole: '后端', location: '深圳', notes: '', interviewRounds: 3, interviewRound: 1, outcome: null, outcomeRound: null, createdAt: daysFromNow(-8), updatedAt: now },
+      { id: 3, name: '美团 · 算法工程师', status: 'active', stage: 'offer', jobDescriptionId: null, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-1), industry: '本地生活', targetRole: '算法', location: '上海', notes: '', interviewRounds: 1, interviewRound: 1, outcome: null, outcomeRound: null, createdAt: daysFromNow(-40), updatedAt: now },
     ],
     stageEvents: [
       { id: 11, targetId: 1, stage: 'applied', occurredAt: daysFromNow(-20) },
@@ -105,6 +109,9 @@ function load(): DbShape {
 function hydrate(db: DbShape) {
   for (const target of db.targets) {
     target.interviewRounds = normalizeInterviewRounds(target.interviewRounds)
+    target.interviewRound = normalizeInterviewRound(target.interviewRound, target.interviewRounds)
+    target.outcome = target.outcome ?? null
+    target.outcomeRound = target.outcomeRound == null ? null : normalizeInterviewRound(target.outcomeRound, target.interviewRounds)
   }
   for (const resume of db.resumes) {
     const versions = db.versions.filter((v) => v.resumeId === resume.id).sort((a, b) => a.versionNo - b.versionNo)
@@ -134,7 +141,7 @@ export function createTarget(name: string, opts: { jobDescriptionId?: number | n
     resumeVersionId: opts.resumeVersionId ?? null,
     archivedAt: null, stageUpdatedAt: now,
     industry: null, targetRole: null, location: null, notes: null,
-    interviewRounds: DEFAULT_INTERVIEW_ROUNDS,
+    interviewRounds: DEFAULT_INTERVIEW_ROUNDS, interviewRound: 1, outcome: null, outcomeRound: null,
     createdAt: now, updatedAt: now,
   }
   db.targets.unshift(target)
@@ -177,9 +184,35 @@ export function updateApplication(id: number, payload: { industry?: string | nul
 export function interviewRoundsOf(target: JobProject): number {
   return normalizeInterviewRounds(target.interviewRounds)
 }
+export function interviewRoundOf(target: JobProject): number {
+  return normalizeInterviewRound(target.interviewRound, interviewRoundsOf(target))
+}
 export function setInterviewRounds(id: number, rounds: number) {
   const t = db.targets.find((x) => x.id === id); if (!t) return
   t.interviewRounds = normalizeInterviewRounds(rounds)
+  t.interviewRound = normalizeInterviewRound(t.interviewRound, t.interviewRounds)
+  t.updatedAt = iso(new Date())
+}
+export function setInterviewRound(id: number, round: number) {
+  const t = db.targets.find((x) => x.id === id); if (!t) return
+  t.interviewRound = normalizeInterviewRound(round, interviewRoundsOf(t))
+  t.updatedAt = iso(new Date())
+}
+export function outcomeLabelOf(target: JobProject): string {
+  if (!target.outcome) return TARGET_STAGE_LABELS[normalizeTargetStage(target.stage)]
+  if (target.outcome === 'interview_failed') return `面试第 ${normalizeInterviewRound(target.outcomeRound, interviewRoundsOf(target))} 面未通过`
+  return TARGET_OUTCOME_LABELS[target.outcome]
+}
+export function setTargetOutcome(id: number, outcome: TargetOutcome | null, round?: number) {
+  const t = db.targets.find((x) => x.id === id); if (!t) return
+  t.outcome = outcome
+  t.outcomeRound = outcome === 'interview_failed' ? normalizeInterviewRound(round, interviewRoundsOf(t)) : null
+  if (outcome) {
+    const stage: TargetStage = outcome === 'pool' ? 'pool' : outcome === 'rejected' ? 'rejected' : outcome === 'closed' ? 'closed' : 'screened_out'
+    t.stage = stage
+    t.stageUpdatedAt = iso(new Date())
+    db.stageEvents.push({ id: nextId(), targetId: id, stage, occurredAt: iso(new Date()) })
+  }
   t.updatedAt = iso(new Date())
 }
 export function stageEventsOf(id: number): StageEvent[] {

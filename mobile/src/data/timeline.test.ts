@@ -11,6 +11,13 @@ describe('日程时间轴', () => {
     expect(days.every((day) => day.getHours() === 0 && day.getMinutes() === 0)).toBe(true)
   })
 
+  it('默认可以生成至少一个月的可滑动日期窗口', () => {
+    const days = timelineDates(new Date(2026, 8, 10, 15, 30), 31)
+
+    expect(days).toHaveLength(31)
+    expect(days[30].toDateString()).toBe(new Date(2026, 9, 10).toDateString())
+  })
+
   it('按本地年月日筛选当天的日程', () => {
     const events = [
       { id: 1, startTime: new Date(2026, 8, 10, 14, 0).toISOString() },

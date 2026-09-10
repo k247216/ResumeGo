@@ -49,7 +49,7 @@ const todayLabel = computed(() => {
   const d = nowDate.value
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 · 周${'日一二三四五六'[d.getDay()]}`
 })
-const timeline = computed(() => timelineDates(nowDate.value, 7))
+const timeline = computed(() => timelineDates(nowDate.value, 31))
 
 const editing = ref<ScheduleEvent | null>(null)
 const sheetOpen = ref(false)
@@ -72,9 +72,6 @@ function fromLocalInput(v: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-const nextUp = computed<ScheduleEvent | null>(() =>
-  listSchedules().find((e) => new Date(e.startTime).getTime() >= now.value - 3_600_000) ?? null,
-)
 const grouped = computed(() => {
   const map = new Map<string, ScheduleEvent[]>()
   for (const ev of listSchedules()) {
@@ -229,8 +226,8 @@ async function syncToCalendar() {
       <section class="timeline-block" aria-labelledby="timeline-title">
         <div class="section-head">
           <div>
-            <h2 id="timeline-title">接下来 7 天</h2>
-            <p>横向滑动查看安排</p>
+            <h2 id="timeline-title">接下来一个月</h2>
+            <p>横向滑动查看整月安排</p>
           </div>
           <button class="inline-action" @click="viewMode = 'month'">查看全部 <AppIcon name="chevronRight" :size="15" /></button>
         </div>
@@ -262,7 +259,7 @@ async function syncToCalendar() {
           <button class="inline-action add-action" @click="openCreate"><AppIcon name="plus" :size="15" /> 添加日程</button>
         </div>
         <div v-if="planEvents.length" class="plan-list">
-          <button v-for="(ev, i) in planEvents" :key="ev.id" class="plan-row" :class="{ selected: nextUp?.id === ev.id }" :style="{ '--i': Math.min(i, 8) }" @click="openEdit(ev)">
+          <button v-for="(ev, i) in planEvents" :key="ev.id" class="plan-row" :style="{ '--i': Math.min(i, 8) }" @click="openEdit(ev)">
             <span class="plan-mark">
               <img v-if="companyMark(companyName(ev)).icon" :src="companyMark(companyName(ev)).icon" alt="">
               <span v-else :style="{ background: companyMark(companyName(ev)).color, color: companyMark(companyName(ev)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(ev)).letter }}</span>

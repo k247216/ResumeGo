@@ -3,7 +3,7 @@ import { objectUrl, getFile } from './fileStore'
 import type { ResumeFileVer } from './store'
 
 export interface ResumePreview {
-  kind: 'pdf' | 'text' | 'none'
+  kind: 'pdf' | 'image' | 'text' | 'none'
   url?: string
   text?: string
 }
@@ -15,8 +15,10 @@ export async function previewResume(ver: ResumeFileVer): Promise<ResumePreview> 
     const blob = await getFile(ver.fileKey)
     return { kind: blob ? 'text' : 'none', text: blob ? await blob.text() : undefined }
   }
+  const isImage = ver.mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(ver.fileName)
   const url = await objectUrl(ver.fileKey)
-  return url ? { kind: 'pdf', url } : { kind: 'none' }
+  if (!url) return { kind: 'none' }
+  return { kind: isImage ? 'image' : 'pdf', url }
 }
 
 function toBase64(blob: Blob): Promise<string> {

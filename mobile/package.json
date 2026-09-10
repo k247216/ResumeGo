@@ -1,7 +1,7 @@
 {
   "name": "zhida-mobile",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "职达 · 移动端：求职目标 / 日程提醒 / 简历记录（导入自己的文件），本地优先、独立运行",
   "type": "module",
   "scripts": {

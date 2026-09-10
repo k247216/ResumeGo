@@ -10,10 +10,11 @@ import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import {
   createTarget, currentVersionOf, deleteTarget, linkResume, listResumes, listTargets,
-  interviewRoundsOf, renameTarget, resumeLabel, setInterviewRounds, setStage, setTargetStatus, stageEventsOf, updateApplication,
+  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, resumeLabel, setInterviewRound,
+  setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, stageEventsOf, updateApplication,
 } from '../data/store'
-import type { JobProject, TargetStage } from '../types/project'
-import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import type { JobProject, TargetOutcome, TargetStage } from '../types/project'
+import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
 
 const search = ref('')
 const filter = ref<'all' | TargetStage | 'outcome' | 'archived'>('all')
@@ -90,6 +91,15 @@ function onChangeStage(t: JobProject, stage: TargetStage) {
   toast(res.ok ? `已推进到「${TARGET_STAGE_LABELS[stage]}」` : (res.message ?? '操作失败'))
 }
 
+function onChangeInterviewRound(t: JobProject, round: number) {
+  if (normalizeTargetStage(t.stage) !== 'interview') {
+    const res = setStage(t.id, 'interview')
+    if (!res.ok) { toast(res.message ?? '操作失败'); return }
+  }
+  setInterviewRound(t.id, round)
+  toast(`当前进度：第 ${round} 面`)
+}
+
 function openDetail(t: JobProject) {
   detailTarget.value = t
   appForm.value = { industry: t.industry ?? '', role: t.targetRole ?? '', location: t.location ?? '', notes: t.notes ?? '' }
@@ -97,6 +107,7 @@ function openDetail(t: JobProject) {
 function saveApplication() {
   if (!detailTarget.value) return
   updateApplication(detailTarget.value.id, { ...appForm.value })
+  detailTarget.value = null
   toast('投递信息已保存')
 }
 function openMenu(t: JobProject) { menuTarget.value = t }
@@ -139,6 +150,15 @@ const resumeOptions = computed(() =>
   }),
 )
 const roundOptions = [1, 2, 3, 4, 5].map((value) => ({ value, label: `${value} 轮` }))
+const outcomeOptions: Array<{ value: TargetOutcome; label: string }> = [
+  { value: 'pool', label: TARGET_OUTCOME_LABELS.pool },
+  { value: 'exam_failed', label: TARGET_OUTCOME_LABELS.exam_failed },
+  { value: 'interview_failed', label: '面试第 N 轮未通过（使用当前面试轮次）' },
+  { value: 'hr_failed', label: TARGET_OUTCOME_LABELS.hr_failed },
+  { value: 'resume_failed', label: TARGET_OUTCOME_LABELS.resume_failed },
+  { value: 'rejected', label: TARGET_OUTCOME_LABELS.rejected },
+  { value: 'closed', label: TARGET_OUTCOME_LABELS.closed },
+]
 function onLinkResume(versionId: number | null) {
   if (!detailTarget.value) return
   linkResume(detailTarget.value.id, versionId)
@@ -154,8 +174,8 @@ function onLinkResume(versionId: number | null) {
         <p class="page-sub">以公司为单位管理进度 · {{ countOf('all') }} 个计划</p>
       </div>
       <div class="view-switch" aria-label="目标卡片布局">
-        <button :class="{ on: layoutMode === 1 }" @click="layoutMode = 1">一列</button>
-        <button :class="{ on: layoutMode === 2 }" @click="layoutMode = 2">两列</button>
+        <button :class="{ on: layoutMode === 1 }" aria-label="一列布局" title="一列布局" @click="layoutMode = 1"><AppIcon name="list" :size="16" /></button>
+        <button :class="{ on: layoutMode === 2 }" aria-label="两列布局" title="两列布局" @click="layoutMode = 2"><AppIcon name="grid" :size="16" /></button>
       </div>
     </header>
 
@@ -185,6 +205,7 @@ function onLinkResume(versionId: number | null) {
         :stage-times="stageTimesOf(t)"
         @open="openDetail(t)"
         @stage="(s) => onChangeStage(t, s)"
+        @round="(r) => onChangeInterviewRound(t, r)"
         @menu="openMenu(t)"
         @link-resume="openDetail(t)"
       />
@@ -238,18 +259,34 @@ function onLinkResume(versionId: number | null) {
         :times="stageTimesOf(detailTarget)"
         :locked="detailTarget.status === 'archived'"
         :interview-rounds="interviewRoundsOf(detailTarget)"
+        :interview-round="interviewRoundOf(detailTarget)"
         @change="(s) => onChangeStage(detailTarget!, s)"
+        @round="(r) => onChangeInterviewRound(detailTarget!, r)"
       />
 
       <p class="section-kicker">面试轮次</p>
       <PickerField
         :model-value="interviewRoundsOf(detailTarget)"
         :options="roundOptions"
-        label="这个岗位预计有几轮面试"
+        label="选择面试轮次"
         title="设置面试轮次"
         icon="target"
         @update:model-value="(v) => setInterviewRounds(detailTarget!.id, Number(v))"
       />
+
+      <p class="section-kicker">结果标记</p>
+      <PickerField
+        :model-value="detailTarget.outcome ?? null"
+        :options="outcomeOptions"
+        label="记录这次投递的结果"
+        title="选择结果标记"
+        placeholder="尚未标记"
+        clearable
+        clear-label="尚未标记"
+        icon="target"
+        @update:model-value="(v) => setTargetOutcome(detailTarget!.id, v as TargetOutcome | null, interviewRoundOf(detailTarget!))"
+      />
+      <p v-if="detailTarget.outcome" class="chip-meta" style="margin-top:6px">当前结果：{{ outcomeLabelOf(detailTarget) }}</p>
 
       <p class="section-kicker">阶段时间轴</p>
       <div class="list">

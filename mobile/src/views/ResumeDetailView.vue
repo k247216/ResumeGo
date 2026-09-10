@@ -141,7 +141,7 @@ function short(v: string): string {
       >V{{ v.versionNo }}<small>{{ short(v.createdAt) }}</small></button>
       <button class="version-dot add" @click="openVersionPicker"><AppIcon name="plus" :size="15" /> 新版</button>
     </div>
-    <input ref="fileRef" type="file" accept=".pdf,.md,.markdown,.txt,application/pdf,text/markdown,text/plain" hidden @change="onVersionFile">
+    <input ref="fileRef" type="file" hidden @change="onVersionFile">
 
     <div v-if="current" class="ver-meta">
       <span class="chip">{{ current.fileName }}</span>
@@ -152,6 +152,7 @@ function short(v: string): string {
     <div class="doc-stage">
       <div v-if="loading" class="doc-loading"><span class="spinner" aria-hidden="true" /> 正在读取文件…</div>
       <iframe v-else-if="preview.kind === 'pdf' && preview.url" class="doc-pdf" :src="preview.url" title="简历预览" />
+      <img v-else-if="preview.kind === 'image' && preview.url" class="doc-image" :src="preview.url" alt="简历预览">
       <article v-else-if="preview.kind === 'text'" class="doc-md" v-html="mdHtml" />
       <EmptyState v-else icon="file" title="文件在本机已缺失" hint="这份简历的版本文件不在当前设备上，点「新增一版」重新上传一份。">
         <template #action>

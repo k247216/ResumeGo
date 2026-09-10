@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createSchedule, createTarget, deleteSchedule, getReminder, importBackup,
-  interviewRoundsOf, listTargets, setInterviewRounds, setReminder, setStage, stageEventsOf,
+  interviewRoundOf, interviewRoundsOf, listTargets, setInterviewRound, setInterviewRounds,
+  setReminder, setStage, setTargetOutcome, stageEventsOf,
 } from './store'
 
 describe('求职目标阶段规则', () => {
@@ -34,6 +35,23 @@ describe('求职目标阶段规则', () => {
     expect(interviewRoundsOf(t)).toBe(4)
     setInterviewRounds(t.id, 99)
     expect(interviewRoundsOf(t)).toBe(8)
+  })
+
+  it('设置面试轮次后可以记录当前第几面', () => {
+    const t = createTarget('当前面试轮次测试')
+    setInterviewRounds(t.id, 4)
+    setInterviewRound(t.id, 3)
+
+    expect(interviewRoundOf(t)).toBe(3)
+  })
+
+  it('求职目标可以记录具体结果标记', () => {
+    const t = createTarget('结果标记测试')
+    setTargetOutcome(t.id, 'interview_failed', 2)
+
+    expect(t.outcome).toBe('interview_failed')
+    expect(t.outcomeRound).toBe(2)
+    expect(t.stage).toBe('screened_out')
   })
 })
 
