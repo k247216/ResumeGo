@@ -13,12 +13,6 @@ const fileRef = ref<HTMLInputElement | null>(null)
 const activeTargetCount = computed(() => listTargets().filter((target) => target.status === 'active').length)
 const resumeCount = computed(() => listResumes().length)
 const scheduleCount = computed(() => listSchedules().length)
-const nextSchedule = computed(() => listSchedules().find((event) => new Date(event.startTime).getTime() >= Date.now() - 3_600_000) ?? null)
-function nextScheduleLabel() {
-  if (!nextSchedule.value) return '暂时没有下一场安排'
-  const date = new Date(nextSchedule.value.startTime)
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')} · ${nextSchedule.value.title}`
-}
 
 function chooseTheme(value: Theme) {
   theme.value = value
@@ -83,7 +77,6 @@ async function onImportFile(e: Event) {
         <div class="metric-card pastel-yellow"><strong>{{ scheduleCount }}</strong><small>本地日程</small></div>
         <div class="metric-card pastel-mint"><strong>{{ resumeCount }}</strong><small>简历资产</small></div>
       </div>
-      <div class="me-next"><span class="me-next-dot" /><span><small>下一步安排</small><strong>{{ nextScheduleLabel() }}</strong></span></div>
     </section>
 
     <p class="section-kicker">外观</p>
@@ -111,11 +104,6 @@ async function onImportFile(e: Event) {
     </div>
 
     <div class="about">
-      <div class="setting-row" style="cursor: default">
-        <span class="sr-ic"><AppIcon name="user" :size="18" /></span>
-        <span class="s-label">职达 · 移动端</span>
-        <span class="s-value">v0.2.5</span>
-      </div>
       <p class="about-note">求职目标、日程、简历记录默认不上传云端；提醒在设备本地触发，无需推送服务器。<br>备份仅含文本记录，简历 PDF/MD 需在新设备重新导入。</p>
     </div>
 
