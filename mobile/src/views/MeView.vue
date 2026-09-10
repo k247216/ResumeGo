@@ -79,7 +79,7 @@ async function onReset() {
       </div>
     </header>
 
-    <section class="me-profile card" aria-label="本地工作区状态">
+    <section class="me-profile card workspace-card" aria-label="本地工作区状态">
       <span class="me-avatar"><AppIcon name="user" :size="22" /></span>
       <div class="me-profile-copy">
         <strong>职达 · Career OS</strong>
@@ -89,11 +89,11 @@ async function onReset() {
     </section>
 
     <p class="section-kicker">工作区概况</p>
-    <section class="me-overview card" aria-label="工作区概况">
+    <section class="me-overview card workspace-card" aria-label="工作区概况">
       <div class="me-metrics">
-        <div><strong>{{ activeTargetCount }}</strong><small>进行中的目标</small></div>
-        <div><strong>{{ scheduleCount }}</strong><small>本地日程</small></div>
-        <div><strong>{{ resumeCount }}</strong><small>简历资产</small></div>
+        <div class="metric-card pastel-pink"><strong>{{ activeTargetCount }}</strong><small>进行中的目标</small></div>
+        <div class="metric-card pastel-yellow"><strong>{{ scheduleCount }}</strong><small>本地日程</small></div>
+        <div class="metric-card pastel-mint"><strong>{{ resumeCount }}</strong><small>简历资产</small></div>
       </div>
       <div class="me-next"><span class="me-next-dot" /><span><small>下一步安排</small><strong>{{ nextScheduleLabel() }}</strong></span></div>
     </section>

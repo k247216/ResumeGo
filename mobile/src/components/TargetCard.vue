@@ -28,6 +28,12 @@ const pillStyle = computed(() => {
   return { background: `color-mix(in srgb, ${color} 12%, transparent)`, color }
 })
 const locked = computed(() => props.target.status === 'archived' || isTerminalStage(stage.value))
+const pastelTone = computed(() => {
+  if (stage.value === 'interview' || stage.value === 'hr') return 'pink'
+  if (stage.value === 'offer') return 'mint'
+  if (stage.value === 'exam') return 'yellow'
+  return 'lilac'
+})
 
 function shortDate(value?: string | null): string {
   if (!value) return '—'
@@ -47,7 +53,7 @@ function recentLabel(): string {
 </script>
 
 <template>
-  <article class="card" :class="{ archived: target.status === 'archived' }" :style="{ '--i': Math.min(index, 8) }" @click="emit('open')">
+  <article class="card workspace-card target-card" :class="[`target-tone-${pastelTone}`, { archived: target.status === 'archived' }]" :style="{ '--i': Math.min(index, 8) }" @click="emit('open')">
     <header class="card-head">
       <img v-if="mark.icon" class="logo-img" :src="mark.icon" alt="" aria-hidden="true">
       <span v-else class="logo-mark" :style="{ background: mark.color, color: mark.lightText ? '#fff' : '#1b1b1b' }">{{ mark.letter }}</span>

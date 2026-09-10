@@ -68,7 +68,7 @@ async function removeResume(id: number, title: string) {
     <div v-else class="list">
       <article
         v-for="(r, i) in resumes" :key="r.id"
-        class="card resume-card" :style="{ '--i': i }"
+        class="card workspace-card resume-card" :class="`resume-tone-${i % 4}`" :style="{ '--i': i }"
         @click="router.push({ name: 'resume-detail', params: { id: String(r.id) } })"
       >
         <ResumeMark :variant="r.mark ?? resumeMarkOf(r.id)" :size="42" />

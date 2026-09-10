@@ -558,7 +558,12 @@ button { font-family: inherit; }
 .import-hero p { margin: 0; color: var(--copy); font-size: 13px; line-height: 1.75; }
 .import-hero .btn-primary { margin-top: 8px; }
 .ih-note { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
-.resume-card { flex-direction: row; align-items: center; gap: 12px; }
+.resume-card { flex-direction: row; align-items: center; gap: 12px; border: 0; }
+.resume-tone-0 { background: var(--pastel-mint); }
+.resume-tone-1 { background: var(--pastel-pink); }
+.resume-tone-2 { background: var(--pastel-yellow); }
+.resume-tone-3 { background: var(--pastel-lilac); }
+.resume-card .resume-mark { background: rgba(255, 255, 255, .72); }
 .resume-card .head-copy { flex: 1; min-width: 0; }
 .rc-side { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .resume-more { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
@@ -616,7 +621,7 @@ button { font-family: inherit; }
 
 /* 设置行图标 + 关于 */
 .sr-ic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--surface-subtle); color: var(--copy); flex: 0 0 auto; }
-.me-profile { flex-direction: row; align-items: center; gap: 12px; margin-top: 4px; padding: 14px; }
+.me-profile { flex-direction: row; align-items: center; gap: 12px; margin-top: 4px; padding: 14px; border: 0; }
 .me-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 14px; background: var(--brand-soft); color: var(--brand); }
 .theme-intro { margin: 0 0 12px; color: var(--copy); font-size: 13px; line-height: 1.6; }
 .theme-options { display: grid; gap: 8px; }
@@ -642,6 +647,13 @@ button { font-family: inherit; }
 .me-overview { gap: 14px; margin-top: 0; padding: 14px; }
 .me-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .me-metrics > div { display: grid; gap: 3px; min-width: 0; padding: 8px 9px; border-radius: 11px; background: var(--surface-subtle); }
+.me-metrics > .pastel-mint,
+.me-metrics > .pastel-pink,
+.me-metrics > .pastel-yellow,
+.me-metrics > .pastel-lilac { background: var(--pastel-mint); }
+.me-metrics > .pastel-pink { background: var(--pastel-pink); }
+.me-metrics > .pastel-yellow { background: var(--pastel-yellow); }
+.me-metrics > .pastel-lilac { background: var(--pastel-lilac); }
 .me-metrics strong { font-size: 20px; font-weight: 750; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
 .me-metrics small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
 .me-next { display: flex; align-items: center; gap: 9px; padding-top: 11px; border-top: 1px solid var(--line-subtle); }
@@ -1252,6 +1264,13 @@ button { font-family: inherit; }
 
 /* 求职目标：在平板/横屏宽度保留两列卡片，手机窄屏自动回落单列 */
 .targets-grid { display: grid; gap: var(--space-3); }
+.target-card { border: 0; min-height: 214px; }
+.target-card .card-foot { border-top-color: rgba(17, 19, 21, .08); }
+.target-tone-mint { background: var(--pastel-mint); }
+.target-tone-pink { background: var(--pastel-pink); }
+.target-tone-yellow { background: var(--pastel-yellow); }
+.target-tone-lilac { background: var(--pastel-lilac); }
+.target-card .stage-pill { background: rgba(255, 255, 255, .7) !important; color: var(--ink) !important; }
 .targets-grid.is-double { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 @media (max-width: 399px) {
   .targets-grid.is-double .card { padding: 12px; }
