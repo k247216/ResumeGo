@@ -85,7 +85,7 @@ async function onReset() {
         <strong>职达 · Career OS</strong>
         <small>你的本地职业资产空间</small>
       </div>
-      <span class="me-version">移动端 · v0.2.4</span>
+      <span class="me-version">移动端 · v0.2.5</span>
     </section>
 
     <p class="section-kicker">工作区概况</p>
@@ -130,7 +130,7 @@ async function onReset() {
       <div class="setting-row" style="cursor: default">
         <span class="sr-ic"><AppIcon name="user" :size="18" /></span>
         <span class="s-label">职达 · 移动端</span>
-        <span class="s-value">v0.2.4</span>
+        <span class="s-value">v0.2.5</span>
       </div>
       <p class="about-note">求职目标、日程、简历记录默认不上传云端；提醒在设备本地触发，无需推送服务器。<br>备份仅含文本记录，简历 PDF/MD 需在新设备重新导入。</p>
     </div>
