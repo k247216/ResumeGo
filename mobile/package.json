@@ -1,0 +1,36 @@
+{
+  "name": "zhida-mobile",
+  "private": true,
+  "version": "0.2.0",
+  "description": "职达 · 移动端：求职目标 / 日程提醒 / 简历记录（导入自己的文件），本地优先、独立运行",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run --environment happy-dom",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "cap:sync": "cap sync",
+    "cap:android": "cap add android && cap sync",
+    "cap:open": "cap open android",
+    "cap:run": "cap run android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/local-notifications": "^6.1.0",
+    "@capacitor/share": "^6.0.3",
+    "vue": "^3.5.39",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/tsconfig": "^0.9.1",
+    "happy-dom": "^20.11.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.1.11",
+    "vue-tsc": "^3.3.5"
+  }
+}
