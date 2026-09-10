@@ -9,6 +9,7 @@ const PATHS: Record<string, string> = {
   chevronDown: 'M6 9l6 6 6-6',
   chevronRight: 'M9 6l6 6-6 6',
   chevronLeft: 'M15 6l-6 6 6 6',
+  arrowUpRight: 'M7 17 17 7m0 0H9m8 0v8',
   close: 'M6 6l12 12M18 6L6 18',
   check: 'M5 13l4 4L19 7',
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.35-4.35',

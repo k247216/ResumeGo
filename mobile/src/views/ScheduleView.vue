@@ -82,6 +82,7 @@ const grouped = computed(() => {
   return [...map.entries()]
 })
 const planEvents = computed(() => listSchedules())
+const nextEvent = computed(() => planEvents.value.find((event) => new Date(event.startTime).getTime() >= now.value - 30 * 60_000) ?? null)
 const eventsByDay = computed(() => new Map(grouped.value))
 
 interface CalCell { key: string; day: number; other: boolean }
@@ -143,6 +144,16 @@ function timelineEvents(day: Date): ScheduleEvent[] {
 }
 function dayNumber(day: Date): string { return `${day.getMonth() + 1}/${day.getDate()}` }
 function weekLabel(day: Date): string { return '日一二三四五六'[day.getDay()] }
+function countdownLabel(event: ScheduleEvent | null): string {
+  if (!event) return '暂时没有安排'
+  const diff = new Date(event.startTime).getTime() - now.value
+  if (diff <= 0) return '正在进行'
+  const minutes = Math.ceil(diff / 60_000)
+  if (minutes < 60) return `${minutes} 分钟后`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} 小时 ${rest} 分钟后` : `${hours} 小时后`
+}
 function toggleCalendar() { viewMode.value = viewMode.value === 'agenda' ? 'month' : 'agenda' }
 function openCreate() {
   editing.value = null
@@ -223,7 +234,39 @@ async function syncToCalendar() {
     </header>
 
     <template v-if="viewMode === 'agenda'">
-      <section class="timeline-block" aria-labelledby="timeline-title">
+      <section class="schedule-focus workspace-card" aria-labelledby="focus-title">
+        <div class="schedule-focus-head">
+          <div>
+            <span class="schedule-eyebrow">今日活动</span>
+            <h1 id="focus-title">{{ nextEvent ? '下一场面试' : '今天的安排' }}</h1>
+          </div>
+          <span class="schedule-focus-count">{{ planEvents.length }} 场</span>
+        </div>
+        <template v-if="nextEvent">
+          <button class="schedule-focus-event" :aria-label="`查看${companyName(nextEvent)}详情`" @click="openEdit(nextEvent)">
+            <span class="schedule-focus-logo">
+              <img v-if="companyMark(companyName(nextEvent)).icon" :src="companyMark(companyName(nextEvent)).icon" alt="">
+              <span v-else :style="{ background: companyMark(companyName(nextEvent)).color, color: companyMark(companyName(nextEvent)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(nextEvent)).letter }}</span>
+            </span>
+            <span class="schedule-focus-copy">
+              <strong>{{ companyName(nextEvent) }} · {{ SCHEDULE_EVENT_TYPE_LABELS[nextEvent.eventType] }}</strong>
+              <small>{{ roleName(nextEvent) }} · {{ fullWhen(nextEvent.startTime) }}</small>
+            </span>
+            <span class="action-arrow" aria-hidden="true"><AppIcon name="arrowUpRight" :size="17" /></span>
+          </button>
+          <div class="schedule-focus-meta">
+            <div><small>距离开始</small><strong>{{ countdownLabel(nextEvent) }}</strong></div>
+            <div><small>提醒</small><strong>{{ getReminder(nextEvent.id) > 0 ? `提前 ${getReminder(nextEvent.id)} 分钟` : '未设置' }}</strong></div>
+          </div>
+        </template>
+        <div v-else class="schedule-focus-empty">
+          <strong>还没有安排面试</strong>
+          <small>添加一场真实面试，日程和提醒会在本机保存。</small>
+          <button class="btn-primary" @click="openCreate"><AppIcon name="plus" :size="16" /> 添加日程</button>
+        </div>
+      </section>
+
+      <section class="timeline-block schedule-month workspace-card" aria-labelledby="timeline-title">
         <div class="section-head">
           <div>
             <h2 id="timeline-title">接下来一个月</h2>
@@ -253,7 +296,7 @@ async function syncToCalendar() {
         </div>
       </section>
 
-      <section class="plan-block" aria-labelledby="plan-title">
+      <section class="plan-block schedule-list workspace-card" aria-labelledby="plan-title">
         <div class="section-head">
           <h2 id="plan-title">面试计划</h2>
           <button class="inline-action add-action" @click="openCreate"><AppIcon name="plus" :size="15" /> 添加日程</button>
