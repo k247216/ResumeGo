@@ -45,6 +45,20 @@ describe('求职目标阶段规则', () => {
     expect(interviewRoundOf(t)).toBe(3)
   })
 
+  it('拿到 Offer 后锁定面试轮次和结果标记', () => {
+    const t = createTarget('Offer 终态锁定测试')
+    expect(setStage(t.id, 'offer').ok).toBe(true)
+
+    setInterviewRounds(t.id, 5)
+    setInterviewRound(t.id, 4)
+    setTargetOutcome(t.id, 'pool')
+
+    expect(interviewRoundsOf(t)).toBe(2)
+    expect(interviewRoundOf(t)).toBe(1)
+    expect(t.stage).toBe('offer')
+    expect(t.outcome).toBeNull()
+  })
+
   it('求职目标可以记录具体结果标记', () => {
     const t = createTarget('结果标记测试')
     setTargetOutcome(t.id, 'interview_failed', 2)

@@ -14,7 +14,7 @@ import {
   setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, stageEventsOf, updateApplication,
 } from '../data/store'
 import type { JobProject, TargetOutcome, TargetStage } from '../types/project'
-import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage } from '../types/project'
 
 const search = ref('')
 const filter = ref<'all' | TargetStage | 'outcome' | 'archived'>('all')
@@ -31,6 +31,10 @@ const renameOpen = ref(false)
 const renameValue = ref('')
 
 const appForm = ref({ industry: '', role: '', location: '', notes: '' })
+const detailLocked = computed(() => {
+  const target = detailTarget.value
+  return !!target && (target.status === 'archived' || isTerminalStage(normalizeTargetStage(target.stage)))
+})
 
 const FILTERS: Array<{ key: typeof filter.value; label: string }> = [
   { key: 'all', label: '全部' },
@@ -257,17 +261,19 @@ function onLinkResume(versionId: number | null) {
       <StagePipeline
         :stage="normalizeTargetStage(detailTarget.stage)"
         :times="stageTimesOf(detailTarget)"
-        :locked="detailTarget.status === 'archived'"
+        :locked="detailLocked"
         :interview-rounds="interviewRoundsOf(detailTarget)"
         :interview-round="interviewRoundOf(detailTarget)"
         @change="(s) => onChangeStage(detailTarget!, s)"
         @round="(r) => onChangeInterviewRound(detailTarget!, r)"
       />
+      <p v-if="detailLocked" class="chip-meta" style="margin-top:6px">该计划已进入终态，阶段、面试轮次和结果标记已锁定。</p>
 
       <p class="section-kicker">面试轮次</p>
       <PickerField
         :model-value="interviewRoundsOf(detailTarget)"
         :options="roundOptions"
+        :disabled="detailLocked"
         label="选择面试轮次"
         title="设置面试轮次"
         icon="target"
@@ -278,6 +284,7 @@ function onLinkResume(versionId: number | null) {
       <PickerField
         :model-value="detailTarget.outcome ?? null"
         :options="outcomeOptions"
+        :disabled="detailLocked"
         label="记录这次投递的结果"
         title="选择结果标记"
         placeholder="尚未标记"

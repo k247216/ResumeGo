@@ -13,9 +13,10 @@ const props = withDefaults(defineProps<{
   clearLabel?: string
   searchable?: boolean
   icon?: string
+  disabled?: boolean
 }>(), {
   title: '请选择', placeholder: '请选择', label: '', clearable: false,
-  clearLabel: '不关联', searchable: false, icon: '',
+  clearLabel: '不关联', searchable: false, icon: '', disabled: false,
 })
 const emit = defineEmits<{ (e: 'update:modelValue', v: T | null): void }>()
 
@@ -31,6 +32,7 @@ const filtered = computed(() => {
 })
 
 async function show() {
+  if (props.disabled) return
   open.value = true
   keyword.value = ''
   await nextTick()
@@ -43,7 +45,7 @@ function pick(v: T | null) { emit('update:modelValue', v); open.value = false }
 <template>
   <div class="picker-field">
     <span v-if="label" class="pf-label">{{ label }}</span>
-    <button type="button" class="pf-trigger" :class="{ placeholder: !current }" @click="show">
+    <button type="button" class="pf-trigger" :class="{ placeholder: !current }" :disabled="disabled" @click="show">
       <AppIcon v-if="current && icon" :name="icon" :size="17" class="pf-lead" />
       <span class="pf-text">{{ current ? current.label : placeholder }}</span>
       <span v-if="current?.meta" class="pf-meta">{{ current.meta }}</span>

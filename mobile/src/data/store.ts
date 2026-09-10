@@ -133,6 +133,14 @@ watch(db, () => {
 
 function nextId(): number { db.seq += 1; return db.seq }
 
+type TargetMutationResult = { ok: boolean; message?: string }
+function targetMutationLock(target: JobProject): TargetMutationResult | null {
+  if (target.status === 'archived' || isTerminalStage(normalizeTargetStage(target.stage))) {
+    return { ok: false, message: '该计划已有最终结果，状态已锁定' }
+  }
+  return null
+}
+
 // ── 求职目标 ──
 export const targets = () => db.targets
 export function listTargets(): JobProject[] { return db.targets }
@@ -190,24 +198,29 @@ export function interviewRoundsOf(target: JobProject): number {
 export function interviewRoundOf(target: JobProject): number {
   return normalizeInterviewRound(target.interviewRound, interviewRoundsOf(target))
 }
-export function setInterviewRounds(id: number, rounds: number) {
-  const t = db.targets.find((x) => x.id === id); if (!t) return
+export function setInterviewRounds(id: number, rounds: number): TargetMutationResult {
+  const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
+  const locked = targetMutationLock(t); if (locked) return locked
   t.interviewRounds = normalizeInterviewRounds(rounds)
   t.interviewRound = normalizeInterviewRound(t.interviewRound, t.interviewRounds)
   t.updatedAt = iso(new Date())
+  return { ok: true }
 }
-export function setInterviewRound(id: number, round: number) {
-  const t = db.targets.find((x) => x.id === id); if (!t) return
+export function setInterviewRound(id: number, round: number): TargetMutationResult {
+  const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
+  const locked = targetMutationLock(t); if (locked) return locked
   t.interviewRound = normalizeInterviewRound(round, interviewRoundsOf(t))
   t.updatedAt = iso(new Date())
+  return { ok: true }
 }
 export function outcomeLabelOf(target: JobProject): string {
   if (!target.outcome) return TARGET_STAGE_LABELS[normalizeTargetStage(target.stage)]
   if (target.outcome === 'interview_failed') return `面试第 ${normalizeInterviewRound(target.outcomeRound, interviewRoundsOf(target))} 面未通过`
   return TARGET_OUTCOME_LABELS[target.outcome]
 }
-export function setTargetOutcome(id: number, outcome: TargetOutcome | null, round?: number) {
-  const t = db.targets.find((x) => x.id === id); if (!t) return
+export function setTargetOutcome(id: number, outcome: TargetOutcome | null, round?: number): TargetMutationResult {
+  const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
+  const locked = targetMutationLock(t); if (locked) return locked
   t.outcome = outcome
   t.outcomeRound = outcome === 'interview_failed' ? normalizeInterviewRound(round, interviewRoundsOf(t)) : null
   if (outcome) {
@@ -217,6 +230,7 @@ export function setTargetOutcome(id: number, outcome: TargetOutcome | null, roun
     db.stageEvents.push({ id: nextId(), targetId: id, stage, occurredAt: iso(new Date()) })
   }
   t.updatedAt = iso(new Date())
+  return { ok: true }
 }
 export function stageEventsOf(id: number): StageEvent[] {
   return db.stageEvents.filter((e) => e.targetId === id).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
