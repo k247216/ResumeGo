@@ -4,8 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import AppIcon from '../components/AppIcon.vue'
 import Sheet from '../components/Sheet.vue'
 import { toast } from '../data/toast'
-import { confirmAction } from '../data/confirm'
-import { exportBackup, importBackup, listResumes, listSchedules, listTargets, resetToSeed } from '../data/store'
+import { exportBackup, importBackup, listResumes, listSchedules, listTargets } from '../data/store'
 import { getTheme, setTheme, THEME_OPTIONS, type Theme } from '../data/theme'
 
 const theme = ref<Theme>(getTheme())
@@ -57,17 +56,6 @@ async function onImportFile(e: Event) {
   ;(e.target as HTMLInputElement).value = ''
 }
 
-async function onReset() {
-  const ok = await confirmAction({
-    title: '清空并恢复示例？',
-    message: '当前所有求职目标、日程与简历记录都会被清空，简历文件本体不会被恢复。',
-    confirmLabel: '清空',
-    danger: true,
-  })
-  if (!ok) return
-  resetToSeed()
-  toast('已恢复示例数据')
-}
 </script>
 
 <template>
@@ -120,10 +108,6 @@ async function onReset() {
         <span class="s-value">选择文件 ›</span>
       </button>
       <input ref="fileRef" type="file" accept="application/json" hidden @change="onImportFile">
-      <button class="setting-row" style="color: var(--danger)" @click="onReset">
-        <span class="sr-ic"><AppIcon name="trash" :size="18" /></span>
-        <span class="s-label" style="color: var(--danger)">清空并恢复示例</span>
-      </button>
     </div>
 
     <div class="about">
