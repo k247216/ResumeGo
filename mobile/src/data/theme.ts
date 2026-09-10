@@ -8,10 +8,21 @@ export const THEME_OPTIONS: Array<{ value: Theme; label: string; description: st
   { value: 'dark', label: '深色', description: '夜间低亮度工作区' },
 ]
 
+// 无 localStorage 的环境（SSR / 部分测试环境）降级为内存存储，保证模块可加载、读写一致。
+const memoryStore = new Map<string, string>()
+const storage = {
+  get(key: string): string | null {
+    try { return localStorage.getItem(key) } catch { return memoryStore.get(key) ?? null }
+  },
+  set(key: string, value: string) {
+    try { localStorage.setItem(key, value) } catch { memoryStore.set(key, value) }
+  },
+}
+
 export function getTheme(): Theme {
-  const saved = localStorage.getItem(KEY)
+  const saved = storage.get(KEY)
   if (saved === 'light' || saved === 'mint' || saved === 'dark') return saved
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return 'light' // 未选择时固定默认「纸张浅色」，不跟随系统深色
 }
 
 export function applyTheme(theme: Theme) {
@@ -21,7 +32,7 @@ export function applyTheme(theme: Theme) {
 }
 
 export function setTheme(theme: Theme) {
-  localStorage.setItem(KEY, theme)
+  storage.set(KEY, theme)
   applyTheme(theme)
 }
 
