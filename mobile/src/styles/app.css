@@ -865,6 +865,213 @@ button { font-family: inherit; }
 }
 .view-switch button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
 
+/* ── 日程工作台：可横滑的七日时间轴 + 轻量计划列表 ── */
+.schedule-head {
+  justify-content: space-between;
+  padding-bottom: var(--space-5);
+}
+.schedule-now { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.schedule-date {
+  color: var(--copy);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.schedule-clock {
+  color: var(--ink);
+  font-size: var(--fs-title);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .03em;
+}
+.schedule-calendar {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  border-color: var(--line);
+  color: var(--ink);
+}
+.timeline-block { margin: 2px 0 0; }
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.section-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 720;
+  letter-spacing: -.015em;
+}
+.section-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--fs-caption);
+}
+.inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: var(--copy);
+  font: inherit;
+  font-size: var(--fs-caption);
+  font-weight: 650;
+  cursor: pointer;
+}
+.inline-action:active { color: var(--brand); }
+.add-action { color: var(--brand); }
+.timeline-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 2px var(--space-4) 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.timeline-scroll::-webkit-scrollbar { height: 4px; }
+.timeline-scroll::-webkit-scrollbar-track { background: transparent; }
+.timeline-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--line-strong); }
+.timeline-rail {
+  position: relative;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  padding: 0 2px;
+}
+.timeline-rail::before {
+  content: '';
+  position: absolute;
+  top: 58px;
+  left: 52px;
+  right: 52px;
+  height: 1px;
+  background: var(--line-strong);
+}
+.timeline-day {
+  position: relative;
+  display: grid;
+  grid-template-rows: 42px 32px minmax(94px, auto);
+  justify-items: center;
+  width: 104px;
+  min-width: 104px;
+}
+.timeline-date {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 3px;
+  color: var(--copy);
+}
+.timeline-date strong { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.timeline-date small { color: var(--muted); font-size: 11px; }
+.timeline-day.today .timeline-date strong,
+.timeline-day.today .timeline-date small { color: var(--brand); }
+.timeline-axis { position: relative; display: grid; place-items: center; width: 100%; }
+.timeline-node {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.timeline-day.today .timeline-node {
+  width: 14px;
+  height: 14px;
+  border-color: var(--brand);
+  background: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
+}
+.timeline-events { display: flex; align-items: start; justify-content: center; gap: 7px; width: 100%; }
+.timeline-event {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 98px;
+  min-width: 98px;
+  min-height: 84px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--copy);
+  cursor: pointer;
+}
+.timeline-event-copy { display: grid; justify-items: center; min-width: 0; max-width: 100%; line-height: 1.2; }
+.timeline-event-copy strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 650; color: var(--ink); }
+.timeline-event-copy small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 550; font-variant-numeric: tabular-nums; color: var(--copy); }
+.timeline-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border: 1px solid var(--line-subtle);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.timeline-mark img { width: 24px; height: 24px; object-fit: contain; }
+.timeline-mark > span { display: grid; place-items: center; width: 100%; height: 100%; font-size: 13px; font-weight: 750; }
+.plan-block { margin-top: var(--space-5); }
+.plan-list {
+  overflow: hidden;
+  border-top: 1px solid var(--line-subtle);
+}
+.plan-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 86px;
+  gap: var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--line-subtle);
+  background: transparent;
+  padding: 14px 2px;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  animation: card-in .28s var(--ease-spring) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.plan-row.selected { padding-left: 10px; padding-right: 10px; border-radius: 14px; background: var(--brand-soft); }
+.plan-row:active { background: var(--surface-hover); }
+.plan-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-subtle);
+  border-radius: 13px;
+  background: var(--surface);
+}
+.plan-mark img { width: 30px; height: 30px; object-fit: contain; }
+.plan-mark > span { display: grid; place-items: center; width: 100%; height: 100%; font-size: 16px; font-weight: 750; }
+.plan-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.plan-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.plan-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--copy); font-size: 12px; }
+.plan-copy .plan-when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.plan-chev { flex: 0 0 auto; color: var(--muted); }
+
+/* 求职目标：在平板/横屏宽度保留两列卡片，手机窄屏自动回落单列 */
+.targets-grid { display: grid; gap: var(--space-3); }
+@media (min-width: 520px) {
+  .targets-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .targets-grid .card { height: 100%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card, .sheet, .sheet-backdrop { animation: none; }
   .node.current .dot { animation: none; }

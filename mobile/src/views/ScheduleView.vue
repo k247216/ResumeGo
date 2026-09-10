@@ -15,6 +15,7 @@ import { requestNotificationPermission, scheduleReminder, cancelReminder } from 
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
 import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import { eventsOnDate, timelineDates } from '../data/timeline'
 
 const TYPES: ScheduleEventType[] = ['interview', 'exam', 'followup', 'other']
 const WEEK = ['日', '一', '二', '三', '四', '五', '六']
@@ -40,6 +41,14 @@ const selectedDay = ref(new Date().toDateString())
 const now = ref(Date.now())
 const timer = setInterval(() => { now.value = Date.now() }, 30_000)
 onBeforeUnmount(() => clearInterval(timer))
+
+const nowDate = computed(() => new Date(now.value))
+const nowClock = computed(() => hhmm(nowDate.value.toISOString()))
+const todayLabel = computed(() => {
+  const d = nowDate.value
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 · 周${'日一二三四五六'[d.getDay()]}`
+})
+const timeline = computed(() => timelineDates(nowDate.value, 7))
 
 const editing = ref<ScheduleEvent | null>(null)
 const sheetOpen = ref(false)
@@ -73,6 +82,7 @@ const grouped = computed(() => {
   }
   return [...map.entries()]
 })
+const planEvents = computed(() => listSchedules())
 const eventsByDay = computed(() => new Map(grouped.value))
 
 interface CalCell { key: string; day: number; other: boolean }
@@ -116,22 +126,25 @@ function fullWhen(isoStr: string): string {
   const d = new Date(isoStr)
   return `${d.getMonth() + 1}月${d.getDate()}日 周${'日一二三四五六'[d.getDay()]} ${hhmm(isoStr)}`
 }
-function untilText(isoStr: string): string {
-  const t = new Date(isoStr).getTime() - now.value
-  if (t <= 0) return '进行中'
-  const min = Math.floor(t / 60000), h = Math.floor(min / 60), d = Math.floor(h / 24)
-  if (d >= 1) return `${d} 天 ${h % 24} 小时后`
-  if (h >= 1) return `${h} 小时 ${min % 60} 分后`
-  return `${min} 分钟后`
-}
 function targetOf(id: number | null) { return id == null ? null : listTargets().find((t) => t.id === id) ?? null }
-function targetName(id: number | null): string { return targetOf(id)?.name ?? '' }
-function reminderLabel(id: number): string {
-  const m = getReminder(id)
-  if (!m) return ''
-  return REMIND_OPTIONS.find((o) => o.value === m)?.label ?? `${m} 分钟前`
+function companyName(ev: ScheduleEvent): string {
+  const target = targetOf(ev.jobProjectId)
+  if (target) return target.name.split(' · ')[0]
+  return ev.title.replace(/\s*(一面|二面|三面|终面|HR面|笔试|面试|跟进).*$/u, '').trim() || ev.title
 }
-
+function roleName(ev: ScheduleEvent): string {
+  const target = targetOf(ev.jobProjectId)
+  return target?.targetRole || SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]
+}
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+function timelineEvents(day: Date): ScheduleEvent[] {
+  return eventsOnDate(listSchedules(), day).slice(0, 2)
+}
+function dayNumber(day: Date): string { return `${day.getMonth() + 1}/${day.getDate()}` }
+function weekLabel(day: Date): string { return '日一二三四五六'[day.getDay()] }
+function toggleCalendar() { viewMode.value = viewMode.value === 'agenda' ? 'month' : 'agenda' }
 function openCreate() {
   editing.value = null
   const d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0)
@@ -189,58 +202,68 @@ async function remove() {
 
 <template>
   <div>
-    <header class="page-head">
-      <div class="grow">
-        <h1 class="page-title">日程</h1>
-        <p class="page-sub">面试 / 笔试 / 跟进 · 本地自动提醒</p>
+    <header class="page-head schedule-head">
+      <div class="schedule-now">
+        <span class="schedule-date">{{ todayLabel }}</span>
+        <span class="schedule-clock">{{ nowClock }}</span>
       </div>
-      <div class="view-switch" role="tablist" aria-label="视图切换">
-        <button role="tab" :aria-selected="viewMode === 'agenda'" :class="{ on: viewMode === 'agenda' }" @click="viewMode = 'agenda'">议程</button>
-        <button role="tab" :aria-selected="viewMode === 'month'" :class="{ on: viewMode === 'month' }" @click="viewMode = 'month'">月历</button>
-      </div>
+      <button class="icon-btn schedule-calendar" :aria-label="viewMode === 'agenda' ? '打开月历' : '返回日程'" @click="toggleCalendar">
+        <AppIcon name="calendar" :size="19" />
+      </button>
     </header>
 
     <template v-if="viewMode === 'agenda'">
-      <!-- 下一场：倒计时英雄卡 -->
-      <section v-if="nextUp" class="next-card" :style="{ '--nc': SCHEDULE_EVENT_TYPE_COLORS[nextUp.eventType] }" @click="openEdit(nextUp)">
-        <div class="nc-top">
-          <span class="nc-kicker"><AppIcon name="clock" :size="13" /> 下一场 · {{ SCHEDULE_EVENT_TYPE_LABELS[nextUp.eventType] }}</span>
-          <span class="nc-countdown">{{ untilText(nextUp.startTime) }}</span>
-        </div>
-        <div class="nc-main">
-          <img v-if="companyMark(targetName(nextUp.jobProjectId)).icon && nextUp.jobProjectId" class="nc-logo" :src="companyMark(targetName(nextUp.jobProjectId)).icon" alt="">
-          <span v-else class="nc-logo letter" :style="{ background: SCHEDULE_EVENT_TYPE_COLORS[nextUp.eventType] }">{{ nextUp.title[0] }}</span>
-          <div class="nc-copy">
-            <h3>{{ nextUp.title }}</h3>
-            <small>{{ fullWhen(nextUp.startTime) }}<template v-if="targetName(nextUp.jobProjectId)"> · {{ targetName(nextUp.jobProjectId) }}</template></small>
+      <section class="timeline-block" aria-labelledby="timeline-title">
+        <div class="section-head">
+          <div>
+            <h2 id="timeline-title">接下来 7 天</h2>
+            <p>横向滑动查看安排</p>
           </div>
+          <button class="inline-action" @click="viewMode = 'month'">查看全部 <AppIcon name="chevronRight" :size="15" /></button>
         </div>
-        <div class="nc-foot">
-          <span v-if="reminderLabel(nextUp.id)" class="nc-chip"><AppIcon name="bell" :size="13" /> {{ reminderLabel(nextUp.id) }}</span>
-          <span v-if="nextUp.notes" class="nc-chip"><AppIcon name="mapPin" :size="13" /> {{ nextUp.notes }}</span>
+        <div class="timeline-scroll" tabindex="0" aria-label="接下来七天的日程时间轴">
+          <div class="timeline-rail">
+            <div v-for="day in timeline" :key="day.toDateString()" class="timeline-day" :class="{ today: isSameDay(day, nowDate) }">
+              <div class="timeline-date"><strong>{{ isSameDay(day, nowDate) ? '今天' : dayNumber(day) }}</strong><small>周{{ weekLabel(day) }}</small></div>
+              <div class="timeline-axis"><span class="timeline-node" /></div>
+              <div class="timeline-events">
+                <button v-for="ev in timelineEvents(day)" :key="ev.id" class="timeline-event" :aria-label="`${companyName(ev)} ${fullWhen(ev.startTime)}`" @click="openEdit(ev)">
+                  <span class="timeline-mark">
+                    <img v-if="companyMark(companyName(ev)).icon" :src="companyMark(companyName(ev)).icon" alt="">
+                    <span v-else :style="{ background: companyMark(companyName(ev)).color, color: companyMark(companyName(ev)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(ev)).letter }}</span>
+                  </span>
+                  <span class="timeline-event-copy">
+                    <strong>{{ companyName(ev) }}</strong>
+                    <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }} · {{ hhmm(ev.startTime) }}</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <p v-if="grouped.length" class="section-kicker">全部日程</p>
-      <template v-for="[day, events] in grouped" :key="day">
-        <p class="day-head"><span :class="{ today: day === new Date().toDateString() }">{{ dayLabel(day) }}</span></p>
-        <div class="list">
-          <article v-for="(ev, i) in events" :key="ev.id" class="card event-card" :style="{ '--i': i, '--nc': SCHEDULE_EVENT_TYPE_COLORS[ev.eventType] }" @click="openEdit(ev)">
-            <div class="ec-band" aria-hidden="true" />
-            <div class="ec-time"><strong>{{ hhmm(ev.startTime) }}</strong><small>{{ ev.endTime ? hhmm(ev.endTime) : '—' }}</small></div>
-            <div class="event-body">
-              <h4>{{ ev.title }}</h4>
-              <small>
-                {{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}
-                <template v-if="targetName(ev.jobProjectId)"> · {{ targetName(ev.jobProjectId) }}</template>
-              </small>
-            </div>
-            <AppIcon v-if="getReminder(ev.id)" name="bell" :size="15" class="ec-bell" />
-            <AppIcon name="chevronRight" :size="17" class="ec-chev" />
-          </article>
+      <section class="plan-block" aria-labelledby="plan-title">
+        <div class="section-head">
+          <h2 id="plan-title">面试计划</h2>
+          <button class="inline-action add-action" @click="openCreate"><AppIcon name="plus" :size="15" /> 添加日程</button>
         </div>
-      </template>
-      <EmptyState v-if="!grouped.length" icon="calendar" title="还没有日程" hint="点右下角 ＋，添加面试、笔试或跟进提醒。" />
+        <div v-if="planEvents.length" class="plan-list">
+          <button v-for="(ev, i) in planEvents" :key="ev.id" class="plan-row" :class="{ selected: nextUp?.id === ev.id }" :style="{ '--i': Math.min(i, 8) }" @click="openEdit(ev)">
+            <span class="plan-mark">
+              <img v-if="companyMark(companyName(ev)).icon" :src="companyMark(companyName(ev)).icon" alt="">
+              <span v-else :style="{ background: companyMark(companyName(ev)).color, color: companyMark(companyName(ev)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(ev)).letter }}</span>
+            </span>
+            <span class="plan-copy">
+              <strong>{{ companyName(ev) }}</strong>
+              <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roleName(ev) !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]"> · {{ roleName(ev) }}</template></small>
+              <small class="plan-when">{{ fullWhen(ev.startTime) }}<template v-if="ev.notes"> · {{ ev.notes }}</template></small>
+            </span>
+            <AppIcon name="chevronRight" :size="18" class="plan-chev" />
+          </button>
+        </div>
+        <EmptyState v-else icon="calendar" title="还没有面试计划" hint="添加一场真实面试，日程和提醒会在本机保存。" />
+      </section>
     </template>
 
     <template v-else>
@@ -271,8 +294,6 @@ async function remove() {
         <EmptyState v-if="!selectedEvents.length" icon="calendar" title="该日暂无日程" hint="换一个日期，或点右下角 ＋ 新建。" />
       </div>
     </template>
-
-    <button class="fab" aria-label="新建日程" @click="openCreate"><AppIcon name="plus" :size="24" /></button>
 
     <Sheet v-if="sheetOpen" :title="editing ? '编辑日程' : '新建日程'" @close="sheetOpen = false">
       <div class="field"><label>标题</label><input v-model="form.title" placeholder="如：字节跳动 一面"></div>

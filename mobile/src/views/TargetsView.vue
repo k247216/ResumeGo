@@ -169,7 +169,7 @@ function onLinkResume(versionId: number | null) {
       </label>
     </div>
 
-    <div class="list">
+    <div class="targets-grid">
       <TargetCard
         v-for="(t, i) in visible"
         :key="t.id"
