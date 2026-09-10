@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createSchedule, createTarget, deleteSchedule, getReminder, importBackup,
-  listTargets, setReminder, setStage, stageEventsOf,
+  interviewRoundsOf, listTargets, setInterviewRounds, setReminder, setStage, stageEventsOf,
 } from './store'
 
 describe('求职目标阶段规则', () => {
@@ -25,6 +25,15 @@ describe('求职目标阶段规则', () => {
     const after = setStage(t.id, 'interview')
     expect(after.ok).toBe(false)
     expect(after.message).toContain('锁定')
+  })
+
+  it('每个求职目标可以独立设置面试轮次', () => {
+    const t = createTarget('轮次配置测试')
+    expect(interviewRoundsOf(t)).toBe(2)
+    setInterviewRounds(t.id, 4)
+    expect(interviewRoundsOf(t)).toBe(4)
+    setInterviewRounds(t.id, 99)
+    expect(interviewRoundsOf(t)).toBe(8)
   })
 })
 

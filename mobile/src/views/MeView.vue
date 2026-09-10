@@ -66,6 +66,15 @@ async function onReset() {
       </div>
     </header>
 
+    <section class="me-profile card" aria-label="本地工作区状态">
+      <span class="me-avatar"><AppIcon name="user" :size="22" /></span>
+      <div class="me-profile-copy">
+        <strong>我的职业空间</strong>
+        <small>数据只保留在这台设备</small>
+      </div>
+      <span class="me-version">移动端 · v0.2.2</span>
+    </section>
+
     <p class="section-kicker">外观</p>
     <div class="list">
       <button class="setting-row" @click="onToggleTheme">
@@ -98,7 +107,7 @@ async function onReset() {
       <div class="setting-row" style="cursor: default">
         <span class="sr-ic"><AppIcon name="user" :size="18" /></span>
         <span class="s-label">职达 · 移动端</span>
-        <span class="s-value">v0.2</span>
+        <span class="s-value">v0.2.2</span>
       </div>
       <p class="about-note">求职目标、日程、简历记录默认不上传云端；提醒在设备本地触发，无需推送服务器。<br>备份仅含文本记录，简历 PDF/MD 需在新设备重新导入。</p>
     </div>

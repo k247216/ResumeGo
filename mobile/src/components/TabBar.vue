@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ current: string; todayCount: number }>()
+const props = defineProps<{ current: string }>()
 const emit = defineEmits<{ (e: 'go', tab: string): void }>()
 
 const tabs = [
@@ -23,7 +23,6 @@ const tabs = [
         <path :d="tab.icon" />
       </svg>
       <span>{{ tab.label }}</span>
-      <span v-if="tab.key === 'schedule' && props.todayCount" class="badge">{{ props.todayCount }}</span>
     </button>
   </nav>
 </template>

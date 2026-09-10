@@ -10,13 +10,14 @@ import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import {
   createTarget, currentVersionOf, deleteTarget, linkResume, listResumes, listTargets,
-  renameTarget, resumeLabel, setStage, setTargetStatus, stageEventsOf, updateApplication,
+  interviewRoundsOf, renameTarget, resumeLabel, setInterviewRounds, setStage, setTargetStatus, stageEventsOf, updateApplication,
 } from '../data/store'
 import type { JobProject, TargetStage } from '../types/project'
 import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
 
 const search = ref('')
 const filter = ref<'all' | TargetStage | 'outcome' | 'archived'>('all')
+const layoutMode = ref<1 | 2>(1)
 
 const createOpen = ref(false)
 const newName = ref('')
@@ -137,6 +138,7 @@ const resumeOptions = computed(() =>
     return v ? [{ value: v.id, label: `${r.title} · V${v.versionNo}` }] : []
   }),
 )
+const roundOptions = [1, 2, 3, 4, 5].map((value) => ({ value, label: `${value} 轮` }))
 function onLinkResume(versionId: number | null) {
   if (!detailTarget.value) return
   linkResume(detailTarget.value.id, versionId)
@@ -150,6 +152,10 @@ function onLinkResume(versionId: number | null) {
       <div class="grow">
         <h1 class="page-title">求职目标</h1>
         <p class="page-sub">以公司为单位管理进度 · {{ countOf('all') }} 个计划</p>
+      </div>
+      <div class="view-switch" aria-label="目标卡片布局">
+        <button :class="{ on: layoutMode === 1 }" @click="layoutMode = 1">一列</button>
+        <button :class="{ on: layoutMode === 2 }" @click="layoutMode = 2">两列</button>
       </div>
     </header>
 
@@ -169,7 +175,7 @@ function onLinkResume(versionId: number | null) {
       </label>
     </div>
 
-    <div class="targets-grid">
+    <div class="targets-grid" :class="{ 'is-double': layoutMode === 2 }">
       <TargetCard
         v-for="(t, i) in visible"
         :key="t.id"
@@ -231,7 +237,18 @@ function onLinkResume(versionId: number | null) {
         :stage="normalizeTargetStage(detailTarget.stage)"
         :times="stageTimesOf(detailTarget)"
         :locked="detailTarget.status === 'archived'"
+        :interview-rounds="interviewRoundsOf(detailTarget)"
         @change="(s) => onChangeStage(detailTarget!, s)"
+      />
+
+      <p class="section-kicker">面试轮次</p>
+      <PickerField
+        :model-value="interviewRoundsOf(detailTarget)"
+        :options="roundOptions"
+        label="这个岗位预计有几轮面试"
+        title="设置面试轮次"
+        icon="target"
+        @update:model-value="(v) => setInterviewRounds(detailTarget!.id, Number(v))"
       />
 
       <p class="section-kicker">阶段时间轴</p>

@@ -16,6 +16,7 @@ import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
 import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
 import { eventsOnDate, timelineDates } from '../data/timeline'
+import { addToDeviceCalendar } from '../data/calendar'
 
 const TYPES: ScheduleEventType[] = ['interview', 'exam', 'followup', 'other']
 const WEEK = ['日', '一', '二', '三', '四', '五', '六']
@@ -52,6 +53,7 @@ const timeline = computed(() => timelineDates(nowDate.value, 7))
 
 const editing = ref<ScheduleEvent | null>(null)
 const sheetOpen = ref(false)
+const calendarSyncing = ref(false)
 const form = ref({
   title: '', eventType: 'interview' as ScheduleEventType,
   start: '', end: '', notes: '', reminder: 30, jobProjectId: null as number | null,
@@ -198,6 +200,17 @@ async function remove() {
   sheetOpen.value = false
   toast('日程已删除')
 }
+async function syncToCalendar() {
+  if (!editing.value) { toast('先保存日程，再添加到手机日历'); return }
+  const event = listSchedules().find((item) => item.id === editing.value?.id)
+  if (!event) return
+  calendarSyncing.value = true
+  try {
+    const mode = await addToDeviceCalendar(event)
+    toast(mode === 'shared' ? '已打开系统分享，可选择手机日历' : '已下载日历文件，可用手机日历打开')
+  } catch { toast('暂时无法连接手机日历，请稍后重试') }
+  finally { calendarSyncing.value = false }
+}
 </script>
 
 <template>
@@ -284,14 +297,22 @@ async function remove() {
         >{{ cell.day }}<span class="cal-dots"><i v-for="(c, i) in dotsOf(cell.key)" :key="i" :style="{ background: c }" /></span></button>
       </div>
       <p class="day-head"><span :class="{ today: selectedDay === new Date().toDateString() }">{{ dayLabel(selectedDay) }}</span></p>
-      <div class="list">
-        <article v-for="(ev, i) in selectedEvents" :key="ev.id" class="card event-card" :style="{ '--i': i, '--nc': SCHEDULE_EVENT_TYPE_COLORS[ev.eventType] }" @click="openEdit(ev)">
-          <div class="ec-band" aria-hidden="true" />
-          <div class="ec-time"><strong>{{ hhmm(ev.startTime) }}</strong><small>{{ ev.endTime ? hhmm(ev.endTime) : '—' }}</small></div>
-          <div class="event-body"><h4>{{ ev.title }}</h4><small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}</small></div>
-          <AppIcon name="chevronRight" :size="17" class="ec-chev" />
-        </article>
-        <EmptyState v-if="!selectedEvents.length" icon="calendar" title="该日暂无日程" hint="换一个日期，或点右下角 ＋ 新建。" />
+      <div v-if="selectedEvents.length" class="plan-list calendar-plan-list">
+        <button v-for="(ev, i) in selectedEvents" :key="ev.id" class="plan-row" :style="{ '--i': i }" @click="openEdit(ev)">
+          <span class="plan-mark">
+            <img v-if="companyMark(companyName(ev)).icon" :src="companyMark(companyName(ev)).icon" alt="">
+            <span v-else :style="{ background: companyMark(companyName(ev)).color, color: companyMark(companyName(ev)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(ev)).letter }}</span>
+          </span>
+          <span class="plan-copy">
+            <strong>{{ companyName(ev) }}</strong>
+            <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roleName(ev) !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]"> · {{ roleName(ev) }}</template></small>
+            <small class="plan-when">{{ fullWhen(ev.startTime) }}<template v-if="ev.notes"> · {{ ev.notes }}</template></small>
+          </span>
+          <AppIcon name="chevronRight" :size="18" class="plan-chev" />
+        </button>
+      </div>
+      <div v-else class="list">
+        <EmptyState v-if="!selectedEvents.length" icon="calendar" title="该日暂无日程" hint="换一个日期，或返回日程页添加安排。" />
       </div>
     </template>
 
@@ -333,6 +354,11 @@ async function remove() {
         />
       </div>
       <div class="field"><label>备注</label><textarea v-model="form.notes" placeholder="会议链接 / 注意事项…"></textarea></div>
+      <button v-if="editing" class="calendar-link" :disabled="calendarSyncing" @click="syncToCalendar">
+        <AppIcon name="calendar" :size="16" />
+        <span>{{ calendarSyncing ? '准备中…' : '添加到手机日历' }}</span>
+        <AppIcon name="external" :size="14" />
+      </button>
       <div class="sheet-actions">
         <button v-if="editing" class="btn-danger" @click="remove"><AppIcon name="trash" :size="16" /></button>
         <button class="btn-ghost" @click="sheetOpen = false">取消</button>

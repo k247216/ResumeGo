@@ -6,6 +6,7 @@ const props = defineProps<{
   stage: TargetStage
   times?: Partial<Record<TargetStage, string>>
   locked?: boolean
+  interviewRounds?: number
 }>()
 const emit = defineEmits<{ (e: 'change', stage: TargetStage): void }>()
 
@@ -25,6 +26,10 @@ function disabled(key: TargetStage): boolean {
   const next = stageFlowRank(key)
   return cur > 0 && next > 0 && next < cur
 }
+function labelOf(key: TargetStage): string {
+  if (key === 'interview' && props.interviewRounds && props.interviewRounds !== 2) return `面试 · ${props.interviewRounds}轮`
+  return TARGET_STAGE_LABELS[key]
+}
 </script>
 
 <template>
@@ -38,7 +43,7 @@ function disabled(key: TargetStage): boolean {
         @click="emit('change', key)"
       >
         <span class="dot" />
-        <span class="node-label">{{ TARGET_STAGE_LABELS[key] }}</span>
+        <span class="node-label">{{ labelOf(key) }}</span>
         <span v-if="props.times?.[key]" class="node-time">{{ props.times[key] }}</span>
       </button>
       <span v-if="i < FLOW.length - 1" class="connector" :class="{ filled: indexOf(props.stage) >= 0 && i < indexOf(props.stage) }" />

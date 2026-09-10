@@ -69,6 +69,8 @@ export interface JobProject {
   targetRole: string | null
   location: string | null
   notes: string | null
+  /** 每个岗位可独立设置面试轮次；旧数据缺失时按 2 轮兼容。 */
+  interviewRounds?: number
   createdAt: string
   updatedAt: string
 }

@@ -521,6 +521,12 @@ button { font-family: inherit; }
 
 /* 设置行图标 + 关于 */
 .sr-ic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--surface-subtle); color: var(--copy); flex: 0 0 auto; }
+.me-profile { flex-direction: row; align-items: center; gap: 12px; margin-top: 4px; padding: 14px; }
+.me-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 14px; background: var(--brand-soft); color: var(--brand); }
+.me-profile-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.me-profile-copy strong { font-size: 15px; font-weight: 700; color: var(--ink); }
+.me-profile-copy small { font-size: 12px; color: var(--muted); }
+.me-version { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .about { margin-top: var(--space-5); }
 .about-note { font-size: 11.5px; line-height: 1.85; color: var(--muted); padding: 12px 4px 0; }
 
@@ -701,6 +707,25 @@ button { font-family: inherit; }
 .seg.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
 .sheet-actions { display: flex; gap: var(--space-3); margin-top: var(--space-5); }
 .sheet-actions > * { flex: 1; }
+.calendar-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+  color: var(--copy);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.calendar-link span { flex: 1; text-align: left; }
+.calendar-link:active { border-color: var(--brand); color: var(--brand); }
+.calendar-link:disabled { opacity: .55; cursor: default; }
 
 /* ── 列表 / 空态 ── */
 .list { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -1067,8 +1092,13 @@ button { font-family: inherit; }
 
 /* 求职目标：在平板/横屏宽度保留两列卡片，手机窄屏自动回落单列 */
 .targets-grid { display: grid; gap: var(--space-3); }
+.targets-grid.is-double { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@media (max-width: 399px) {
+  .targets-grid.is-double .card { padding: 12px; }
+  .targets-grid.is-double .head-side { gap: 2px; }
+  .targets-grid.is-double .stage-pill { padding-inline: 7px; }
+}
 @media (min-width: 520px) {
-  .targets-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .targets-grid .card { height: 100%; }
 }
 
