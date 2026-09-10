@@ -17,7 +17,7 @@ export function getTheme(): Theme {
 export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#111212' : theme === 'mint' ? '#eef8f2' : '#f5f5f2')
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#111212' : theme === 'mint' ? '#eef8f2' : '#ffffff')
 }
 
 export function setTheme(theme: Theme) {
