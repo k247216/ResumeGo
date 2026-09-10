@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
+import ResumeMark from '../components/ResumeMark.vue'
 import {
   addResumeVersion, currentVersionOf, deleteResume, getResume, renameResume,
   setCurrentVersion, versionsOf,
@@ -10,6 +11,7 @@ import {
 import { humanSize, previewResume, shareResumeFile, type ResumePreview } from '../data/resumeFile'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
+import { resumeMarkOf } from '../data/resumeMark'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,7 +110,7 @@ async function onDelete() {
   if (!ok) return
   await deleteResume(resumeId)
   toast('已删除')
-  router.back()
+  await router.replace({ name: 'resumes' })
 }
 function short(v: string): string {
   const d = new Date(v)
@@ -129,6 +131,7 @@ function short(v: string): string {
         </h1>
         <p class="page-sub">{{ versions.length }} 个版本 · 点标题可改名</p>
       </div>
+      <ResumeMark v-if="resume" :variant="resume.mark ?? resumeMarkOf(resume.id)" :size="38" />
       <button class="icon-btn" aria-label="删除简历" @click="onDelete"><AppIcon name="trash" :size="17" /></button>
     </header>
 

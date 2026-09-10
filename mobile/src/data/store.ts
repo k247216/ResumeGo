@@ -3,6 +3,7 @@ import type { JobProject, StageEvent, TargetOutcome, TargetStage } from '../type
 import { isTerminalStage, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
 import type { ScheduleEvent } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
+import { resumeMarkOf, type ResumeMarkName } from './resumeMark'
 
 export const DEFAULT_INTERVIEW_ROUNDS = 2
 
@@ -19,6 +20,7 @@ function normalizeInterviewRound(value: unknown, rounds: number): number {
 export interface ResumeFile {
   id: number
   title: string
+  mark?: ResumeMarkName
   archivedAt: string | null
   currentVersionId: number | null
   createdAt: string
@@ -114,6 +116,7 @@ function hydrate(db: DbShape) {
     target.outcomeRound = target.outcomeRound == null ? null : normalizeInterviewRound(target.outcomeRound, target.interviewRounds)
   }
   for (const resume of db.resumes) {
+    resume.mark = resume.mark ?? resumeMarkOf(resume.id)
     const versions = db.versions.filter((v) => v.resumeId === resume.id).sort((a, b) => a.versionNo - b.versionNo)
     if (resume.currentVersionId == null || !versions.some((v) => v.id === resume.currentVersionId)) {
       resume.currentVersionId = versions[versions.length - 1]?.id ?? null
@@ -294,7 +297,8 @@ async function addVersion(resume: ResumeFile, file: File, note: string | null): 
 export async function importResume(title: string, file: File): Promise<ResumeFile> {
   const now = iso(new Date())
   const name = title.trim() || file.name.replace(/\.[^.]+$/, '') || '未命名简历'
-  const resume: ResumeFile = { id: nextId(), title: name, archivedAt: null, currentVersionId: null, createdAt: now, updatedAt: now }
+  const id = nextId()
+  const resume: ResumeFile = { id, title: name, mark: resumeMarkOf(id), archivedAt: null, currentVersionId: null, createdAt: now, updatedAt: now }
   db.resumes.push(resume)
   await addVersion(resume, file, '初始版本')
   return resume
@@ -316,7 +320,8 @@ export function renameResume(resumeId: number, title: string) {
 }
 export async function deleteResume(resumeId: number) {
   const removed = db.versions.filter((v) => v.resumeId === resumeId)
-  await Promise.all(removed.map((v) => deleteFile(v.fileKey)))
+  // 文件本体清理失败不应阻止元数据删除，否则用户会看到“删除无效”。
+  await Promise.all(removed.map((v) => deleteFile(v.fileKey).catch(() => undefined)))
   db.resumes = db.resumes.filter((r) => r.id !== resumeId)
   db.versions = db.versions.filter((v) => v.resumeId !== resumeId)
   for (const t of db.targets) { if (t.resumeVersionId != null && removed.some((v) => v.id === t.resumeVersionId)) t.resumeVersionId = null }

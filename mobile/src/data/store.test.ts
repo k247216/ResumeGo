@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  createSchedule, createTarget, deleteSchedule, getReminder, importBackup,
+  createSchedule, createTarget, currentVersionOf, deleteResume, deleteSchedule, getReminder, getResume, importBackup, importResume,
   interviewRoundOf, interviewRoundsOf, listTargets, setInterviewRound, setInterviewRounds,
-  setReminder, setStage, setTargetOutcome, stageEventsOf,
+  setReminder, setStage, setTargetOutcome, stageEventsOf, linkResume,
 } from './store'
 
 describe('求职目标阶段规则', () => {
@@ -92,5 +92,20 @@ describe('备份导入校验', () => {
   it('合法备份可恢复', () => {
     const snapshot = { targets: listTargets(), schedules: [], reminders: {}, stageEvents: [], resumes: [], versions: [], seq: 1 }
     expect(importBackup(JSON.stringify(snapshot)).ok).toBe(true)
+  })
+})
+
+describe('简历资产删除', () => {
+  it('删除简历时同步解除求职目标绑定', async () => {
+    const target = createTarget('简历删除绑定测试')
+    const resume = await importResume('待删除简历', new File(['resume'], 'resume.pdf', { type: 'application/pdf' }))
+    const version = currentVersionOf(resume.id)
+    expect(version).not.toBeNull()
+    linkResume(target.id, version!.id)
+
+    await deleteResume(resume.id)
+
+    expect(getResume(resume.id)).toBeUndefined()
+    expect(listTargets().find((item) => item.id === target.id)?.resumeVersionId).toBeNull()
   })
 })

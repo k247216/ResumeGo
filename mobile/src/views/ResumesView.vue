@@ -2,9 +2,12 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
-import { importResume, listResumes, currentVersionOf, versionsOf } from '../data/store'
+import ResumeMark from '../components/ResumeMark.vue'
+import { deleteResume, importResume, listResumes, currentVersionOf, versionsOf } from '../data/store'
 import { humanSize } from '../data/resumeFile'
+import { resumeMarkOf } from '../data/resumeMark'
 import { toast } from '../data/toast'
+import { confirmAction } from '../data/confirm'
 
 const router = useRouter()
 const resumes = computed(() => listResumes())
@@ -25,8 +28,17 @@ async function onFile(e: Event) {
   } catch { toast('导入失败，请重试') } finally { busy.value = false }
 }
 
-function isPdf(mime: string, name: string) { return mime === 'application/pdf' || /\.pdf$/i.test(name) }
 function verCount(id: number) { return versionsOf(id).length }
+async function removeResume(id: number, title: string) {
+  const ok = await confirmAction({
+    title: `删除「${title}」？`,
+    message: '这份简历和它的全部版本会从本机移除，已绑定的求职目标也会解除关联。',
+    confirmLabel: '删除', danger: true,
+  })
+  if (!ok) return
+  await deleteResume(id)
+  toast('简历已删除')
+}
 </script>
 
 <template>
@@ -59,9 +71,7 @@ function verCount(id: number) { return versionsOf(id).length }
         class="card resume-card" :style="{ '--i': i }"
         @click="router.push({ name: 'resume-detail', params: { id: String(r.id) } })"
       >
-        <span class="rc-badge" :class="isPdf(currentVersionOf(r.id)?.mime ?? '', currentVersionOf(r.id)?.fileName ?? '') ? 'pdf' : 'md'">
-          {{ isPdf(currentVersionOf(r.id)?.mime ?? '', currentVersionOf(r.id)?.fileName ?? '') ? 'PDF' : 'MD' }}
-        </span>
+        <ResumeMark :variant="r.mark ?? resumeMarkOf(r.id)" :size="42" />
         <div class="head-copy">
           <h3>{{ r.title }}</h3>
           <small>
@@ -71,6 +81,7 @@ function verCount(id: number) { return versionsOf(id).length }
         </div>
         <div class="rc-side">
           <span class="stage-pill" :style="{ background: 'var(--brand-soft)', color: 'var(--brand)' }">{{ verCount(r.id) }} 版</span>
+          <button class="resume-more" :aria-label="`删除 ${r.title}`" @click.stop="removeResume(r.id, r.title)"><AppIcon name="trash" :size="15" /></button>
           <AppIcon name="chevronRight" :size="18" class="rc-chev" />
         </div>
       </article>

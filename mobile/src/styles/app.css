@@ -516,12 +516,38 @@ button { font-family: inherit; }
 .import-hero .btn-primary { margin-top: 8px; }
 .ih-note { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
 .resume-card { flex-direction: row; align-items: center; gap: 12px; }
-.rc-badge { flex: 0 0 auto; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; font-size: 11.5px; font-weight: 800; letter-spacing: .02em; }
-.rc-badge.pdf { background: rgba(192, 72, 60, .1); color: #c0483c; }
-.rc-badge.md { background: var(--brand-soft); color: var(--brand); }
 .resume-card .head-copy { flex: 1; min-width: 0; }
 .rc-side { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.resume-more { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.resume-more:active { color: var(--danger); background: var(--danger-soft); }
 .rc-chev { color: var(--text-disabled); }
+
+/* 简历身份图标：统一纸张轮廓，不把 PDF / MD 等技术格式当作产品身份。 */
+.resume-mark {
+  --resume-mark-accent: var(--brand);
+  --resume-mark-paper: var(--brand-soft);
+  display: grid;
+  place-items: center;
+  width: var(--resume-mark-size, 44px);
+  height: var(--resume-mark-size, 44px);
+  flex: 0 0 auto;
+  border-radius: 13px;
+  background: var(--resume-mark-paper);
+  color: var(--resume-mark-accent);
+}
+.resume-mark svg { width: 100%; height: 100%; overflow: visible; }
+.resume-mark-paper { fill: color-mix(in srgb, var(--resume-mark-paper) 72%, var(--surface)); stroke: color-mix(in srgb, var(--resume-mark-accent) 18%, transparent); stroke-width: 1; }
+.resume-mark-fold { stroke: color-mix(in srgb, var(--resume-mark-accent) 42%, transparent); stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.resume-mark-accent { stroke: var(--resume-mark-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.resume-mark-accent-fill { fill: var(--resume-mark-accent); }
+.resume-mark-engineering { --resume-mark-accent: #4b67c8; --resume-mark-paper: rgba(75, 103, 200, .11); }
+.resume-mark-academic { --resume-mark-accent: #8a5cbd; --resume-mark-paper: rgba(138, 92, 189, .11); }
+.resume-mark-product { --resume-mark-accent: #168b68; --resume-mark-paper: rgba(22, 139, 104, .11); }
+.resume-mark-research { --resume-mark-accent: #cb7b25; --resume-mark-paper: rgba(203, 123, 37, .11); }
+.resume-mark-creative { --resume-mark-accent: #c0567c; --resume-mark-paper: rgba(192, 86, 124, .11); }
+.resume-mark-timeline { --resume-mark-accent: #3d8c91; --resume-mark-paper: rgba(61, 140, 145, .11); }
+.resume-mark-profile { --resume-mark-accent: #5b7791; --resume-mark-paper: rgba(91, 119, 145, .11); }
+.resume-mark-general { --resume-mark-accent: var(--brand); --resume-mark-paper: var(--brand-soft); }
 
 /* 版本轨 + 元信息 + 预览 */
 .version-dot { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; gap: 1px; }
@@ -570,6 +596,16 @@ button { font-family: inherit; }
 .me-profile-copy strong { font-size: 15px; font-weight: 700; color: var(--ink); }
 .me-profile-copy small { font-size: 12px; color: var(--muted); }
 .me-version { flex: 0 0 auto; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.me-overview { gap: 14px; margin-top: 0; padding: 14px; }
+.me-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.me-metrics > div { display: grid; gap: 3px; min-width: 0; padding: 8px 9px; border-radius: 11px; background: var(--surface-subtle); }
+.me-metrics strong { font-size: 20px; font-weight: 750; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.me-metrics small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.me-next { display: flex; align-items: center; gap: 9px; padding-top: 11px; border-top: 1px solid var(--line-subtle); }
+.me-next-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
+.me-next span:last-child { display: grid; gap: 2px; min-width: 0; }
+.me-next small { color: var(--muted); font-size: 11px; }
+.me-next strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .about { margin-top: var(--space-5); }
 .about-note { font-size: 11.5px; line-height: 1.85; color: var(--muted); padding: 12px 4px 0; }
 
