@@ -11,7 +11,7 @@ import {
   createSchedule, deleteSchedule, getReminder, listSchedules, listTargets,
   setReminder, updateSchedule,
 } from '../data/store'
-import { requestNotificationPermission, scheduleReminder, cancelReminder } from '../data/notifications'
+import { requestNotificationPermission, scheduleReminder, cancelReminder, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
 import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
@@ -58,6 +58,8 @@ const form = ref({
   title: '', eventType: 'interview' as ScheduleEventType,
   start: '', end: '', notes: '', reminder: 30, jobProjectId: null as number | null,
 })
+/** 面试/笔试的价值在结束后那几分钟的复盘，所以同一个文本域换成「复盘心得」的说法。 */
+const isAssessment = computed(() => form.value.eventType === 'interview' || form.value.eventType === 'exam')
 
 function toLocalInput(isoStr: string | null): string {
   if (!isoStr) return ''
@@ -184,14 +186,16 @@ async function submit() {
   if (editing.value) { updateSchedule(editing.value.id, payload); id = editing.value.id }
   else { id = createSchedule(payload).id }
   setReminder(id, form.value.reminder)
+  let reminderNote = ''
   if (form.value.reminder > 0) {
-    const granted = await requestNotificationPermission()
-    if (!granted) toast('未获通知权限，提醒仅会话内生效')
+    await requestNotificationPermission()
     const ev = listSchedules().find((e) => e.id === id)
-    if (ev) await scheduleReminder(ev, form.value.reminder)
+    const outcome = ev ? await scheduleReminder(ev, form.value.reminder) : 'failed' as const
+    // toast 只有一个槽位，提醒失败必须并进最后一句，否则会被「日程已创建」盖掉。
+    if (outcome !== 'scheduled') reminderNote = ` · ${REMINDER_OUTCOME_MESSAGES[outcome]}`
   } else { cancelReminder(id) }
   sheetOpen.value = false
-  toast(editing.value ? '日程已更新' : '日程已创建')
+  toast(`${editing.value ? '日程已更新' : '日程已创建'}${reminderNote}`)
 }
 async function remove() {
   if (!editing.value) return
@@ -393,7 +397,10 @@ async function syncToCalendar() {
           @update:model-value="(v) => form.reminder = Number(v)"
         />
       </div>
-      <div class="field"><label>备注</label><textarea v-model="form.notes" placeholder="会议链接 / 注意事项…"></textarea></div>
+      <div class="field">
+        <label>{{ isAssessment ? '复盘心得' : '备注' }}</label>
+        <textarea v-model="form.notes" rows="3" :placeholder="isAssessment ? '这轮考了什么、哪里没答好、下一轮要补什么…' : '会议链接 / 注意事项…'"></textarea>
+      </div>
       <button v-if="editing" class="calendar-link" :disabled="calendarSyncing" @click="syncToCalendar">
         <AppIcon name="calendar" :size="16" />
         <span>{{ calendarSyncing ? '准备中…' : '添加到手机日历' }}</span>

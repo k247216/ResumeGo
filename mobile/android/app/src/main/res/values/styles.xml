@@ -17,6 +17,7 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- 模板给的 splash.png 是 480x320 位图，会被拉伸到任意屏幕比例且仍是 Capacitor 默认图；纯色底不留模板痕迹 -->
+        <item name="android:background">@color/ic_launcher_background</item>
     </style>
 </resources>

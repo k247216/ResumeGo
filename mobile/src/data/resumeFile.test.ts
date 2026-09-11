@@ -5,7 +5,7 @@ vi.mock('./fileStore', () => ({
   objectUrl: vi.fn(async (key: string) => key === 'resume-image' ? 'blob:image' : null),
 }))
 
-import { previewResume } from './resumeFile'
+import { isSupportedResume, previewResume } from './resumeFile'
 
 describe('简历文件预览', () => {
   it('Markdown 版本读取为文本预览，而不是只显示文件名', async () => {
@@ -32,5 +32,23 @@ describe('简历文件预览', () => {
     })
     expect(preview.kind).toBe('image')
     expect(preview.url).toBe('blob:image')
+  })
+
+  it('无法渲染的格式落到 unsupported，而不是当 PDF 显示成空白', async () => {
+    const preview = await previewResume({
+      id: 4, resumeId: 1, versionNo: 4, fileName: '简历.docx', mime: 'application/octet-stream',
+      size: 4096, fileKey: 'resume-docx', note: null, createdAt: new Date().toISOString(),
+    })
+    expect(preview.kind).toBe('unsupported')
+  })
+})
+
+describe('简历导入格式门槛', () => {
+  it('扩展名或 mime 任一命中即放行，docx 一律拒绝', () => {
+    expect(isSupportedResume({ name: 'a.pdf', type: '' })).toBe(true)
+    expect(isSupportedResume({ name: 'a.md', type: '' })).toBe(true)
+    expect(isSupportedResume({ name: 'resume', type: 'application/pdf' })).toBe(true)
+    expect(isSupportedResume({ name: 'a.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })).toBe(false)
+    expect(isSupportedResume({ name: 'a.zip', type: 'application/zip' })).toBe(false)
   })
 })

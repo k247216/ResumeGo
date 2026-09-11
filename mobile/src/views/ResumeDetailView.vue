@@ -4,11 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import EmptyState from '../components/EmptyState.vue'
 import ResumeMark from '../components/ResumeMark.vue'
+import Sheet from '../components/Sheet.vue'
 import {
   addResumeVersion, currentVersionOf, deleteResume, getResume, renameResume,
-  setCurrentVersion, versionsOf,
+  setCurrentVersion, setVersionNote, versionsOf,
 } from '../data/store'
-import { humanSize, previewResume, shareResumeFile, type ResumePreview } from '../data/resumeFile'
+import { humanSize, isSupportedResume, previewResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT, shareResumeFile, type ResumePreview } from '../data/resumeFile'
+import { shareErrorMessage, shareTargetName } from '../data/share'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { resumeMarkOf } from '../data/resumeMark'
@@ -73,21 +75,47 @@ const mdHtml = computed(() => {
   return out.join('')
 })
 
+const noteOpen = ref(false)
+const noteValue = ref('')
+function openNote() {
+  if (!current.value) return
+  noteValue.value = current.value.note ?? ''
+  noteOpen.value = true
+}
+function saveNote() {
+  const ver = current.value
+  if (!ver) return
+  setVersionNote(resumeId, ver.id, noteValue.value)
+  noteOpen.value = false
+  toast(noteValue.value.trim() ? '备注已保存' : '备注已清空')
+}
+
 function openVersionPicker() { fileRef.value?.click() }
 async function onVersionFile(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
   if (!file || !resume.value) return
+  if (!isSupportedResume(file)) { toast(RESUME_UNSUPPORTED_HINT); return }
   await addResumeVersion(resumeId, file)
   toast('已新增最新版本')
+  // 刚传完的这一刻最清楚自己改了什么，过了就懒得补了。
+  openNote()
 }
 
 async function onShare() {
   const ver = current.value
   if (!ver) return
   sharing.value = true
-  try { await shareResumeFile(ver); toast('已发送简历文件') } catch { toast('分享失败') } finally { sharing.value = false }
+  try {
+    const target = await shareResumeFile(ver)
+    const label = shareTargetName(target)
+    if (target) toast(label ? `已交给${label}` : '已交给所选应用')
+  } catch (err) {
+    toast(shareErrorMessage(err))
+  } finally {
+    sharing.value = false
+  }
 }
 
 function startRename() { renameValue.value = resume.value?.title ?? ''; renaming.value = true }
@@ -141,15 +169,21 @@ function short(v: string): string {
         v-for="v in versions" :key="v.id"
         class="version-dot" :class="{ on: current?.id === v.id }"
         @click="setCurrentVersion(resumeId, v.id)"
-      >V{{ v.versionNo }}<small>{{ short(v.createdAt) }}</small></button>
+      >V{{ v.versionNo }}<small>{{ short(v.createdAt) }}</small><i v-if="v.note" class="dot-flag" aria-label="该版本已有备注" /></button>
       <button class="version-dot add" @click="openVersionPicker"><AppIcon name="plus" :size="15" /> 新版</button>
     </div>
-    <input ref="fileRef" type="file" hidden @change="onVersionFile">
+    <input ref="fileRef" type="file" :accept="RESUME_FILE_ACCEPT" hidden @change="onVersionFile">
 
     <div v-if="current" class="ver-meta">
       <span class="chip">{{ current.fileName }}</span>
       <span class="chip-meta">{{ humanSize(current.size) }} · {{ new Date(current.createdAt).toLocaleDateString('zh-CN') }}</span>
     </div>
+
+    <button v-if="current" class="note-row" @click="openNote">
+      <span class="note-row-label"><AppIcon name="edit" :size="14" /> V{{ current.versionNo }} 备注</span>
+      <span v-if="current.note" class="note-text">{{ current.note }}</span>
+      <span v-else class="note-empty">这一版投了什么岗位、改了什么，写一句 ›</span>
+    </button>
 
     <!-- 预览：PDF 内嵌 / MD 渲染 / 缺失兜底 -->
     <div class="doc-stage">
@@ -157,6 +191,11 @@ function short(v: string): string {
       <iframe v-else-if="preview.kind === 'pdf' && preview.url" class="doc-pdf" :src="preview.url" title="简历预览" />
       <img v-else-if="preview.kind === 'image' && preview.url" class="doc-image" :src="preview.url" alt="简历预览">
       <article v-else-if="preview.kind === 'text'" class="doc-md" v-html="mdHtml" />
+      <EmptyState v-else-if="preview.kind === 'unsupported'" icon="file" title="该格式无法在本机预览" hint="职达支持 PDF、Markdown、TXT 和图片简历。文件仍完整保存在本机，可以照常转发给 HR；换一份受支持的格式就能预览。">
+        <template #action>
+          <button class="btn-primary" @click="openVersionPicker"><AppIcon name="upload" :size="16" /> 重新上传</button>
+        </template>
+      </EmptyState>
       <EmptyState v-else icon="file" title="文件在本机已缺失" hint="这份简历的版本文件不在当前设备上，点「新增一版」重新上传一份。">
         <template #action>
           <button class="btn-primary" @click="openVersionPicker"><AppIcon name="upload" :size="16" /> 重新上传</button>
@@ -168,6 +207,19 @@ function short(v: string): string {
       <button class="btn-ghost" @click="openVersionPicker"><AppIcon name="upload" :size="16" /> 新增一版</button>
       <button class="btn-primary" :disabled="!current || sharing" @click="onShare"><AppIcon name="share" :size="16" /> {{ sharing ? '发送中…' : '发送给 HR' }}</button>
     </div>
+
+    <Sheet v-if="noteOpen && current" :title="`V${current.versionNo} 备注`" @close="noteOpen = false">
+      <p class="theme-intro">记下这一版投的岗位、改动的侧重点，回看版本历史时就不用靠记忆猜。</p>
+      <div class="field">
+        <label for="version-note-input">备注</label>
+        <textarea id="version-note-input" v-model="noteValue" rows="4" maxlength="200" placeholder="例：投字节后端 3 面版，加了 Go 并发项目细节"></textarea>
+        <small class="field-help">{{ noteValue.trim().length }}/200</small>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-ghost" @click="noteOpen = false">取消</button>
+        <button class="btn-primary" @click="saveNote">保存</button>
+      </div>
+    </Sheet>
   </div>
   <EmptyState v-else icon="file" title="简历不存在" hint="它可能已被删除，返回简历列表查看其它版本。">
     <template #action>

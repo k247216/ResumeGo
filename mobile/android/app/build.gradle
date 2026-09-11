@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+// 版本号只认 package.json 一个来源：这里曾写死 "1.0"，和应用内显示的 v0.2.x 对不上。
+def pkgJson = new groovy.json.JsonSlurper().parse(new File(rootProject.projectDir, '../package.json'))
+def pkgVersion = pkgJson.version.toString().tokenize('-')[0]
+def pkgParts = pkgVersion.split('\\.').toList().collect { it.toInteger() }
+while (pkgParts.size() < 3) { pkgParts << 0 }
+
 android {
     namespace "com.resumego.zhida.mobile"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +13,8 @@ android {
         applicationId "com.resumego.zhida.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode pkgParts[0] * 10000 + pkgParts[1] * 100 + pkgParts[2]
+        versionName pkgVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

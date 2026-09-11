@@ -58,7 +58,7 @@ function disabled(node: { stage: TargetStage }): boolean {
         class="node"
         :class="stepState(node)"
         :disabled="disabled(node)"
-        @click="node.stage === 'interview' ? emit('round', node.round!) : emit('change', node.stage)"
+        @click.stop="node.stage === 'interview' ? emit('round', node.round!) : emit('change', node.stage)"
       >
         <span class="dot" />
         <span class="node-label">{{ node.label }}</span>

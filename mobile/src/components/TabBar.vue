@@ -11,12 +11,13 @@ const tabs = [
 </script>
 
 <template>
-  <nav class="tabbar">
+  <nav class="tabbar" aria-label="主导航">
     <button
       v-for="tab in tabs"
       :key="tab.key"
       class="tab"
       :class="{ on: props.current === tab.key }"
+      :aria-current="props.current === tab.key ? 'page' : undefined"
       @click="emit('go', tab.key)"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

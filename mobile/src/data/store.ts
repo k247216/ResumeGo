@@ -39,15 +39,31 @@ export interface ResumeFileVer {
 }
 
 const DB_KEY = 'zhida-mobile-db-v2'
+// 解析失败时把原始字节挪到这里，坏数据仍可人工找回。
+const QUARANTINE_KEY = `${DB_KEY}-corrupt`
 
 // 无 localStorage 的环境（SSR / 部分测试环境）降级为内存存储，保证模块可加载。
+// 注意：写入抛错时（配额用尽 / WebView 关闭了 DOM 存储）也会落到内存，这份数据重启即丢，
+// 所以必须把故障留痕给 UI 提示用户，而不是假装一切正常。
 const memoryStore = new Map<string, string>()
+const storageFault = { message: null as string | null }
+export function storageFaultMessage(): string | null { return storageFault.message }
 const storage = {
   get(key: string): string | null {
     try { return localStorage.getItem(key) } catch { return memoryStore.get(key) ?? null }
   },
   set(key: string, value: string) {
-    try { localStorage.setItem(key, value) } catch { memoryStore.set(key, value) }
+    try {
+      localStorage.setItem(key, value)
+      storageFault.message = null
+    } catch {
+      memoryStore.set(key, value)
+      storageFault.message = '本机存储空间不足或已被禁用，最近的改动只存在于当前会话，退出后会丢失。请尽快导出备份。'
+    }
+  },
+  remove(key: string) {
+    try { localStorage.removeItem(key) } catch { /* 内存回退分支由下一行负责 */ }
+    memoryStore.delete(key)
   },
 }
 
@@ -62,50 +78,45 @@ interface DbShape {
 }
 
 function iso(d: Date): string { return d.toISOString() }
-function daysFromNow(n: number, hour = 10, minute = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() + n)
-  d.setHours(hour, minute, 0, 0)
-  return iso(d)
+
+function emptyDb(): DbShape {
+  return { seq: 0, reminders: {}, targets: [], stageEvents: [], schedules: [], resumes: [], versions: [] }
 }
 
-function seed(): DbShape {
-  const now = iso(new Date())
+/** 任意来源（本地存储 / 用户备份文件）都必须先归一，避免某个集合是 undefined 就让整页崩。 */
+function normalizeDb(input: unknown): DbShape {
+  const base = emptyDb()
+  if (!input || typeof input !== 'object') return base
+  const raw = input as Partial<DbShape>
   return {
-    seq: 100,
-    reminders: { 21: 30, 22: 60 },
-    targets: [
-      { id: 1, name: '字节跳动 · 前端开发', status: 'active', stage: 'interview', jobDescriptionId: 1, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-2), industry: '互联网', targetRole: '前端', location: '北京', notes: '', interviewRounds: 2, interviewRound: 1, outcome: null, outcomeRound: null, createdAt: daysFromNow(-20), updatedAt: now },
-      { id: 2, name: '腾讯 · 后端开发', status: 'active', stage: 'applied', jobDescriptionId: null, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-5), industry: '互联网', targetRole: '后端', location: '深圳', notes: '', interviewRounds: 3, interviewRound: 1, outcome: null, outcomeRound: null, createdAt: daysFromNow(-8), updatedAt: now },
-      { id: 3, name: '美团 · 算法工程师', status: 'active', stage: 'offer', jobDescriptionId: null, resumeVersionId: null, archivedAt: null, stageUpdatedAt: daysFromNow(-1), industry: '本地生活', targetRole: '算法', location: '上海', notes: '', interviewRounds: 1, interviewRound: 1, outcome: null, outcomeRound: null, createdAt: daysFromNow(-40), updatedAt: now },
-    ],
-    stageEvents: [
-      { id: 11, targetId: 1, stage: 'applied', occurredAt: daysFromNow(-20) },
-      { id: 12, targetId: 1, stage: 'exam', occurredAt: daysFromNow(-12) },
-      { id: 13, targetId: 1, stage: 'interview', occurredAt: daysFromNow(-2) },
-      { id: 14, targetId: 2, stage: 'applied', occurredAt: daysFromNow(-5) },
-      { id: 15, targetId: 3, stage: 'applied', occurredAt: daysFromNow(-40) },
-      { id: 16, targetId: 3, stage: 'offer', occurredAt: daysFromNow(-1) },
-    ],
-    schedules: [
-      { id: 21, title: '字节跳动 一面', eventType: 'interview', startTime: daysFromNow(0, 14, 0), endTime: daysFromNow(0, 15, 0), notes: '腾讯会议', jobDescriptionId: 1, jobProjectId: 1, createdAt: now, updatedAt: now },
-      { id: 22, title: '腾讯 笔试', eventType: 'exam', startTime: daysFromNow(1, 19, 0), endTime: daysFromNow(1, 21, 0), notes: '', jobDescriptionId: null, jobProjectId: 2, createdAt: now, updatedAt: now },
-      { id: 23, title: '跟进美团 Offer 意向', eventType: 'followup', startTime: daysFromNow(3, 10, 0), endTime: null, notes: '', jobDescriptionId: null, jobProjectId: 3, createdAt: now, updatedAt: now },
-    ],
-    // 简历是“你自己上传的文件”，示例数据不含任何虚构简历，交给空态引导。
-    resumes: [],
-    versions: [],
+    targets: Array.isArray(raw.targets) ? raw.targets : [],
+    stageEvents: Array.isArray(raw.stageEvents) ? raw.stageEvents : [],
+    schedules: Array.isArray(raw.schedules) ? raw.schedules : [],
+    resumes: Array.isArray(raw.resumes) ? raw.resumes : [],
+    versions: Array.isArray(raw.versions) ? raw.versions : [],
+    reminders: raw.reminders && typeof raw.reminders === 'object' ? raw.reminders : {},
+    seq: Number.isFinite(Number(raw.seq)) && Number(raw.seq) > 0 ? Number(raw.seq) : 0,
   }
 }
 
+function persist() { storage.set(DB_KEY, JSON.stringify(db)) }
+
 function load(): DbShape {
+  const raw = storage.get(DB_KEY)
+  if (!raw) {
+    const fresh = emptyDb()
+    storage.set(DB_KEY, JSON.stringify(fresh))
+    return fresh
+  }
   try {
-    const raw = storage.get(DB_KEY)
-    if (raw) return JSON.parse(raw) as DbShape
-  } catch { /* 损坏则回落到种子 */ }
-  const fresh = seed()
-  storage.set(DB_KEY, JSON.stringify(fresh))
-  return fresh
+    return normalizeDb(JSON.parse(raw))
+  } catch {
+    // 解析失败绝不覆盖真实记录：原始字节隔离留存，本次以空工作区启动。
+    storage.set(QUARANTINE_KEY, raw)
+    const fresh = emptyDb()
+    storage.set(DB_KEY, JSON.stringify(fresh))
+    return fresh
+  }
 }
 
 function hydrate(db: DbShape) {
@@ -128,7 +139,7 @@ const db = reactive(load()) as DbShape
 hydrate(db)
 
 watch(db, () => {
-  storage.set(DB_KEY, JSON.stringify(db))
+  persist()
 }, { deep: true })
 
 function nextId(): number { db.seq += 1; return db.seq }
@@ -174,15 +185,39 @@ export function setStage(id: number, stage: TargetStage): { ok: boolean; message
   db.stageEvents.push({ id: nextId(), targetId: id, stage, occurredAt: iso(new Date()) })
   return { ok: true }
 }
+/** 解除终态锁定：回到该计划时间轴上最后一个非终态阶段，并清空结果标记。 */
+export function reopenTarget(id: number): { ok: boolean; message?: string; stage?: TargetStage } {
+  const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
+  if (t.status === 'archived') return { ok: false, message: '该计划已归档，请先恢复后再解锁' }
+  if (!isTerminalStage(normalizeTargetStage(t.stage))) return { ok: false, message: '该计划未被锁定' }
+  const events = stageEventsOf(id)
+  let prev: TargetStage = 'applied'
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const stage = normalizeTargetStage(events[i].stage)
+    if (!isTerminalStage(stage)) { prev = stage; break }
+  }
+  const now = iso(new Date())
+  t.stage = prev; t.outcome = null; t.outcomeRound = null
+  t.stageUpdatedAt = now; t.updatedAt = now
+  db.stageEvents.push({ id: nextId(), targetId: id, stage: prev, occurredAt: now })
+  return { ok: true, stage: prev }
+}
 export function setTargetStatus(id: number, status: 'active' | 'archived') {
   const t = db.targets.find((x) => x.id === id); if (!t) return
   t.status = status
   t.archivedAt = status === 'archived' ? iso(new Date()) : null
   t.updatedAt = iso(new Date())
 }
-export function deleteTarget(id: number) {
+export function schedulesOfTarget(id: number): ScheduleEvent[] {
+  return db.schedules.filter((e) => e.jobProjectId === id).sort((a, b) => a.startTime.localeCompare(b.startTime))
+}
+export function deleteTarget(id: number): { removedScheduleIds: number[] } {
+  const removedScheduleIds = db.schedules.filter((e) => e.jobProjectId === id).map((e) => e.id)
   db.targets = db.targets.filter((x) => x.id !== id)
   db.stageEvents = db.stageEvents.filter((x) => x.targetId !== id)
+  db.schedules = db.schedules.filter((e) => e.jobProjectId !== id)
+  for (const scheduleId of removedScheduleIds) delete db.reminders[scheduleId]
+  return { removedScheduleIds }
 }
 export function updateApplication(id: number, payload: { industry?: string | null; role?: string | null; location?: string | null; notes?: string | null }) {
   const t = db.targets.find((x) => x.id === id); if (!t) return
@@ -258,6 +293,12 @@ export function deleteSchedule(id: number) {
   delete db.reminders[id]
 }
 export function getReminder(id: number): number { return db.reminders[id] ?? 0 }
+/** 所有仍然有效的提醒意图（日程 id + 提前分钟数），启动时据此向系统重新排期。 */
+export function eventsWithReminders(): Array<{ event: ScheduleEvent; minutes: number }> {
+  return db.schedules
+    .filter((e) => (db.reminders[e.id] ?? 0) > 0)
+    .map((e) => ({ event: e, minutes: db.reminders[e.id] }))
+}
 export function setReminder(id: number, minutes: number) {
   if (minutes > 0) db.reminders[id] = minutes
   else delete db.reminders[id]
@@ -313,8 +354,9 @@ export async function importResume(title: string, file: File): Promise<ResumeFil
   const name = title.trim() || file.name.replace(/\.[^.]+$/, '') || '未命名简历'
   const id = nextId()
   const resume: ResumeFile = { id, title: name, mark: resumeMarkOf(id), archivedAt: null, currentVersionId: null, createdAt: now, updatedAt: now }
+  // 先确认文件真的落盘再挂元数据行，否则失败后会留下一份永远打不开的空简历。
+  await addVersion(resume, file, null)
   db.resumes.push(resume)
-  await addVersion(resume, file, '初始版本')
   return resume
 }
 
@@ -331,6 +373,14 @@ export function setCurrentVersion(resumeId: number, versionId: number) {
 }
 export function renameResume(resumeId: number, title: string) {
   const r = getResume(resumeId); if (r) { r.title = title; r.updatedAt = iso(new Date()) }
+}
+/** 版本备注：这一版投了什么岗、改了什么，只有用户自己知道，所以给足一次改写的机会。 */
+export function setVersionNote(resumeId: number, versionId: number, note: string) {
+  const ver = db.versions.find((v) => v.id === versionId && v.resumeId === resumeId)
+  const resume = getResume(resumeId)
+  if (!ver || !resume) return
+  ver.note = note.trim() || null
+  resume.updatedAt = iso(new Date())
 }
 export async function deleteResume(resumeId: number) {
   const removed = db.versions.filter((v) => v.resumeId === resumeId)
@@ -354,17 +404,57 @@ export async function deleteResumeVersion(resumeId: number, versionId: number) {
 }
 
 // ── 备份 / 恢复 ──
+export interface RestoreSummary {
+  targets: number
+  schedules: number
+  resumes: number
+  reminders: number
+}
 export function exportBackup(): string { return JSON.stringify(db, null, 2) }
-export function importBackup(json: string): { ok: boolean; message?: string } {
-  try {
-    const parsed = JSON.parse(json) as DbShape
-    if (!Array.isArray(parsed.targets) || !Array.isArray(parsed.schedules)) return { ok: false, message: '备份格式不正确' }
-    Object.assign(db, parsed)
-    hydrate(db)
-    return { ok: true }
-  } catch { return { ok: false, message: '解析备份失败' } }
-}
-export function resetToSeed() {
-  Object.assign(db, seed())
+export function importBackup(json: string): { ok: boolean; message?: string; restored?: RestoreSummary } {
+  let parsed: unknown
+  try { parsed = JSON.parse(json) } catch { return { ok: false, message: '解析备份失败' } }
+  const raw = parsed as Partial<DbShape>
+  if (!Array.isArray(raw?.targets) || !Array.isArray(raw?.schedules)) {
+    return { ok: false, message: '备份格式不正确，未做任何改动' }
+  }
+  const next = normalizeDb(parsed)
+  // 备份里的 seq 可能落后于数据本身，必须抬高到最大 id 之上，否则新建记录会撞已有 id。
+  // 用循环而非 Math.max(...spread)：备份文件是外部输入，集合过大时展开参数会抛栈溢出。
+  let maxId = next.seq
+  for (const list of [next.targets, next.stageEvents, next.schedules, next.resumes, next.versions]) {
+    for (const item of list) {
+      const id = Number((item as { id?: unknown }).id)
+      if (Number.isFinite(id) && id > maxId) maxId = id
+    }
+  }
+  next.seq = maxId
+  Object.assign(db, next)
   hydrate(db)
+  persist()
+  clearQuarantinedData()
+  return {
+    ok: true,
+    restored: {
+      targets: next.targets.length,
+      schedules: next.schedules.length,
+      resumes: next.resumes.length,
+      reminders: Object.keys(next.reminders).length,
+    },
+  }
 }
+
+/** 清空本机全部记录（含简历文件本体），用于换机前交付或彻底重来。 */
+export async function resetWorkspace(): Promise<{ ok: boolean; message?: string }> {
+  try {
+    await Promise.all(db.versions.map((v) => deleteFile(v.fileKey).catch(() => undefined)))
+  } catch { /* 文件清理失败不阻塞元数据清空 */ }
+  Object.assign(db, emptyDb())
+  persist()
+  clearQuarantinedData()
+  return { ok: true }
+}
+
+export function hasQuarantinedData(): boolean { return !!storage.get(QUARANTINE_KEY) }
+/** 工作区已被整份替换，隔离的坏数据不再有机会被找回，继续留着只会让告警条常亮。 */
+export function clearQuarantinedData() { storage.remove(QUARANTINE_KEY) }

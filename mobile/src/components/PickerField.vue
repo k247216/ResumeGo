@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T extends string | number">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
+import { registerOverlay } from '../data/overlays'
 
 interface Option<T> { value: T; label: string; hint?: string; meta?: string }
 const props = withDefaults(defineProps<{
@@ -23,6 +24,13 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: T | null): void }>()
 const open = ref(false)
 const keyword = ref('')
 const listRef = ref<HTMLElement | null>(null)
+
+let unregisterOverlay: (() => void) | null = null
+watch(open, (v) => {
+  unregisterOverlay?.()
+  unregisterOverlay = v ? registerOverlay(() => { open.value = false }) : null
+})
+onScopeDispose(() => unregisterOverlay?.())
 
 const current = computed(() => props.options.find((o) => o.value === props.modelValue) ?? null)
 const filtered = computed(() => {

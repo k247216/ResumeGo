@@ -9,10 +9,12 @@ import EmptyState from '../components/EmptyState.vue'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import {
-  createTarget, currentVersionOf, deleteTarget, linkResume, listResumes, listTargets,
-  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, resumeLabel, setInterviewRound,
-  setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, stageEventsOf, updateApplication,
+  createTarget, currentVersionOf, deleteTarget, getReminder, linkResume, listResumes, listTargets,
+  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, reopenTarget, resumeLabel, setInterviewRound,
+  setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, stageEventsOf, schedulesOfTarget, updateApplication,
 } from '../data/store'
+import { cancelReminder } from '../data/notifications'
+import { SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
 import type { JobProject, TargetOutcome, TargetStage } from '../types/project'
 import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage } from '../types/project'
 
@@ -35,6 +37,11 @@ const detailLocked = computed(() => {
   const target = detailTarget.value
   return !!target && (target.status === 'archived' || isTerminalStage(normalizeTargetStage(target.stage)))
 })
+const terminalLock = computed(() => {
+  const target = detailTarget.value
+  return !!target && isTerminalStage(normalizeTargetStage(target.stage))
+})
+const detailSchedules = computed(() => (detailTarget.value ? schedulesOfTarget(detailTarget.value.id) : []))
 
 const FILTERS: Array<{ key: typeof filter.value; label: string }> = [
   { key: 'all', label: '全部' },
@@ -77,6 +84,16 @@ function stageTimesOf(t: JobProject) {
   return map
 }
 
+function formatEventTime(value: string): string {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+function reminderNoteOf(scheduleId: number): string {
+  const minutes = getReminder(scheduleId)
+  return minutes > 0 ? ` · 提前 ${minutes} 分钟` : ' · 无提醒'
+}
+
 function openCreate() { newName.value = ''; newRole.value = ''; newLocation.value = ''; createOpen.value = true }
 function submitCreate() {
   const name = newName.value.trim()
@@ -90,9 +107,40 @@ function submitCreate() {
   toast('已创建求职目标')
 }
 
-function onChangeStage(t: JobProject, stage: TargetStage) {
+async function onChangeStage(t: JobProject, stage: TargetStage) {
+  const cur = normalizeTargetStage(t.stage)
+  if (isTerminalStage(stage) && cur !== stage) {
+    const ok = await confirmAction({
+      title: `标记为「${TARGET_STAGE_LABELS[stage]}」？`,
+      message: '这是终态，确认后阶段、面试轮次和结果标记都会被锁定，需要手动解锁才能继续编辑。',
+      confirmLabel: '确认锁定',
+    })
+    if (!ok) return
+  }
   const res = setStage(t.id, stage)
   toast(res.ok ? `已推进到「${TARGET_STAGE_LABELS[stage]}」` : (res.message ?? '操作失败'))
+}
+
+function onPickRounds(t: JobProject, rounds: number) {
+  const res = setInterviewRounds(t.id, rounds)
+  if (!res.ok) toast(res.message ?? '操作失败')
+}
+
+function onPickOutcome(t: JobProject, value: TargetOutcome | null) {
+  const res = setTargetOutcome(t.id, value, interviewRoundOf(t))
+  if (!res.ok) { toast(res.message ?? '操作失败'); return }
+  toast(value ? `已标记「${outcomeLabelOf(t)}」` : '已清除结果标记')
+}
+
+async function doReopen(t: JobProject) {
+  const ok = await confirmAction({
+    title: '解除锁定，继续编辑？',
+    message: '阶段会回到锁定前的位置，结果标记会被清除，之后可以继续推进流程。',
+    confirmLabel: '解除锁定',
+  })
+  if (!ok) return
+  const res = reopenTarget(t.id)
+  toast(res.ok ? `已解锁，回到「${TARGET_STAGE_LABELS[res.stage ?? 'applied']}」` : (res.message ?? '操作失败'))
 }
 
 function onChangeInterviewRound(t: JobProject, round: number) {
@@ -134,17 +182,21 @@ function toggleArchive(t: JobProject) {
   toast(t.status === 'archived' ? '已恢复' : '已归档')
 }
 async function doDelete(t: JobProject) {
+  const related = schedulesOfTarget(t.id)
   const ok = await confirmAction({
     title: `删除「${t.name}」？`,
-    message: '该计划及其阶段记录会被移除，且不可恢复。',
+    message: related.length
+      ? `该计划、阶段记录以及关联的 ${related.length} 条日程和提醒会被移除，且不可恢复。`
+      : '该计划及其阶段记录会被移除，且不可恢复。',
     confirmLabel: '删除',
     danger: true,
   })
   if (!ok) return
-  deleteTarget(t.id)
+  const { removedScheduleIds } = deleteTarget(t.id)
+  for (const scheduleId of removedScheduleIds) cancelReminder(scheduleId)
   menuTarget.value = null
   detailTarget.value = null
-  toast('已删除')
+  toast(related.length ? `已删除（含 ${removedScheduleIds.length} 条日程）` : '已删除')
 }
 
 const resumeOptions = computed(() =>
@@ -267,7 +319,12 @@ function onLinkResume(versionId: number | null) {
         @change="(s) => onChangeStage(detailTarget!, s)"
         @round="(r) => onChangeInterviewRound(detailTarget!, r)"
       />
-      <p v-if="detailLocked" class="chip-meta" style="margin-top:6px">该计划已进入终态，阶段、面试轮次和结果标记已锁定。</p>
+      <div v-if="detailLocked" class="lock-note">
+        <p class="chip-meta">
+          {{ detailTarget.status === 'archived' ? '该计划已归档，恢复后才能继续编辑。' : '该计划已进入终态，阶段、面试轮次和结果标记已锁定。' }}
+        </p>
+        <button v-if="terminalLock" class="btn-ghost btn-sm" @click="doReopen(detailTarget!)">解除锁定</button>
+      </div>
 
       <p class="section-kicker">面试轮次</p>
       <PickerField
@@ -277,7 +334,7 @@ function onLinkResume(versionId: number | null) {
         label="选择面试轮次"
         title="设置面试轮次"
         icon="target"
-        @update:model-value="(v) => setInterviewRounds(detailTarget!.id, Number(v))"
+        @update:model-value="(v) => onPickRounds(detailTarget!, Number(v))"
       />
 
       <p class="section-kicker">结果标记</p>
@@ -291,9 +348,19 @@ function onLinkResume(versionId: number | null) {
         clearable
         clear-label="尚未标记"
         icon="target"
-        @update:model-value="(v) => setTargetOutcome(detailTarget!.id, v as TargetOutcome | null, interviewRoundOf(detailTarget!))"
+        @update:model-value="(v) => onPickOutcome(detailTarget!, v as TargetOutcome | null)"
       />
       <p v-if="detailTarget.outcome" class="chip-meta" style="margin-top:6px">当前结果：{{ outcomeLabelOf(detailTarget) }}</p>
+
+      <p class="section-kicker">关联日程</p>
+      <div v-if="detailSchedules.length" class="list">
+        <div v-for="ev in detailSchedules" :key="ev.id" class="setting-row" style="cursor: default">
+          <span class="event-type-dot" :style="{ background: SCHEDULE_EVENT_TYPE_COLORS[ev.eventType] }" />
+          <span class="s-label">{{ ev.title }}</span>
+          <span class="s-value">{{ formatEventTime(ev.startTime) }}{{ reminderNoteOf(ev.id) }}</span>
+        </div>
+      </div>
+      <p v-else class="chip-meta">还没有与该计划关联的日程。去「日程」新建时选择这个计划，面试和笔试就会出现在这里。</p>
 
       <p class="section-kicker">阶段时间轴</p>
       <div class="list">

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import ResumeMark from '../components/ResumeMark.vue'
 import { deleteResume, importResume, listResumes, currentVersionOf, versionsOf } from '../data/store'
-import { humanSize } from '../data/resumeFile'
+import { humanSize, isSupportedResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT } from '../data/resumeFile'
 import { resumeMarkOf } from '../data/resumeMark'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
@@ -20,6 +20,7 @@ async function onFile(e: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  if (!isSupportedResume(file)) { toast(RESUME_UNSUPPORTED_HINT); return }
   busy.value = true
   try {
     const resume = await importResume('', file)
@@ -52,7 +53,7 @@ async function removeResume(id: number, title: string) {
         <AppIcon name="upload" :size="18" />
       </button>
     </header>
-    <input ref="fileRef" type="file" hidden @change="onFile">
+    <input ref="fileRef" type="file" :accept="RESUME_FILE_ACCEPT" hidden @change="onFile">
 
     <!-- 首次使用：导入引导 -->
     <div v-if="!resumes.length" class="import-hero card">

@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 插旗＝抵达目标。前景只留 72x72 安全区内的实心形状，圆形/方形遮罩下都不会被切。 -->
+    <path
+        android:pathData="M38,29 L38,77"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M45,27 L76,27 L63.5,42 L76,57 L45,57 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

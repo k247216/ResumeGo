@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { onScopeDispose } from 'vue'
 import AppIcon from './AppIcon.vue'
+import { registerOverlay } from '../data/overlays'
+
 defineProps<{ title: string }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
+onScopeDispose(registerOverlay(() => emit('close')))
 </script>
 
 <template>

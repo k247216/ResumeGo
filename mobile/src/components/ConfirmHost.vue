@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import { onScopeDispose, watch } from 'vue'
 import { confirmState, confirmResult } from '../data/confirm'
+import { registerOverlay } from '../data/overlays'
 import AppIcon from './AppIcon.vue'
+
+let unregisterOverlay: (() => void) | null = null
+watch(() => confirmState.value.open, (v) => {
+  unregisterOverlay?.()
+  unregisterOverlay = v ? registerOverlay(() => confirmResult(false)) : null
+})
+onScopeDispose(() => unregisterOverlay?.())
 </script>
 
 <template>
