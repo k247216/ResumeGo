@@ -38,7 +38,7 @@ export async function previewResume(ver: ResumeFileVer): Promise<ResumePreview> 
   return { kind: isImage ? 'image' : 'pdf', url }
 }
 
-/** 把简历文件发到系统分享面板（转发给 HR）；Web 端降级为下载。 */
+/** 把简历文件发到系统分享面板（微信 / QQ / 邮件…由用户当场选）；Web 端降级为下载。 */
 export async function shareResumeFile(ver: ResumeFileVer): Promise<string | null> {
   const blob = await getFile(ver.fileKey)
   if (!blob) throw new Error('本机未找到该版本的文件')
@@ -48,7 +48,7 @@ export async function shareResumeFile(ver: ResumeFileVer): Promise<string | null
     fileName: ver.fileName,
     blob: typed,
     subject: ver.fileName,
-    dialogTitle: '发送简历',
+    dialogTitle: '分享简历',
   })
   return target
 }
@@ -57,4 +57,30 @@ export function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/**
+ * 系统导出的简历名常常很长，而文件名的两头才是有效信息：前缀认人、后缀认格式。
+ * 尾部省略会把 `.pdf` 省掉，所以从中间截；按码点切，中文文件名不会被劈成半个字。
+ */
+export function middleEllipsis(name: string, max = 28): string {
+  const chars = [...name.trim()]
+  if (chars.length <= max) return chars.join('')
+  const extMatch = /\.([\p{L}\p{N}]{1,5})$/u.exec(name)
+  const ext = extMatch ? [...extMatch[0]] : []
+  const stem = chars.slice(0, chars.length - ext.length)
+  const keep = Math.max(4, max - 1 - ext.length)
+  const head = Math.ceil(keep / 2)
+  const tail = Math.floor(keep / 2)
+  return `${stem.slice(0, head).join('')}…${tail ? stem.slice(stem.length - tail).join('') : ''}${ext.join('')}`
+}
+
+/**
+ * 只留开头。middleEllipsis 是为「保住扩展名」而生的，但简历标题、选择器标签这类文本没有扩展名，
+ * 身份全在前缀里，从中间裁只会剩下「…0260910」这种没意义的日期尾巴。
+ */
+export function headEllipsis(name: string, max = 14): string {
+  const chars = [...name.trim()]
+  if (chars.length <= max) return chars.join('')
+  return `${chars.slice(0, Math.max(1, max - 1)).join('')}…`
 }

@@ -126,6 +126,11 @@ function hydrate(db: DbShape) {
     target.outcome = target.outcome ?? null
     target.outcomeRound = target.outcomeRound == null ? null : normalizeInterviewRound(target.outcomeRound, target.interviewRounds)
   }
+  // 心得是后加字段，旧工作区里的日程没有这个键；补成 null 后 UI 层就不必到处判 undefined。
+  for (const schedule of db.schedules) {
+    schedule.notes = schedule.notes ?? null
+    schedule.review = schedule.review ?? null
+  }
   for (const resume of db.resumes) {
     resume.mark = resume.mark ?? resumeMarkOf(resume.id)
     const versions = db.versions.filter((v) => v.resumeId === resume.id).sort((a, b) => a.versionNo - b.versionNo)
@@ -173,18 +178,46 @@ export function createTarget(name: string, opts: { jobDescriptionId?: number | n
 export function renameTarget(id: number, name: string) {
   const t = db.targets.find((x) => x.id === id); if (t) { t.name = name; t.updatedAt = iso(new Date()) }
 }
-export function setStage(id: number, stage: TargetStage): { ok: boolean; message?: string } {
+export function setStage(id: number, stage: TargetStage, opts: { allowBackward?: boolean } = {}): { ok: boolean; message?: string } {
   const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
   const cur = normalizeTargetStage(t.stage)
   if (cur === stage) return { ok: true }
   if (isTerminalStage(cur)) return { ok: false, message: '该计划已有最终结果，状态已锁定' }
-  if (stageFlowRank(cur) > 0 && stageFlowRank(stage) > 0 && stageFlowRank(stage) < stageFlowRank(cur)) {
+  // 倒退只在详情里、经用户确认后开放（allowBackward）；卡片正面的轻点仍然是单向的，避免顺手改乱进度。
+  if (!opts.allowBackward && stageFlowRank(cur) > 0 && stageFlowRank(stage) > 0 && stageFlowRank(stage) < stageFlowRank(cur)) {
     return { ok: false, message: '阶段只能向前推进，不能回退' }
   }
   t.stage = stage; t.stageUpdatedAt = iso(new Date()); t.updatedAt = iso(new Date())
   db.stageEvents.push({ id: nextId(), targetId: id, stage, occurredAt: iso(new Date()) })
   return { ok: true }
 }
+
+/**
+ * 一次改动的完整快照。阶段推进、结果标记、归档这类操作一旦落库就很难靠"反着点一遍"还原，
+ * 所以统一在动手前拍快照、由提示条的「撤销」整份还原，比给每种操作各写一个逆操作更可靠。
+ */
+export interface TargetSnapshot { target: JobProject; stageEvents: Array<StageEvent & { targetId: number }> }
+export function snapshotTarget(id: number): TargetSnapshot | null {
+  const target = db.targets.find((x) => x.id === id)
+  if (!target) return null
+  return clone({
+    target,
+    stageEvents: db.stageEvents.filter((e) => e.targetId === id),
+  })
+}
+/** 目标已被删除时无法还原，返回 false 让 UI 如实说明，而不是假装撤销成功。 */
+export function restoreTarget(snap: TargetSnapshot): boolean {
+  const target = db.targets.find((x) => x.id === snap.target.id)
+  if (!target) return false
+  const { target: next, stageEvents } = clone(snap)
+  Object.assign(target, next)
+  db.stageEvents = [
+    ...db.stageEvents.filter((e) => e.targetId !== next.id),
+    ...stageEvents.map((e) => ({ ...e, targetId: next.id })),
+  ]
+  return true
+}
+function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T }
 /** 解除终态锁定：回到该计划时间轴上最后一个非终态阶段，并清空结果标记。 */
 export function reopenTarget(id: number): { ok: boolean; message?: string; stage?: TargetStage } {
   const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
@@ -302,6 +335,18 @@ export function eventsWithReminders(): Array<{ event: ScheduleEvent; minutes: nu
 export function setReminder(id: number, minutes: number) {
   if (minutes > 0) db.reminders[id] = minutes
   else delete db.reminders[id]
+}
+/** 复盘心得独立于 notes：notes 是赛前要看的（会议链接、注意事项），心得是赛后写的，两者生命周期完全不同。 */
+export function setScheduleReview(id: number, review: string) {
+  const e = db.schedules.find((x) => x.id === id); if (!e) return
+  e.review = review.trim() || null
+  e.updatedAt = iso(new Date())
+}
+/** 写过心得的日程，最近一场在前——复盘视图只看这一份，不必把没结束的安排也拉进来。 */
+export function listReviews(): ScheduleEvent[] {
+  return db.schedules
+    .filter((e) => !!e.review?.trim())
+    .sort((a, b) => b.startTime.localeCompare(a.startTime))
 }
 
 // ── 简历（导入文件版）──

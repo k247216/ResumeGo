@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createSchedule, createTarget, currentVersionOf, deleteResume, deleteSchedule, deleteTarget, getReminder, getResume, importBackup, importResume,
-  interviewRoundOf, interviewRoundsOf, listResumes, listSchedules, listTargets, reopenTarget, resetWorkspace,
+  interviewRoundOf, interviewRoundsOf, listResumes, listReviews, listSchedules, listTargets, reopenTarget, resetWorkspace, restoreTarget,
   setInterviewRound, setInterviewRounds,
-  setReminder, setStage, setTargetOutcome, setVersionNote, stageEventsOf, linkResume,
+  setReminder, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateSchedule, linkResume,
 } from './store'
 
 describe('求职目标阶段规则', () => {
@@ -215,5 +215,82 @@ describe('清空与恢复', () => {
     expect(importBackup(JSON.stringify(snapshot)).ok).toBe(true)
     const created = createTarget('恢复后新建')
     expect(created.id).toBeGreaterThan(existing.id)
+  })
+})
+
+function scheduleOf(title: string, startTime: string, jobProjectId: number | null = null) {
+  return createSchedule({
+    title, eventType: 'interview', startTime,
+    endTime: null, notes: null, jobDescriptionId: null, jobProjectId,
+  })
+}
+
+describe('复盘心得', () => {
+  it('心得与备注各存各的，写心得不会覆盖赛前备注', () => {
+    const ev = scheduleOf('心得与备注分离', '2026-03-01T02:00:00.000Z')
+    updateSchedule(ev.id, { notes: '面试官：王工' })
+
+    setScheduleReview(ev.id, '算法题没答上来')
+
+    const saved = listSchedules().find((item) => item.id === ev.id)
+    expect(saved?.notes).toBe('面试官：王工')
+    expect(saved?.review).toBe('算法题没答上来')
+  })
+
+  it('清空或只留空格时心得字段回到 null，不会存一条假心得', () => {
+    const ev = scheduleOf('清空心得', '2026-03-02T02:00:00.000Z')
+    setScheduleReview(ev.id, '写了两句')
+    setScheduleReview(ev.id, '   ')
+
+    expect(listSchedules().find((item) => item.id === ev.id)?.review).toBeNull()
+    expect(listReviews().some((item) => item.id === ev.id)).toBe(false)
+  })
+
+  it('复盘列表只收写过心得的日程，并按最近一场排在最前', () => {
+    const t = createTarget('复盘归组公司')
+    const early = scheduleOf('早的一场', '2026-03-03T02:00:00.000Z', t.id)
+    const late = scheduleOf('晚的一场', '2026-03-20T02:00:00.000Z', t.id)
+    const unwritten = scheduleOf('没写心得的一场', '2026-03-25T02:00:00.000Z', t.id)
+    setScheduleReview(early.id, '一面基础题')
+    setScheduleReview(late.id, '三面系统设计')
+
+    const ids = listReviews().map((item) => item.id)
+    expect(ids).not.toContain(unwritten.id)
+    expect(ids.indexOf(late.id)).toBeLessThan(ids.indexOf(early.id))
+  })
+})
+
+describe('阶段误触回退', () => {
+  it('退回更早阶段默认被拒，显式允许时可以退回', () => {
+    const t = createTarget('回退测试')
+    setStage(t.id, 'interview')
+
+    expect(setStage(t.id, 'applied').ok).toBe(false)
+    expect(setStage(t.id, 'applied', { allowBackward: true }).ok).toBe(true)
+    expect(t.stage).toBe('applied')
+  })
+
+  it('快照能撤销误触：阶段、面试轮次与阶段时间轴一起回到改动前', () => {
+    const t = createTarget('撤销快照')
+    setStage(t.id, 'interview')
+    setInterviewRound(t.id, 2)
+    const snap = snapshotTarget(t.id)
+    expect(snap).not.toBeNull()
+    const eventsBefore = stageEventsOf(t.id).length
+
+    setStage(t.id, 'offer')
+
+    expect(restoreTarget(snap!)).toBe(true)
+    expect(t.stage).toBe('interview')
+    expect(interviewRoundOf(t)).toBe(2)
+    expect(stageEventsOf(t.id)).toHaveLength(eventsBefore)
+  })
+
+  it('计划已被删除时撤销如实返回失败', () => {
+    const t = createTarget('撤销前被删')
+    const snap = snapshotTarget(t.id)!
+    deleteTarget(t.id)
+
+    expect(restoreTarget(snap)).toBe(false)
   })
 })

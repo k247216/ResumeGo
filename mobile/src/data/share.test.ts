@@ -14,6 +14,7 @@ describe('shareFileName', () => {
     expect(shareFileName('resume', 'application/pdf')).toBe('resume.pdf')
     expect(shareFileName('resume', 'text/markdown')).toBe('resume.md')
     expect(shareFileName('resume', 'image/jpeg')).toBe('resume.jpg')
+    expect(shareFileName('面试-42', 'text/calendar;charset=utf-8')).toBe('面试-42.ics')
   })
 
   it('mime 带参数或不认识时不影响已有扩展名', () => {

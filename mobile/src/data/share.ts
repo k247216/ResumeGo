@@ -13,6 +13,7 @@ const EXT_BY_MIME: Record<string, string> = {
   'application/json': 'json',
   'text/plain': 'txt',
   'text/markdown': 'md',
+  'text/calendar': 'ics',
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/gif': 'gif',

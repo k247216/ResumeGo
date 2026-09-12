@@ -7,10 +7,27 @@ export interface ScheduleEvent {
   startTime: string
   endTime: string | null
   notes: string | null
+  /** 赛后复盘心得；notes 是赛前要看的，心得是结束后写的，两者不能挤在同一个字段里。 */
+  review?: string | null
   jobDescriptionId: number | null
   jobProjectId: number | null
   createdAt: string
   updatedAt: string
+}
+
+/** 未填结束时间时按一小时估长度——与 .ics 生成用的是同一个口径。 */
+export const DEFAULT_EVENT_DURATION_MIN = 60
+
+/** 该日程的预计结束时刻（毫秒）。时间字段非法时退回开始时间，保证调用方拿到可比数值。 */
+export function eventEndsAt(ev: Pick<ScheduleEvent, 'startTime' | 'endTime'>): number {
+  const start = new Date(ev.startTime).getTime()
+  if (!Number.isFinite(start)) return 0
+  const end = ev.endTime ? new Date(ev.endTime).getTime() : NaN
+  if (!Number.isFinite(end) || end <= start) return start + DEFAULT_EVENT_DURATION_MIN * 60_000
+  return end
+}
+export function isEventFinished(ev: Pick<ScheduleEvent, 'startTime' | 'endTime'>, now = Date.now()): boolean {
+  return eventEndsAt(ev) <= now
 }
 
 export interface CreateScheduleEventRequest {

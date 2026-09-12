@@ -9,8 +9,9 @@ import {
   addResumeVersion, currentVersionOf, deleteResume, getResume, renameResume,
   setCurrentVersion, setVersionNote, versionsOf,
 } from '../data/store'
-import { humanSize, isSupportedResume, previewResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT, shareResumeFile, type ResumePreview } from '../data/resumeFile'
+import { headEllipsis, humanSize, isSupportedResume, middleEllipsis, previewResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT, shareResumeFile, type ResumePreview } from '../data/resumeFile'
 import { shareErrorMessage, shareTargetName } from '../data/share'
+import { appendPromptLine } from '../data/prompt'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { resumeMarkOf } from '../data/resumeMark'
@@ -77,10 +78,16 @@ const mdHtml = computed(() => {
 
 const noteOpen = ref(false)
 const noteValue = ref('')
+/** 版本备注的三条骨架：投给谁、改了什么、还欠什么——回看版本历史时最常被问起的三件事。 */
+const NOTE_MAX = 200
+const NOTE_PROMPTS = ['投递岗位', '改动侧重', '待优化']
 function openNote() {
   if (!current.value) return
   noteValue.value = current.value.note ?? ''
   noteOpen.value = true
+}
+function appendNote(label: string) {
+  noteValue.value = appendPromptLine(noteValue.value, label, NOTE_MAX)
 }
 function saveNote() {
   const ver = current.value
@@ -129,8 +136,8 @@ async function onDelete() {
   if (confirmingDelete.value) return
   confirmingDelete.value = true
   const ok = await confirmAction({
-    title: `删除「${resume.value?.title}」？`,
-    message: '该简历及其所有版本文件都会被移除，且不可恢复。',
+    title: `删除「${headEllipsis(resume.value?.title ?? '未命名简历', 12)}」？`,
+    message: '这份简历和它的全部版本会从本机移除，已绑定的求职目标也会解除关联。',
     confirmLabel: '删除',
     danger: true,
   })
@@ -154,8 +161,9 @@ function short(v: string): string {
         <template v-if="renaming">
           <input class="title-edit" v-model="renameValue" @keyup.enter="saveRename" @blur="saveRename" autofocus>
         </template>
-        <h1 v-else class="page-title clickable" style="font-size: 18px" @click="startRename">
-          {{ resume.title }}<AppIcon name="edit" :size="13" class="title-edit-ic" />
+        <h1 v-else class="page-title clickable" style="font-size: 18px" :title="resume.title" @click="startRename">
+          <span class="title-text">{{ headEllipsis(resume.title, 12) }}</span>
+          <AppIcon name="edit" :size="13" class="title-edit-ic" />
         </h1>
         <p class="page-sub">{{ versions.length }} 个版本 · 点标题可改名</p>
       </div>
@@ -175,14 +183,21 @@ function short(v: string): string {
     <input ref="fileRef" type="file" :accept="RESUME_FILE_ACCEPT" hidden @change="onVersionFile">
 
     <div v-if="current" class="ver-meta">
-      <span class="chip">{{ current.fileName }}</span>
-      <span class="chip-meta">{{ humanSize(current.size) }} · {{ new Date(current.createdAt).toLocaleDateString('zh-CN') }}</span>
+      <span class="chip ver-file" :title="current.fileName">
+        <AppIcon name="file" :size="13" class="ver-file-ic" />
+        <span class="ver-file-name">{{ middleEllipsis(current.fileName, 26) }}</span>
+      </span>
+      <span class="chip-meta">{{ humanSize(current.size) }}</span>
     </div>
 
-    <button v-if="current" class="note-row" @click="openNote">
-      <span class="note-row-label"><AppIcon name="edit" :size="14" /> V{{ current.versionNo }} 备注</span>
+    <button v-if="current" class="note-row" :class="{ filled: !!current.note }" @click="openNote">
+      <span class="note-row-head">
+        <AppIcon :name="current.note ? 'check' : 'edit'" :size="14" :class="current.note ? 'note-row-done' : 'note-row-ask'" />
+        <span class="note-row-label">V{{ current.versionNo }} 备注</span>
+        <AppIcon name="chevronRight" :size="15" class="note-row-chev" />
+      </span>
       <span v-if="current.note" class="note-text">{{ current.note }}</span>
-      <span v-else class="note-empty">这一版投了什么岗位、改了什么，写一句 ›</span>
+      <span v-else class="note-empty">这一版投了什么岗位、改了什么，点一下写一句</span>
     </button>
 
     <!-- 预览：PDF 内嵌 / MD 渲染 / 缺失兜底 -->
@@ -191,7 +206,7 @@ function short(v: string): string {
       <iframe v-else-if="preview.kind === 'pdf' && preview.url" class="doc-pdf" :src="preview.url" title="简历预览" />
       <img v-else-if="preview.kind === 'image' && preview.url" class="doc-image" :src="preview.url" alt="简历预览">
       <article v-else-if="preview.kind === 'text'" class="doc-md" v-html="mdHtml" />
-      <EmptyState v-else-if="preview.kind === 'unsupported'" icon="file" title="该格式无法在本机预览" hint="职达支持 PDF、Markdown、TXT 和图片简历。文件仍完整保存在本机，可以照常转发给 HR；换一份受支持的格式就能预览。">
+      <EmptyState v-else-if="preview.kind === 'unsupported'" icon="file" title="该格式无法在本机预览" hint="职达支持 PDF、Markdown、TXT 和图片简历。文件仍完整保存在本机，照常可以分享出去；换一份受支持的格式就能预览。">
         <template #action>
           <button class="btn-primary" @click="openVersionPicker"><AppIcon name="upload" :size="16" /> 重新上传</button>
         </template>
@@ -205,15 +220,18 @@ function short(v: string): string {
 
     <div class="doc-actions">
       <button class="btn-ghost" @click="openVersionPicker"><AppIcon name="upload" :size="16" /> 新增一版</button>
-      <button class="btn-primary" :disabled="!current || sharing" @click="onShare"><AppIcon name="share" :size="16" /> {{ sharing ? '发送中…' : '发送给 HR' }}</button>
+      <button class="btn-primary" :disabled="!current || sharing" @click="onShare"><AppIcon name="share" :size="16" /> {{ sharing ? '分享中…' : '立刻分享' }}</button>
     </div>
 
     <Sheet v-if="noteOpen && current" :title="`V${current.versionNo} 备注`" @close="noteOpen = false">
-      <p class="theme-intro">记下这一版投的岗位、改动的侧重点，回看版本历史时就不用靠记忆猜。</p>
+      <p class="theme-intro">记下这一版投给谁、相对上一版改了什么，之后回看版本历史就不用靠记忆猜。</p>
+      <div class="prompt-row">
+        <button v-for="p in NOTE_PROMPTS" :key="p" class="prompt-chip" @click="appendNote(p)">{{ p }}</button>
+      </div>
       <div class="field">
         <label for="version-note-input">备注</label>
-        <textarea id="version-note-input" v-model="noteValue" rows="4" maxlength="200" placeholder="例：投字节后端 3 面版，加了 Go 并发项目细节"></textarea>
-        <small class="field-help">{{ noteValue.trim().length }}/200</small>
+        <textarea id="version-note-input" v-model="noteValue" rows="4" :maxlength="NOTE_MAX" placeholder="例：投字节后端 3 面版，加了 Go 并发项目细节"></textarea>
+        <small class="field-help">{{ noteValue.trim().length }}/{{ NOTE_MAX }}</small>
       </div>
       <div class="sheet-actions">
         <button class="btn-ghost" @click="noteOpen = false">取消</button>

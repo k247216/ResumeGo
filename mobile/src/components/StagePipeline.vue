@@ -9,6 +9,8 @@ const props = defineProps<{
   locked?: boolean
   interviewRounds?: number
   interviewRound?: number
+  /** 允许点已完成的阶段退回。列表卡片不开（轻点就会改进度，太容易误伤），详情面板开并由父层加确认。 */
+  allowBackward?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'change', stage: TargetStage): void
@@ -42,11 +44,14 @@ function stepState(node: { stage: TargetStage; round?: number }) {
   const isCurrent = node.stage === props.stage && (node.stage !== 'interview' || node.round === currentRound.value)
   return { current: isCurrent, done: cur >= 0 && i < cur }
 }
-function disabled(node: { stage: TargetStage }): boolean {
-  if (props.locked) return true
+function backward(node: { stage: TargetStage }): boolean {
   const cur = stageFlowRank(props.stage)
   const next = stageFlowRank(node.stage)
   return cur > 0 && next > 0 && next < cur
+}
+function disabled(node: { stage: TargetStage }): boolean {
+  if (props.locked) return true
+  return !props.allowBackward && backward(node)
 }
 </script>
 

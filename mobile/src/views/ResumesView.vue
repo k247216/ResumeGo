@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import ResumeMark from '../components/ResumeMark.vue'
 import { deleteResume, importResume, listResumes, currentVersionOf, versionsOf } from '../data/store'
-import { humanSize, isSupportedResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT } from '../data/resumeFile'
+import { headEllipsis, humanSize, isSupportedResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT } from '../data/resumeFile'
 import { resumeMarkOf } from '../data/resumeMark'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
@@ -30,9 +30,20 @@ async function onFile(e: Event) {
 }
 
 function verCount(id: number) { return versionsOf(id).length }
+function mdDay(isoStr: string): string {
+  const d = new Date(isoStr)
+  return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}月${d.getDate()}日`
+}
+/** 卡片标题已经是文件名本身，副行再重复一遍只会在长文件名上被裁两次——换成版本号和上传时间。 */
+function verLine(id: number): string {
+  const v = currentVersionOf(id)
+  if (!v) return ''
+  const day = mdDay(v.createdAt)
+  return `当前 V${v.versionNo} · ${humanSize(v.size)}${day ? ` · ${day}上传` : ''}`
+}
 async function removeResume(id: number, title: string) {
   const ok = await confirmAction({
-    title: `删除「${title}」？`,
+    title: `删除「${headEllipsis(title, 12)}」？`,
     message: '这份简历和它的全部版本会从本机移除，已绑定的求职目标也会解除关联。',
     confirmLabel: '删除', danger: true,
   })
@@ -75,10 +86,7 @@ async function removeResume(id: number, title: string) {
         <ResumeMark :variant="r.mark ?? resumeMarkOf(r.id)" :size="42" />
         <div class="head-copy">
           <h3>{{ r.title }}</h3>
-          <small>
-            <template v-if="currentVersionOf(r.id)">当前 V{{ currentVersionOf(r.id)!.versionNo }} · {{ currentVersionOf(r.id)!.fileName }} · {{ humanSize(currentVersionOf(r.id)!.size) }}</template>
-            <template v-else>暂无版本</template>
-          </small>
+          <small>{{ verLine(r.id) || '暂无版本' }}</small>
         </div>
         <div class="rc-side">
           <span class="stage-pill" :style="{ background: 'var(--brand-soft)', color: 'var(--brand)' }">{{ verCount(r.id) }} 版</span>

@@ -10,13 +10,16 @@ import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import {
   createTarget, currentVersionOf, deleteTarget, getReminder, linkResume, listResumes, listTargets,
-  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, reopenTarget, resumeLabel, setInterviewRound,
-  setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, stageEventsOf, schedulesOfTarget, updateApplication,
+  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, reopenTarget, resumeLabel, restoreTarget,
+  setInterviewRound, setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, snapshotTarget,
+  stageEventsOf, schedulesOfTarget, updateApplication,
 } from '../data/store'
+import type { TargetSnapshot } from '../data/store'
 import { cancelReminder } from '../data/notifications'
+import { headEllipsis } from '../data/resumeFile'
 import { SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
 import type { JobProject, TargetOutcome, TargetStage } from '../types/project'
-import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage } from '../types/project'
+import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage, stageFlowRank } from '../types/project'
 
 const search = ref('')
 const filter = ref<'all' | TargetStage | 'outcome' | 'archived'>('all')
@@ -107,8 +110,30 @@ function submitCreate() {
   toast('已创建求职目标')
 }
 
+/**
+ * 改完就给一次「撤销」。这里不搭 undo 栈：一次改动对应一份快照，用户只关心刚点错的那一下，
+ * 而快照能把阶段、轮次、结果标记、归档状态一起还原，比逐个写逆操作更不容易漏。
+ */
+function doneWithUndo(snap: TargetSnapshot | null, message: string) {
+  if (!snap) { toast(message); return }
+  toast(message, {
+    label: '撤销',
+    run: () => { toast(restoreTarget(snap) ? '已撤销' : '该计划已被删除，无法撤销') },
+  })
+}
+function movedBackward(from: TargetStage, to: TargetStage): boolean {
+  const cur = stageFlowRank(from)
+  const next = stageFlowRank(to)
+  return cur > 0 && next > 0 && next < cur
+}
+function outcomeText(t: JobProject, value: TargetOutcome): string {
+  if (value === 'interview_failed') return `面试第 ${interviewRoundOf(t)} 面未通过`
+  return TARGET_OUTCOME_LABELS[value]
+}
+
 async function onChangeStage(t: JobProject, stage: TargetStage) {
   const cur = normalizeTargetStage(t.stage)
+  const back = movedBackward(cur, stage)
   if (isTerminalStage(stage) && cur !== stage) {
     const ok = await confirmAction({
       title: `标记为「${TARGET_STAGE_LABELS[stage]}」？`,
@@ -116,20 +141,40 @@ async function onChangeStage(t: JobProject, stage: TargetStage) {
       confirmLabel: '确认锁定',
     })
     if (!ok) return
+  } else if (back) {
+    const ok = await confirmAction({
+      title: `退回「${TARGET_STAGE_LABELS[stage]}」？`,
+      message: '进度会退回这一步，之后的阶段要重新点一次。退回后仍然可以撤销。',
+      confirmLabel: '退回',
+    })
+    if (!ok) return
   }
-  const res = setStage(t.id, stage)
-  toast(res.ok ? `已推进到「${TARGET_STAGE_LABELS[stage]}」` : (res.message ?? '操作失败'))
+  const snap = snapshotTarget(t.id)
+  const res = setStage(t.id, stage, { allowBackward: back })
+  if (!res.ok) { toast(res.message ?? '操作失败'); return }
+  doneWithUndo(snap, `${back ? '已退回' : '已推进到'}「${TARGET_STAGE_LABELS[stage]}」`)
 }
 
 function onPickRounds(t: JobProject, rounds: number) {
+  const snap = snapshotTarget(t.id)
   const res = setInterviewRounds(t.id, rounds)
-  if (!res.ok) toast(res.message ?? '操作失败')
+  if (!res.ok) { toast(res.message ?? '操作失败'); return }
+  doneWithUndo(snap, `面试总轮次设为 ${rounds} 轮`)
 }
 
-function onPickOutcome(t: JobProject, value: TargetOutcome | null) {
+async function onPickOutcome(t: JobProject, value: TargetOutcome | null) {
+  if (value) {
+    const ok = await confirmAction({
+      title: `标记为「${outcomeText(t, value)}」？`,
+      message: '标记结果会把这条计划推进到终态并锁定，之后要手动解锁才能继续改流程。',
+      confirmLabel: '标记',
+    })
+    if (!ok) return
+  }
+  const snap = snapshotTarget(t.id)
   const res = setTargetOutcome(t.id, value, interviewRoundOf(t))
   if (!res.ok) { toast(res.message ?? '操作失败'); return }
-  toast(value ? `已标记「${outcomeLabelOf(t)}」` : '已清除结果标记')
+  doneWithUndo(snap, value ? `已标记「${outcomeLabelOf(t)}」` : '已清除结果标记')
 }
 
 async function doReopen(t: JobProject) {
@@ -139,17 +184,20 @@ async function doReopen(t: JobProject) {
     confirmLabel: '解除锁定',
   })
   if (!ok) return
+  const snap = snapshotTarget(t.id)
   const res = reopenTarget(t.id)
-  toast(res.ok ? `已解锁，回到「${TARGET_STAGE_LABELS[res.stage ?? 'applied']}」` : (res.message ?? '操作失败'))
+  if (!res.ok) { toast(res.message ?? '操作失败'); return }
+  doneWithUndo(snap, `已解锁，回到「${TARGET_STAGE_LABELS[res.stage ?? 'applied']}」`)
 }
 
 function onChangeInterviewRound(t: JobProject, round: number) {
+  const snap = snapshotTarget(t.id)
   if (normalizeTargetStage(t.stage) !== 'interview') {
     const res = setStage(t.id, 'interview')
     if (!res.ok) { toast(res.message ?? '操作失败'); return }
   }
   setInterviewRound(t.id, round)
-  toast(`当前进度：第 ${round} 面`)
+  doneWithUndo(snap, `当前进度：第 ${round} 面`)
 }
 
 function openDetail(t: JobProject) {
@@ -177,9 +225,11 @@ function submitRename() {
   toast('已重命名')
 }
 function toggleArchive(t: JobProject) {
-  setTargetStatus(t.id, t.status === 'archived' ? 'active' : 'archived')
+  const snap = snapshotTarget(t.id)
+  const wasArchived = t.status === 'archived'
+  setTargetStatus(t.id, wasArchived ? 'active' : 'archived')
   menuTarget.value = null
-  toast(t.status === 'archived' ? '已恢复' : '已归档')
+  doneWithUndo(snap, wasArchived ? '已恢复到进行中' : '已归档，可在筛选「已归档」里找到')
 }
 async function doDelete(t: JobProject) {
   const related = schedulesOfTarget(t.id)
@@ -202,7 +252,7 @@ async function doDelete(t: JobProject) {
 const resumeOptions = computed(() =>
   listResumes().flatMap((r) => {
     const v = currentVersionOf(r.id)
-    return v ? [{ value: v.id, label: `${r.title} · V${v.versionNo}` }] : []
+    return v ? [{ value: v.id, label: `${headEllipsis(r.title, 14)} · V${v.versionNo}` }] : []
   }),
 )
 const roundOptions = [1, 2, 3, 4, 5].map((value) => ({ value, label: `${value} 轮` }))
@@ -217,8 +267,9 @@ const outcomeOptions: Array<{ value: TargetOutcome; label: string }> = [
 ]
 function onLinkResume(versionId: number | null) {
   if (!detailTarget.value) return
+  const snap = snapshotTarget(detailTarget.value.id)
   linkResume(detailTarget.value.id, versionId)
-  toast(versionId ? '已绑定简历版本' : '已解除绑定')
+  doneWithUndo(snap, versionId ? `已绑定 ${resumeLabel(versionId) ?? '该简历版本'}` : '已解除简历绑定')
 }
 </script>
 
@@ -314,11 +365,13 @@ function onLinkResume(versionId: number | null) {
         :stage="normalizeTargetStage(detailTarget.stage)"
         :times="stageTimesOf(detailTarget)"
         :locked="detailLocked"
+        :allow-backward="true"
         :interview-rounds="interviewRoundsOf(detailTarget)"
         :interview-round="interviewRoundOf(detailTarget)"
         @change="(s) => onChangeStage(detailTarget!, s)"
         @round="(r) => onChangeInterviewRound(detailTarget!, r)"
       />
+      <p v-if="!detailLocked" class="chip-meta">点已完成的阶段可以退回上一步；每次改动都会给一条「撤销」。</p>
       <div v-if="detailLocked" class="lock-note">
         <p class="chip-meta">
           {{ detailTarget.status === 'archived' ? '该计划已归档，恢复后才能继续编辑。' : '该计划已进入终态，阶段、面试轮次和结果标记已锁定。' }}

@@ -1,2 +1,9 @@
 # 验证截图产物（本地生成，不入库）
 .shots/
+# 无头截图脚手架（隔离的 puppeteer-core 前缀，不入库）
+.pptr/
+# 启动图标几何校准脚本与预览图
+.icon-probe/
+# 本地打包/发布脚本与 Release 正文草稿
+.androidtools-*.sh
+.release-notes-*.md

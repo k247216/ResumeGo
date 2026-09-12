@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
   <defs><clipPath id="c"><rect width="108" height="108" rx="23" ry="23"/></clipPath></defs>
-  <g clip-path="url(#c)"><rect width="108" height="108" fill="#168B68"/><path d="M38,29 L38,77" stroke="#fff" stroke-width="12" stroke-linecap="round" fill="none"/>
-    <path d="M45,27 L76,27 L63.5,42 L76,57 L45,57 Z" fill="#fff"/></g>
+  <g clip-path="url(#c)"><rect width="108" height="108" fill="#168B68"/>
+    <polyline points="35,36 73,36 35,72 73,72" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

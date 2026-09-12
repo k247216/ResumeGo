@@ -17,7 +17,7 @@ onScopeDispose(registerOverlay(() => emit('close')))
         <h2>{{ title }}</h2>
         <button class="sheet-x" aria-label="关闭" @click="emit('close')"><AppIcon name="close" :size="18" /></button>
       </div>
-      <slot />
+      <div class="sheet-body"><slot /></div>
     </section>
   </Teleport>
 </template>
