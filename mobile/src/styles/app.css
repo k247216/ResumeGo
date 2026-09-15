@@ -1542,7 +1542,7 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .note-owner { display: flex; align-items: center; gap: 11px; margin: -2px 0 14px; }
 .note-owner .plan-copy { flex: 1; }
 .review-meta { color: var(--muted); font-size: var(--fs-micro); }
-.prompt-row { display: flex; flex-wrap: wrap; gap: 7px; margin: -2px 0 14px; }
+.prompt-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; }
 .prompt-chip {
   padding: 6px 11px; border: 1px solid var(--line-subtle); border-radius: 999px;
   background: var(--surface-subtle); color: var(--copy);
@@ -1551,7 +1551,7 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .prompt-chip:active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
 
 /* 心得标签：像手机上那样一排可点可加的胶囊 */
-.review-tags { display: grid; gap: 8px; margin: 2px 0 14px; }
+.review-tags { display: grid; gap: 8px; margin: 0; }
 .review-tags-head { display: flex; align-items: baseline; gap: 8px; }
 .review-tags-title { font-size: 13px; font-weight: 700; color: var(--ink); }
 .review-tags-hint { color: var(--muted); font-size: var(--fs-micro); }
@@ -1711,10 +1711,13 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 }
 .ne-head { display: flex; align-items: flex-start; gap: 12px; }
 /* 便签纸：纸张风格由纸张选择器给（白/米/牛皮，--paper-c 是整个 CSS 变量引用）；
-   圆角 + 投影 + 顶部胶带，是一张贴在桌上的纸，不是「一个窗口」 */
-.ne-desk { display: grid; justify-items: stretch; gap: 6px; }
+   圆角 + 投影 + 顶部胶带，是一张贴在桌上的纸，不是「一个窗口」。
+   纸面 flex 撑满剩余空间，正文在纸内滚动——标签/工具收进抽屉后，写作区就是全屏。 */
+.ne-desk { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0; }
 .ne-sheet {
   position: relative;
+  flex: 1 1 auto; min-height: 220px;
+  display: flex; flex-direction: column;
   padding: 30px 16px 20px 20px;
   border-radius: 4px 4px 14px 14px;
   background: var(--paper-c, var(--paper-white));
@@ -1734,7 +1737,9 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
   pointer-events: none;
 }
 .ne-input {
-  min-height: 280px; outline: none;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
   font-size: 15px; line-height: 28px; color: var(--ink);
   overflow-wrap: anywhere; word-break: break-word;
   background-image: repeating-linear-gradient(180deg, transparent 0 27px, var(--paper-line) 27px 28px);
@@ -1761,7 +1766,7 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
   background: var(--surface-subtle); color: var(--ink); font: inherit; font-size: 13.5px;
 }
 .ne-link-input:focus { outline: none; border-color: var(--brand); }
-/* 工具栏常驻底部：加粗 / 图片 / 链接 / 便签底色，不随长文滚走 */
+/* 工具栏常驻底部：长横条，放不下就横向滑——B / 图片 / 链接 / 纸张 / 便签色 / 完成一根滑杆全装下 */
 .ne-toolbar {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: 7px;
@@ -1770,8 +1775,8 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--line-subtle);
-  /* 放不下就换行——便签色/纸张藏进横向滚动区等于没这个功能 */
-  flex-wrap: wrap; row-gap: 6px; scrollbar-width: none;
+  overflow-x: auto; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 .ne-toolbar::-webkit-scrollbar { display: none; }
 .ne-tool {
@@ -1802,8 +1807,41 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
   background: none; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer;
 }
 .ne-swatch-auto.on { color: var(--ink); border-color: var(--line-strong); }
-.ne-actions { display: flex; gap: var(--space-3); margin-top: 12px; }
-.ne-actions > * { flex: 1; }
+/* 抽屉：标签 + 提示语 + 清空/分享图。0fr→1fr 的高度过渡，展开时把纸面向上让位 */
+.ne-drawer {
+  flex: 0 0 auto;
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows .26s var(--ease-out);
+}
+.ne-drawer.open { grid-template-rows: 1fr; }
+.ne-drawer-inner {
+  overflow: hidden; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ne-drawer.open .ne-drawer-inner { padding-bottom: 2px; }
+.ne-drawer-actions { display: flex; gap: var(--space-3); }
+.ne-drawer-actions > * { flex: 1; }
+/* 把手条：抽屉沿。虚线胶囊居中，标签数用品牌绿点出来 */
+.ne-handle {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 12px;
+  border: 1px dashed var(--line); border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--muted); font: inherit; font-size: 12px; cursor: pointer;
+}
+.ne-handle span { font-weight: 600; }
+.ne-handle small { color: var(--brand); font-weight: 700; }
+.ne-handle-chev { transition: transform .26s var(--ease-out); }
+.ne-handle-chev.flip { transform: rotate(180deg); }
+/* 完成钮：工具栏最右，主色常驻——写完随时能走，不用先拉开抽屉 */
+.ne-done {
+  flex: 0 0 auto; margin-left: auto;
+  padding: 8px 18px; border: none; border-radius: 11px;
+  background: var(--brand); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.ne-done:active { filter: brightness(.94); }
 /* 提醒排入状态点：绿色=系统里确实挂着，琥珀=没挂上（多半被 ROM 清了） */
 .r-arm { display: inline-flex; align-items: center; gap: 4px; margin-top: 1px; color: var(--muted); }
 .r-arm-dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -1811,9 +1849,13 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .r-arm.ok .r-arm-dot { background: #168b68; }
 .r-arm.miss { color: #b25e00; font-weight: 600; }
 .r-arm.miss .r-arm-dot { background: #e8a13c; }
+/* 已触发：提醒时刻已过，中性灰绿——既不是警报也不是虚假担保 */
+.r-arm.fired { color: #75756f; }
+.r-arm.fired .r-arm-dot { background: #a8a89f; }
 .arm-tag { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
 .arm-tag.ok { color: #168b68; background: color-mix(in srgb, #168b68 14%, transparent); }
 .arm-tag.miss { color: #b25e00; background: color-mix(in srgb, #e8a13c 22%, transparent); }
+.arm-tag.fired { color: #5f5f5b; background: rgba(0, 0, 0, .07); }
 /* 复盘问询：过/挂两个大按钮，跳过永远可用 */
 .oc-lead { margin: 0 0 var(--space-4); color: var(--copy); font-size: 13.5px; line-height: 1.6; }
 .oc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3); }
@@ -1843,15 +1885,19 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .pb-open { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: var(--brand); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 /* 高频标签聚合条：点一根即按标签筛墙，与统计环共用开合 */
 .rs-tagbars { display: grid; gap: 7px; margin-top: 14px; }
-.rs-tagbar { display: grid; grid-template-columns: 76px 1fr 34px; align-items: center; gap: 10px; padding: 0; border: none; background: none; font: inherit; cursor: pointer; text-align: left; }
-.rs-tagbar .rt-name { font-size: 12.5px; color: var(--copy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-tagbar { display: grid; grid-template-columns: minmax(88px, auto) 1fr 34px; align-items: center; gap: 10px; padding: 0; border: none; background: none; font: inherit; cursor: pointer; text-align: left; }
+/* 标签名不省略号截断：最多两行折行——「反问质量高」这类六字标签是常态，截成「反问质…」没有信息量 */
+.rs-tagbar .rt-name { font-size: 12.5px; line-height: 1.35; color: var(--copy); white-space: normal; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rs-tagbar .rt-track { display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--brand) 10%, transparent); overflow: hidden; }
 .rs-tagbar .rt-track i { display: block; height: 100%; border-radius: 4px; background: var(--brand); transition: width .3s ease; }
 .rs-tagbar .rt-num { font-size: 12px; color: var(--muted); text-align: right; }
 .rs-tagbar.on .rt-name { color: var(--brand); font-weight: 800; }
 .rs-tagbar.on .rt-track i { background: color-mix(in srgb, var(--brand) 55%, var(--ink)); }
-/* 求职季报告：复用 metric-card，网格三列 */
+/* 求职季报告：复用 metric-card，网格三列；字级与「我的」页指标卡同一套口径 */
 .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: 14px; }
+.report-grid .metric-card { display: grid; gap: 4px; align-content: start; min-width: 0; padding: 12px 11px; }
+.report-grid .metric-card strong { font-size: 21px; font-weight: 750; line-height: 1; letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.report-grid .metric-card small { font-size: 10.5px; font-weight: 500; line-height: 1.35; color: var(--muted); white-space: normal; }
 .report-insight { grid-column: 1 / -1; margin: 4px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
 /* 全局搜索结果：分组行，点了就走 */
 .search-results { display: grid; gap: 4px; margin-top: var(--space-3); }

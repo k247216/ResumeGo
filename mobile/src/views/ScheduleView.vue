@@ -72,12 +72,23 @@ void refreshArmed()
 async function refreshArmed() {
   armedIds.value = await pendingNotificationIds()
 }
-/** '' = 不显示（没设提醒 / 无法核实 / 已开始）；'ok' 已排入；'miss' 未排入——就是 ROM 吃通知的证据。 */
-function armStateOf(ev: ScheduleEvent): '' | 'ok' | 'miss' {
-  if (getReminder(ev.id) <= 0) return ''
+/** '' = 不显示（没设提醒 / 无法核实）；'ok' 已排入；'miss' 未排入——ROM 吃通知的证据；
+ *  'fired' 提醒时刻已过——通知触发后会被系统移出待发队列，不能拿「不在队列」当「没排入」。 */
+const ARM_LABELS = { ok: '提醒已排入系统', miss: '提醒未排入', fired: '提醒已触发' } as const
+function armStateOf(ev: ScheduleEvent): '' | 'ok' | 'miss' | 'fired' {
+  const rem = getReminder(ev.id)
+  if (rem <= 0) return ''
+  // 提醒响过之后待发队列里必然没有这条：此刻改报「已触发」，不再制造「未排入」的假警报。
+  const fireAt = new Date(ev.startTime).getTime() - rem * 60_000
+  if (Number.isFinite(fireAt) && now.value >= fireAt) return 'fired'
   if (!armedIds.value) return ''
   if (eventStatus(ev, now.value) !== 'upcoming') return ''
   return armedIds.value.has(ev.id) ? 'ok' : 'miss'
+}
+/** 状态文案（'' = 该行不显示提醒状态）。 */
+function armLabelOf(ev: ScheduleEvent): string {
+  const s = armStateOf(ev)
+  return s ? ARM_LABELS[s] : ''
 }
 
 // ── 粘贴式快速录入：把通知原文整段粘进来，核心动作的成本砍掉一半 ──
@@ -185,6 +196,8 @@ const savedRange = ref<Range | null>(null)
 const savedText = ref('')
 /** 链接输入条：null = 收起；空串 = 展开待输入。 */
 const linkDraft = ref<string | null>(null)
+/** 抽屉（标签 + 提示语 + 清空/分享图）：默认收起，让正文纸面吃满屏幕；把手条一点向上展开。 */
+const drawerOpen = ref(false)
 
 /** 纸张风格 → 纸面底色：白/米/牛皮是三种「本子」，与外面的便签色互不相干。 */
 const PAPER_BG: Record<string, string> = {
@@ -377,6 +390,7 @@ function openNote(ev: ScheduleEvent) {
   savedRange.value = null
   savedText.value = ''
   linkDraft.value = null
+  drawerOpen.value = false
   noteOverLimit.value = false
   // 编辑器节点要等下一拍才挂上（Transition 分支渲染），先填内容再统计字数
   nextTick(() => {
@@ -842,7 +856,7 @@ async function syncToCalendar() {
           </button>
           <div class="schedule-focus-meta">
             <div><small>距离开始</small><strong>{{ countdownLabel(nextEvent) }}</strong></div>
-            <div><small>提醒</small><strong>{{ getReminder(nextEvent.id) > 0 ? `提前 ${getReminder(nextEvent.id)} 分钟` : '未设置' }}<em v-if="armStateOf(nextEvent) === 'ok'" class="arm-tag ok">已排入</em><em v-else-if="armStateOf(nextEvent) === 'miss'" class="arm-tag miss">未排入</em></strong></div>
+            <div><small>提醒</small><strong>{{ getReminder(nextEvent.id) > 0 ? `提前 ${getReminder(nextEvent.id)} 分钟` : '未设置' }}<em v-if="armStateOf(nextEvent) === 'ok'" class="arm-tag ok">已排入</em><em v-else-if="armStateOf(nextEvent) === 'miss'" class="arm-tag miss">未排入</em><em v-else-if="armStateOf(nextEvent) === 'fired'" class="arm-tag fired">已提醒</em></strong></div>
           </div>
         </template>
         <div v-else class="schedule-focus-empty">
@@ -922,7 +936,7 @@ async function syncToCalendar() {
                 <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roleName(ev) !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]"> · {{ roleName(ev) }}</template></small>
                 <small class="plan-when">{{ fullWhen(ev.startTime) }}<template v-if="ev.notes"> · {{ ev.notes }}</template></small>
                 <small v-if="armStateOf(ev)" class="r-arm" :class="armStateOf(ev)">
-                  <i class="r-arm-dot" aria-hidden="true" />{{ armStateOf(ev) === 'ok' ? '提醒已排入系统' : '提醒未排入' }}
+                  <i class="r-arm-dot" aria-hidden="true" />{{ armLabelOf(ev) }}
                 </small>
               </span>
               <AppIcon name="chevronRight" :size="18" class="plan-chev" />
@@ -1257,49 +1271,59 @@ async function syncToCalendar() {
             <small class="nb-count" :class="{ over: noteOverLimit }">{{ noteTextLen }}/{{ NOTE_MAX_TEXT }}</small>
           </div>
 
-          <div class="review-tags">
-            <div class="review-tags-head">
-              <span class="review-tags-title">标签</span>
-              <small class="review-tags-hint">打几个标签，复盘墙里就能按它筛</small>
-            </div>
-            <div class="tag-list">
-              <button
-                v-for="t in visibleDraftTags" :key="t" type="button"
-                class="tag-chip on" @click="removeTag(t)"
-              >{{ t }}<AppIcon name="close" :size="12" /></button>
-              <button
-                v-if="hiddenSelectedCount > 0" type="button"
-                class="tag-chip tag-more" @click="selectedExpanded = !selectedExpanded"
-              >{{ selectedExpanded ? '收起' : `展开 ${hiddenSelectedCount} 个` }}
-                <AppIcon :name="selectedExpanded ? 'chevronDown' : 'chevronRight'" :size="12" />
-              </button>
-              <input
-                v-model="tagInput" class="tag-input" :maxlength="12"
-                placeholder="加标签…" @keydown.enter.prevent="addTagFromInput" @blur="addTagFromInput"
-              >
-            </div>
-            <div class="tag-suggest">
-              <button
-                v-for="t in visibleTagSuggestions" :key="t" type="button"
-                class="tag-chip" :class="{ on: draftTags.includes(t) }"
-                :disabled="!draftTags.includes(t) && draftTags.length >= MAX_TAGS"
-                @click="toggleTag(t)"
-              >{{ t }}</button>
-              <button v-if="hiddenTagCount > 0" type="button" class="tag-chip tag-more" @click="tagsExpanded = !tagsExpanded">
-                {{ tagsExpanded ? '收起' : `更多 ${hiddenTagCount} 个` }}
-                <AppIcon :name="tagsExpanded ? 'chevronDown' : 'chevronRight'" :size="12" />
-              </button>
+          <!-- 抽屉：标签 + 提示语 + 清空/分享图，默认收起。把手条贴在纸面下方，一点向上拉开——
+               平时正文纸面吃满整屏，写完要归类时再拉开，像拉开写字台抽屉。 -->
+          <div class="ne-drawer" :class="{ open: drawerOpen }">
+            <div class="ne-drawer-inner">
+              <div class="review-tags">
+                <div class="review-tags-head">
+                  <span class="review-tags-title">标签</span>
+                  <small class="review-tags-hint">打几个标签，复盘墙里就能按它筛</small>
+                </div>
+                <div class="tag-list">
+                  <button
+                    v-for="t in visibleDraftTags" :key="t" type="button"
+                    class="tag-chip on" @click="removeTag(t)"
+                  >{{ t }}<AppIcon name="close" :size="12" /></button>
+                  <button
+                    v-if="hiddenSelectedCount > 0" type="button"
+                    class="tag-chip tag-more" @click="selectedExpanded = !selectedExpanded"
+                  >{{ selectedExpanded ? '收起' : `展开 ${hiddenSelectedCount} 个` }}
+                    <AppIcon :name="selectedExpanded ? 'chevronDown' : 'chevronRight'" :size="12" />
+                  </button>
+                  <input
+                    v-model="tagInput" class="tag-input" :maxlength="12"
+                    placeholder="加标签…" @keydown.enter.prevent="addTagFromInput" @blur="addTagFromInput"
+                  >
+                </div>
+                <div class="tag-suggest">
+                  <button
+                    v-for="t in visibleTagSuggestions" :key="t" type="button"
+                    class="tag-chip" :class="{ on: draftTags.includes(t) }"
+                    :disabled="!draftTags.includes(t) && draftTags.length >= MAX_TAGS"
+                    @click="toggleTag(t)"
+                  >{{ t }}</button>
+                  <button v-if="hiddenTagCount > 0" type="button" class="tag-chip tag-more" @click="tagsExpanded = !tagsExpanded">
+                    {{ tagsExpanded ? '收起' : `更多 ${hiddenTagCount} 个` }}
+                    <AppIcon :name="tagsExpanded ? 'chevronDown' : 'chevronRight'" :size="12" />
+                  </button>
+                </div>
+              </div>
+              <div class="prompt-row">
+                <button v-for="p in REVIEW_PROMPTS" :key="p" class="prompt-chip" @click="appendPrompt(p)">{{ p }}</button>
+              </div>
+              <div class="ne-drawer-actions">
+                <button v-if="reviewPlainText(noteTarget.review ?? '').trim()" class="btn-danger" @click="clearNote"><AppIcon name="trash" :size="16" /> 清空</button>
+                <button class="btn-ghost" :disabled="cardBusy" @click="shareReviewCard"><AppIcon name="share" :size="16" /> {{ cardBusy ? '生成中…' : '分享图' }}</button>
+              </div>
             </div>
           </div>
-          <div class="prompt-row">
-            <button v-for="p in REVIEW_PROMPTS" :key="p" class="prompt-chip" @click="appendPrompt(p)">{{ p }}</button>
-          </div>
-
-          <div class="ne-actions">
-            <button v-if="reviewPlainText(noteTarget.review ?? '').trim()" class="btn-danger" @click="clearNote"><AppIcon name="trash" :size="16" /> 清空</button>
-            <button class="btn-ghost" :disabled="cardBusy" @click="shareReviewCard"><AppIcon name="share" :size="16" /> {{ cardBusy ? '生成中…' : '分享图' }}</button>
-            <button class="btn-primary" @click="closeNote">完成</button>
-          </div>
+          <!-- 把手条：抽屉沿。显示当前标签数，开合都点它 -->
+          <button class="ne-handle" :aria-expanded="drawerOpen" @click="drawerOpen = !drawerOpen">
+            <AppIcon name="chevronDown" :size="14" class="ne-handle-chev" :class="{ flip: drawerOpen }" />
+            <span>{{ drawerOpen ? '收起标签与操作' : '标签与操作' }}</span>
+            <small v-if="draftTags.length">{{ draftTags.length }} 个标签</small>
+          </button>
         </article>
 
         <!-- 插链接：不用弹窗，就在工具栏上方输入，确认后按记住的选区原位插入 -->
@@ -1340,6 +1364,8 @@ async function syncToCalendar() {
             />
             <button class="ne-swatch-auto" :class="{ on: !draftColor }" aria-label="便签色跟随日程类型配色" @pointerdown.prevent="pickColor(null)">类型色</button>
           </div>
+          <span class="ne-sep" aria-hidden="true" />
+          <button class="ne-done" @click="closeNote">完成</button>
         </div>
         <input ref="imageInputEl" type="file" accept="image/*" class="ne-file" @change="onPickImage">
       </div>
