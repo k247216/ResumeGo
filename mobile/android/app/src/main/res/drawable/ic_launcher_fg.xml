@@ -9,11 +9,11 @@
          纸面自上而下 = 笑脸（卡通人格）+ 两行正文线（简历内容），
          右下压一枚绿色对勾徽章（投递完成 / 拿到结果），右上星星、左上粉点点缀。
 
-         配色全部来自 App 设计系统：
-         - 描边/徽章 --brand #168B68
-         - 纸面      --pastel-mint 的更浅一档 #E9F6F0
-         - 正文线    --brand-soft 系 #93CDB6
-         - 星星      --pastel-yellow #F6E5AD，圆点 --pastel-pink #F5D7E6
+         配色全部来自 App 设计系统（CSS 变量名里的双横线不能出现在 XML 注释，故写作单横线）：
+         · 描边/徽章 brand 色 #168B68
+         · 纸面    pastel-mint 更浅一档 #E9F6F0
+         · 正文线  brand-soft 系 #93CDB6
+         · 星星    pastel-yellow #F6E5AD，圆点 pastel-pink #F5D7E6
 
          adaptive icon 比例按可见区算（中心 72dp 即 18..90，安全区 21..87）。
          所有元素都收在距中心 35.5dp 以内，圆形/圆角/方圆各种遮罩都不裁切：
