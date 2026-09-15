@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import AppIcon from '../components/AppIcon.vue'
+import CompanyMark from '../components/CompanyMark.vue'
 import PickerField from '../components/PickerField.vue'
 import Sheet from '../components/Sheet.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { companyMark } from '../constants/companyBrands'
 import { headEllipsis } from '../data/resumeFile'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
-import { appendPromptLine } from '../data/prompt'
+import { ensureReviewHtml, sanitizeReviewHtml, reviewPlainText, compressImageToDataUrl, escapeHtml } from '../data/noteHtml'
+import { NOTE_COLORS, NOTE_PAPERS, normalizeNotePaper } from '../constants/noteColors'
 import {
-  createSchedule, deleteSchedule, getReminder, listReviews, listSchedules, listTargets,
-  setReminder, setScheduleReview, updateSchedule,
+  createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listTargets,
+  setReminder, setReviewTags, setScheduleReview, updateSchedule,
 } from '../data/store'
 import { requestNotificationPermission, scheduleReminder, cancelReminder, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
-import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS, isEventFinished } from '../types/schedule'
+import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS, eventStatus, isEventFinished, scheduleTimeError } from '../types/schedule'
 import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
 import { eventsOnDate, timelineDates } from '../data/timeline'
 import { addToDeviceCalendar } from '../data/calendar'
@@ -62,10 +63,73 @@ const form = ref({
   start: '', end: '', notes: '', reminder: 30, jobProjectId: null as number | null,
 })
 /** notes 只放赛前要看的信息；心得另开一个窗口，避免把「会议链接」和「这轮没答好」写进同一个框里。 */
-const REVIEW_MAX = 500
+/** 心得正文上限按纯文本计（HTML 标签不占额度）；富文本一篇 5000 字足够写完一场复盘。 */
+const NOTE_MAX_TEXT = 5000
 const REVIEW_PROMPTS = ['这轮被问了什么', '哪里没答好', '下一轮要补什么']
-const reviewTarget = ref<ScheduleEvent | null>(null)
-const reviewDraft = ref('')
+/** 心得标签：常用的先摆在前面当推荐，其余收进「更多」，不占地方；用户也能自己打字加任意标签。 */
+const REVIEW_TAG_SUGGESTIONS = [
+  '自我介绍', '项目深挖', '算法', '系统设计', '手撕代码', '八股', '行为题', '英语',
+  'HR面', '主管面', '群面', '拿offer', '挂了', '答得不错', '待补', '薪资',
+  '反问环节', '反问质量高', '进度催一下', '感谢信', '二面预告', '面试官好', '氛围好', '白板题',
+  'case interview', '数理逻辑', '编程环境坑', '迟到体验差', '流程清晰', '已感谢拒绝',
+]
+const TAG_PREVIEW_COUNT = 8
+const TAG_SELECTED_PREVIEW = 6
+const tagsExpanded = ref(false)
+const selectedExpanded = ref(false)
+const visibleTagSuggestions = computed(() =>
+  tagsExpanded.value ? REVIEW_TAG_SUGGESTIONS : REVIEW_TAG_SUGGESTIONS.slice(0, TAG_PREVIEW_COUNT),
+)
+const hiddenTagCount = REVIEW_TAG_SUGGESTIONS.length - TAG_PREVIEW_COUNT
+const MAX_TAGS = 12
+
+// ── 全屏心得笔记本：阅读与编辑是同一张纸，点开就能直接往下写 ──
+const noteTarget = ref<ScheduleEvent | null>(null)
+const draftTags = ref<string[]>([])
+const draftColor = ref<string | null>(null)
+const draftPaper = ref('plain')
+const tagInput = ref('')
+const noteEditorEl = ref<HTMLDivElement | null>(null)
+const imageInputEl = ref<HTMLInputElement | null>(null)
+const noteTextLen = ref(0)
+const noteOverLimit = ref(false)
+/** 点工具栏前记住光标（点输入框/选图会抢焦点），回来接着选区插入。 */
+const savedRange = ref<Range | null>(null)
+const savedText = ref('')
+/** 链接输入条：null = 收起；空串 = 展开待输入。 */
+const linkDraft = ref<string | null>(null)
+
+/** 纸张风格 → 纸面底色：白/米/牛皮是三种「本子」，与外面的便签色互不相干。 */
+const PAPER_BG: Record<string, string> = {
+  plain: 'var(--paper-white)',
+  cream: 'var(--paper-cream)',
+  kraft: 'var(--paper-kraft)',
+}
+const paperColor = computed(() => PAPER_BG[draftPaper.value] ?? PAPER_BG.plain)
+
+/** 已选标签折叠：超过 6 个才出现「展开」，少的时候保持一排摊开、不给收纳钮。 */
+const visibleDraftTags = computed(() =>
+  selectedExpanded.value ? draftTags.value : draftTags.value.slice(0, TAG_SELECTED_PREVIEW),
+)
+const hiddenSelectedCount = computed(() => Math.max(0, draftTags.value.length - TAG_SELECTED_PREVIEW))
+
+/** 心得墙卡片底色：没选便签色时跟随日程类型色（编辑器纸面由 reviewPaper 管，与此无关）。 */
+function noteColorOf(ev: ScheduleEvent): string {
+  return ev.reviewColor ?? SCHEDULE_EVENT_TYPE_COLORS[ev.eventType]
+}
+function noteSnippet(ev: ScheduleEvent): string {
+  return reviewPlainText(ev.review ?? '').trim()
+}
+function noteLen(ev: ScheduleEvent): number {
+  return reviewPlainText(ev.review ?? '').trim().length
+}
+const NOTE_TAG_PREVIEW = 3
+function visibleNoteTags(ev: ScheduleEvent): string[] {
+  return (ev.reviewTags ?? []).slice(0, NOTE_TAG_PREVIEW)
+}
+function hiddenNoteTags(ev: ScheduleEvent): number {
+  return Math.max(0, (ev.reviewTags ?? []).length - NOTE_TAG_PREVIEW)
+}
 
 function toLocalInput(isoStr: string | null): string {
   if (!isoStr) return ''
@@ -115,24 +179,247 @@ const reviewSpanLabel = computed(() => {
 })
 
 const reviewFilter = ref<'all' | ScheduleEventType>('all')
+const reviewTagFilter = ref<string | null>(null)
 const reviewKeyword = ref('')
+/** 复盘墙里用过的所有标签，按热度排——直接喂给标签筛选条。 */
+const allTags = computed(() => listReviewTags())
 /** 便签墙是扁平的：每张卡片自带公司图标和计划名，再按公司分组只会把同一个名字重复两遍。 */
 const reviewNotes = computed<ScheduleEvent[]>(() => {
   const kw = reviewKeyword.value.trim().toLowerCase()
   return reviewedEvents.value.filter((ev) => {
     if (reviewFilter.value !== 'all' && ev.eventType !== reviewFilter.value) return false
-    return !kw || `${planName(ev)} ${ev.title} ${ev.review ?? ''}`.toLowerCase().includes(kw)
+    if (reviewTagFilter.value && !(ev.reviewTags ?? []).includes(reviewTagFilter.value)) return false
+    return !kw || `${planName(ev)} ${ev.title} ${noteSnippet(ev)}`.toLowerCase().includes(kw)
   })
 })
-/** 已结束才允许新写；已经写过的要能一直改，否则记录会被时间锁死。 */
+/**
+ * 复盘入口跟着「开始」走而不是「结束」：面试一开始就该能随手记要点，
+ * 结束后自然变成写心得——用户反馈「时间到了没有任何提示」的根源就是以前卡在结束时刻。
+ */
 function reviewable(ev: ScheduleEvent): boolean {
-  return !!ev.review?.trim() || isEventFinished(ev, now.value)
+  return !!ev.review?.trim() || eventStatus(ev, now.value) !== 'upcoming'
+}
+/** 行内状态徽标：进行中的日程要有活的提示，而不是默默等着结束。 */
+function statusOf(ev: ScheduleEvent): 'ongoing' | null {
+  if (ev.review?.trim()) return null
+  return eventStatus(ev, now.value) === 'ongoing' ? 'ongoing' : null
+}
+/** 心得按钮的文案：已写→看心得；进行中→记心得；结束→写心得。 */
+function reviewLabel(ev: ScheduleEvent): string {
+  if (ev.review?.trim()) return '看心得'
+  return eventStatus(ev, now.value) === 'ongoing' ? '记心得' : '写心得'
+}
+/** 点心得按钮：无论写过没写，都进同一张全屏笔记本——阅读与编辑不再分家。 */
+function onReviewClick(ev: ScheduleEvent) {
+  openNote(ev)
 }
 const reviewTypeCounts = computed(() => TYPES.map((type) => ({
   key: type,
   label: SCHEDULE_EVENT_TYPE_LABELS[type],
   count: reviewedEvents.value.filter((ev) => ev.eventType === type).length,
 })).filter((item) => item.count > 0))
+
+/**
+ * 便签按月份分组。reviewNotes 已是时间倒序，所以顺序扫一遍即可连续成组。
+ * 一屏几十张便签时纯平铺会失去节奏，月份标题是唯一能让人「找回位置」的视觉锚点。
+ */
+const reviewGroups = computed(() => {
+  const groups: Array<{ key: string; label: string; notes: ScheduleEvent[] }> = []
+  for (const ev of reviewNotes.value) {
+    const d = new Date(ev.startTime)
+    if (Number.isNaN(d.getTime())) continue
+    const key = `${d.getFullYear()}-${d.getMonth()}`
+    const label = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`
+    const last = groups[groups.length - 1]
+    if (last?.key === key) last.notes.push(ev)
+    else groups.push({ key, label, notes: [ev] })
+  }
+  return groups
+})
+/**
+ * 便签卡不再随机倾斜、不再贴胶带：心得是正经的记录工具，
+ * 花哨的「随手贴」质感与内容的严肃性不匹配（用户原话：太随意，和实际情况差太多）。
+ * 彩色感改由便签底色承担——每张卡一个可选的底色，整面墙依然是一面彩墙。
+ */
+
+// ── 全屏笔记本：像看日记一样读心得，光标点进去就能接着写 ──
+/** 心得日期抬头：「9月14日 · 周一」这种日记式落款。 */
+function nbDate(ev: ScheduleEvent): string {
+  const d = new Date(ev.startTime)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getMonth() + 1}月${d.getDate()}日 · 周${'日一二三四五六'[d.getDay()]}`
+}
+
+function openNote(ev: ScheduleEvent) {
+  noteTarget.value = ev
+  draftTags.value = [...(ev.reviewTags ?? [])]
+  draftColor.value = ev.reviewColor ?? null
+  draftPaper.value = normalizeNotePaper(ev.reviewPaper)
+  tagInput.value = ''
+  tagsExpanded.value = false
+  selectedExpanded.value = false
+  savedRange.value = null
+  savedText.value = ''
+  linkDraft.value = null
+  noteOverLimit.value = false
+  // 编辑器节点要等下一拍才挂上（Transition 分支渲染），先填内容再统计字数
+  nextTick(() => {
+    const el = noteEditorEl.value
+    if (!el) return
+    el.innerHTML = ensureReviewHtml(ev.review ?? '')
+    countNoteText()
+  })
+}
+function countNoteText() {
+  const text = reviewPlainText(noteEditorEl.value?.innerHTML ?? '').trim()
+  noteTextLen.value = text.length
+  noteOverLimit.value = text.length > NOTE_MAX_TEXT
+}
+function onNoteInput() { countNoteText() }
+
+function rememberRange() {
+  const sel = window.getSelection()
+  if (sel && sel.rangeCount && noteEditorEl.value?.contains(sel.anchorNode)) {
+    const range = sel.getRangeAt(0)
+    savedRange.value = range.cloneRange()
+    savedText.value = range.toString()
+  }
+}
+function restoreRange() {
+  const range = savedRange.value
+  const el = noteEditorEl.value
+  if (!range || !el) return
+  el.focus()
+  const sel = window.getSelection()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+}
+function exec(cmd: string, value?: string) {
+  document.execCommand(cmd, false, value)
+  countNoteText()
+}
+function boldSelection() { exec('bold') }
+function placeCaretEnd(el: HTMLElement) {
+  el.focus()
+  const sel = window.getSelection()
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  range.collapse(false)
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+}
+/** 提示词片段：有光标插到光标处，没光标就补到文末，加粗成小抬头让用户接着往下写。 */
+function appendPrompt(label: string) {
+  const el = noteEditorEl.value
+  if (!el) return
+  const html = `<p><strong>${label}：</strong></p>`
+  const sel = window.getSelection()
+  if (sel && sel.rangeCount && el.contains(sel.anchorNode)) {
+    exec('insertHTML', html)
+  } else {
+    el.innerHTML += html
+    countNoteText()
+    placeCaretEnd(el)
+  }
+}
+function insertImage() {
+  rememberRange()
+  imageInputEl.value?.click()
+}
+async function onPickImage(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) { toast('只能插入图片文件'); return }
+  if (file.size > 8 * 1024 * 1024) { toast('图片太大（超过 8MB），换一张小的'); return }
+  try {
+    const dataUrl = await compressImageToDataUrl(file)
+    restoreRange()
+    exec('insertImage', dataUrl)
+  } catch {
+    toast('这张图片读不出来，换一张试试')
+  }
+}
+function insertLink() {
+  rememberRange()
+  linkDraft.value = ''
+}
+/** 确认插链接：不用 window.prompt（部分 WebView 会吞掉它，而且选区保不住），
+ *  在输入条里填 URL，回到记住的选区用 insertHTML 原位生成 <a>——
+ *  没选中文字时直接把链接本身当文字插进去。 */
+function confirmLink() {
+  const raw = (linkDraft.value ?? '').trim()
+  linkDraft.value = null
+  if (!raw) return
+  const url = /^(https?:\/\/|mailto:)/i.test(raw) ? raw : `https://${raw}`
+  const el = noteEditorEl.value
+  if (!el) return
+  const sel = window.getSelection()
+  const hasLiveSelection = !!(savedRange.value && sel && sel.rangeCount && el.contains(sel.anchorNode))
+  if (!hasLiveSelection && !savedRange.value) placeCaretEnd(el)
+  else restoreRange()
+  const text = savedText.value.trim() || url
+  exec('insertHTML', `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`)
+}
+function pickColor(color: string | null) { draftColor.value = color }
+function pickPaper(key: string) { draftPaper.value = key }
+
+/** 关笔记本 = 保存：没有「忘记点保存」这回事。 */
+function closeNote() {
+  if (!noteTarget.value) return
+  const ev = noteTarget.value
+  const html = sanitizeReviewHtml(noteEditorEl.value?.innerHTML ?? '')
+  const text = reviewPlainText(html).trim()
+  if (noteOverLimit.value) { toast(`心得超过 ${NOTE_MAX_TEXT} 字，先删一点再关`); return }
+  const prev = ev.review ?? ''
+  setScheduleReview(ev.id, text ? html : '', draftColor.value, draftPaper.value)
+  setReviewTags(ev.id, draftTags.value)
+  noteTarget.value = null
+  if (text && reviewPlainText(prev).trim() !== text) toast('心得已保存')
+}
+async function clearNote() {
+  const ev = noteTarget.value
+  if (!ev) return
+  const prevHtml = ev.review ?? ''
+  const prevTags = ev.reviewTags ?? []
+  const prevColor = ev.reviewColor ?? null
+  const prevPaper = normalizeNotePaper(ev.reviewPaper)
+  if (!reviewPlainText(prevHtml).trim()) {
+    // 还没写过：清空就是关掉，不必弹确认
+    noteTarget.value = null
+    return
+  }
+  const ok = await confirmAction({
+    title: '清空这篇心得？',
+    message: '这场日程会保留，只删掉写下的复盘文字和标签。',
+    confirmLabel: '清空',
+    danger: true,
+  })
+  if (!ok) return
+  setScheduleReview(ev.id, '', null)
+  setReviewTags(ev.id, [])
+  const el = noteEditorEl.value
+  if (el) el.innerHTML = ''
+  countNoteText()
+  draftTags.value = []
+  noteTarget.value = null
+  toast('心得已清空', { label: '撤销', run: () => { setScheduleReview(ev.id, prevHtml, prevColor, prevPaper); setReviewTags(ev.id, prevTags) } })
+}
+
+// ── 复盘统计环：各类型心得的占比，点击即筛选，默认收起不占地方 ──
+const statsOpen = ref(false)
+const RING_CIRCUMFERENCE = 2 * Math.PI * 20
+const reviewTypeRings = computed(() => {
+  const total = reviewedEvents.value.length || 1
+  return TYPES.map((type) => {
+    const count = reviewedEvents.value.filter((ev) => ev.eventType === type).length
+    return { key: type, label: SCHEDULE_EVENT_TYPE_LABELS[type], count, pct: Math.round((count / total) * 100) }
+  })
+})
+function toggleTypeFilter(type: ScheduleEventType) {
+  reviewFilter.value = reviewFilter.value === type ? 'all' : type
+}
 
 interface CalCell { key: string; day: number; other: boolean }
 const calCells = computed<CalCell[]>(() => {
@@ -189,12 +476,21 @@ function roleName(ev: ScheduleEvent): string {
 function planName(ev: ScheduleEvent): string {
   return targetOf(ev.jobProjectId)?.name ?? companyName(ev)
 }
-function markOf(ev: ScheduleEvent) { return companyMark(companyName(ev)) }
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
+/** 时间轴一天最多摊 2 条，装不下的收进「+N」点开月历看——日程一多，摊开会把整条轨撑得参差不齐。 */
+const TIMELINE_PREVIEW = 2
 function timelineEvents(day: Date): ScheduleEvent[] {
-  return eventsOnDate(listSchedules(), day).slice(0, 2)
+  return eventsOnDate(listSchedules(), day).slice(0, TIMELINE_PREVIEW)
+}
+function extraEventsOn(day: Date): number {
+  return Math.max(0, eventsOnDate(listSchedules(), day).length - TIMELINE_PREVIEW)
+}
+/** 「+N」的落点：月历并选中那一天，把溢出的日程完整交给月历视图。 */
+function openDayInMonth(day: Date) {
+  selectedDay.value = day.toDateString()
+  viewMode.value = 'month'
 }
 function dayNumber(day: Date): string { return `${day.getMonth() + 1}/${day.getDate()}` }
 function weekLabel(day: Date): string { return '日一二三四五六'[day.getDay()] }
@@ -211,13 +507,9 @@ function countdownLabel(event: ScheduleEvent | null): string {
 function showView(mode: 'agenda' | 'month' | 'review') {
   viewMode.value = viewMode.value === mode ? 'agenda' : mode
 }
-function openReview(ev: ScheduleEvent) {
-  reviewTarget.value = ev
-  reviewDraft.value = ev.review ?? ''
-}
-/** 首页那条待办只指一个方向：一场就直接开书写窗，多场就交给复盘页的「还没写心得」列表。 */
+/** 首页那条待办只指一个方向：一场就直接开笔记本，多场就交给复盘页的「还没写心得」列表。 */
 function goPendingReview() {
-  if (pendingReviews.value.length === 1) openReview(pendingReviews.value[0])
+  if (pendingReviews.value.length === 1) openNote(pendingReviews.value[0])
   else viewMode.value = 'review'
 }
 /** 标题里的轮次词。复盘窗口用它而不是「目标阶段」——后者和日程类型经常撞成「面试 · … · 面试」。 */
@@ -225,31 +517,20 @@ function roundOf(ev: ScheduleEvent): string | null {
   const m = /(一面|二面|三面|四面|终面|HR面|复试|加面|笔试|面试|跟进|回访)/u.exec(ev.title)
   return m && m[1] !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] ? m[1] : null
 }
-function appendPrompt(text: string) {
-  reviewDraft.value = appendPromptLine(reviewDraft.value, text, REVIEW_MAX)
+function addTagFromInput() {
+  const t = tagInput.value.trim()
+  if (!t) return
+  if (draftTags.value.length >= MAX_TAGS) { toast('标签最多 12 个'); return }
+  if (!draftTags.value.includes(t)) draftTags.value = [...draftTags.value, t]
+  tagInput.value = ''
 }
-function saveReview() {
-  if (!reviewTarget.value) return
-  const next = reviewDraft.value.trim()
-  const prev = reviewTarget.value.review ?? ''
-  setScheduleReview(reviewTarget.value.id, next)
-  reviewTarget.value = null
-  if (next && next !== prev.trim()) toast('心得已记录')
+function toggleTag(tag: string) {
+  draftTags.value = draftTags.value.includes(tag)
+    ? draftTags.value.filter((t) => t !== tag)
+    : [...draftTags.value, tag]
 }
-async function clearReview() {
-  const ev = reviewTarget.value
-  const prev = ev?.review?.trim()
-  if (!ev || !prev) { reviewTarget.value = null; return }
-  const ok = await confirmAction({
-    title: '清空这篇心得？',
-    message: '这场日程会保留，只删掉写下的复盘文字。',
-    confirmLabel: '清空',
-    danger: true,
-  })
-  if (!ok) return
-  setScheduleReview(ev.id, '')
-  reviewTarget.value = null
-  toast('心得已清空', { label: '撤销', run: () => setScheduleReview(ev.id, prev) })
+function removeTag(tag: string) {
+  draftTags.value = draftTags.value.filter((t) => t !== tag)
 }
 function openCreate() {
   editing.value = null
@@ -270,10 +551,13 @@ function openEdit(ev: ScheduleEvent) {
 async function submit() {
   if (!form.value.title.trim()) { toast('请填写日程标题'); return }
   const start = fromLocalInput(form.value.start)
-  if (!start) { toast('请选择开始时间'); return }
+  const end = fromLocalInput(form.value.end)
+  // 结束早于开始以前会被静默存进去，再靠 eventEndsAt 兜底；现在在入口处拦下并说清原因。
+  const timeError = scheduleTimeError(start, end)
+  if (timeError || !start) { toast(timeError ?? '请选择开始时间'); return }
   const payload = {
     title: form.value.title.trim(), eventType: form.value.eventType, startTime: start,
-    endTime: fromLocalInput(form.value.end), notes: form.value.notes || null,
+    endTime: end, notes: form.value.notes || null,
     jobDescriptionId: null, jobProjectId: form.value.jobProjectId,
   }
   let id: number
@@ -304,7 +588,7 @@ async function remove() {
   cancelReminder(ev.id)
   deleteSchedule(ev.id)
   sheetOpen.value = false
-  if (reviewTarget.value?.id === ev.id) reviewTarget.value = null
+  if (noteTarget.value?.id === ev.id) noteTarget.value = null
   toast('日程已删除')
 }
 /** 四条落点必须分开说：拉起日历预填页、丢进分享面板、浏览器下载是三件不同的事，用户下一步动作也不同。 */
@@ -355,10 +639,7 @@ async function syncToCalendar() {
         </div>
         <template v-if="nextEvent">
           <button class="schedule-focus-event" :aria-label="`查看${companyName(nextEvent)}详情`" @click="openEdit(nextEvent)">
-            <span class="schedule-focus-logo">
-              <img v-if="companyMark(companyName(nextEvent)).icon" :src="companyMark(companyName(nextEvent)).icon" alt="">
-              <span v-else :style="{ background: companyMark(companyName(nextEvent)).color, color: companyMark(companyName(nextEvent)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(nextEvent)).letter }}</span>
-            </span>
+        <CompanyMark :name="companyName(nextEvent)" :size="48" />
             <span class="schedule-focus-copy">
               <strong>{{ companyName(nextEvent) }} · {{ SCHEDULE_EVENT_TYPE_LABELS[nextEvent.eventType] }}</strong>
               <small>{{ roleName(nextEvent) }} · {{ fullWhen(nextEvent.startTime) }}</small>
@@ -371,8 +652,11 @@ async function syncToCalendar() {
           </div>
         </template>
         <div v-else class="schedule-focus-empty">
-          <strong>还没有安排面试</strong>
-          <small>添加一场真实面试，日程和提醒会在本机保存。</small>
+          <!-- nextEvent 只认「还没开始、或开始不到半小时」的日程。已经记了几十场但都过去了时，
+               说「还没有安排面试」会和右上角的场次数直接打架。 -->
+          <strong>{{ planEvents.length ? '没有即将开始的安排' : '还没有安排面试' }}</strong>
+          <small v-if="planEvents.length">已记录 {{ planEvents.length }} 场，下一场还没添加。</small>
+          <small v-else>添加一场真实面试，日程和提醒会在本机保存。</small>
           <button class="btn-primary" @click="openCreate"><AppIcon name="plus" :size="16" /> 添加日程</button>
         </div>
       </section>
@@ -392,15 +676,18 @@ async function syncToCalendar() {
               <div class="timeline-axis"><span class="timeline-node" /></div>
               <div class="timeline-events">
                 <button v-for="ev in timelineEvents(day)" :key="ev.id" class="timeline-event" :aria-label="`${companyName(ev)} ${fullWhen(ev.startTime)}`" @click="openEdit(ev)">
-                  <span class="timeline-mark">
-                    <img v-if="companyMark(companyName(ev)).icon" :src="companyMark(companyName(ev)).icon" alt="">
-                    <span v-else :style="{ background: companyMark(companyName(ev)).color, color: companyMark(companyName(ev)).lightText ? '#fff' : '#171717' }">{{ companyMark(companyName(ev)).letter }}</span>
-                  </span>
+                    <CompanyMark :name="companyName(ev)" :size="34" />
                   <span class="timeline-event-copy">
-                    <strong>{{ companyName(ev) }}</strong>
+                    <strong>{{ companyName(ev) }}<template v-if="statusOf(ev)"><i class="live-badge"><span class="live-dot" />进行中</i></template></strong>
                     <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }} · {{ hhmm(ev.startTime) }}</small>
                   </span>
                 </button>
+                <button
+                  v-if="extraEventsOn(day)"
+                  class="timeline-more"
+                  :aria-label="`该日还有 ${extraEventsOn(day)} 条日程，打开月历查看`"
+                  @click="openDayInMonth(day)"
+                >+{{ extraEventsOn(day) }}</button>
               </div>
             </div>
           </div>
@@ -415,12 +702,9 @@ async function syncToCalendar() {
         <div v-if="planEvents.length" class="plan-list">
           <div v-for="(ev, i) in planEvents" :key="ev.id" class="plan-row" :style="{ '--i': Math.min(i, 8) }">
             <button class="plan-main" @click="openEdit(ev)">
-              <span class="plan-mark">
-                <img v-if="markOf(ev).icon" :src="markOf(ev).icon" alt="">
-                <span v-else :style="{ background: markOf(ev).color, color: markOf(ev).lightText ? '#fff' : '#171717' }">{{ markOf(ev).letter }}</span>
-              </span>
+              <CompanyMark :name="companyName(ev)" :size="42" />
               <span class="plan-copy">
-                <strong>{{ companyName(ev) }}</strong>
+                <strong>{{ companyName(ev) }}<template v-if="statusOf(ev)"><i class="live-badge"><span class="live-dot" />进行中</i></template></strong>
                 <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roleName(ev) !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]"> · {{ roleName(ev) }}</template></small>
                 <small class="plan-when">{{ fullWhen(ev.startTime) }}<template v-if="ev.notes"> · {{ ev.notes }}</template></small>
               </span>
@@ -430,11 +714,11 @@ async function syncToCalendar() {
               v-if="reviewable(ev)"
               class="plan-note"
               :class="{ filled: !!ev.review?.trim() }"
-              :aria-label="ev.review ? `查看 ${companyName(ev)} 的心得` : `为 ${companyName(ev)} 写心得`"
-              @click="openReview(ev)"
+              :aria-label="ev.review ? `查看 ${companyName(ev)} 的心得` : `为 ${companyName(ev)} 记心得`"
+              @click="onReviewClick(ev)"
             >
               <AppIcon :name="ev.review?.trim() ? 'book' : 'edit'" :size="15" />
-              <span>{{ ev.review?.trim() ? '看心得' : '写心得' }}</span>
+              <span>{{ reviewLabel(ev) }}</span>
             </button>
           </div>
         </div>
@@ -467,6 +751,31 @@ async function syncToCalendar() {
         </div>
       </section>
 
+      <!-- 统计环：默认收起，点开看各类型占比；点环即按该类型筛选心得墙 -->
+      <section v-if="finishedEvents.length" class="review-stats workspace-card" aria-label="心得统计">
+        <button class="rs-toggle" :aria-expanded="statsOpen" @click="statsOpen = !statsOpen">
+          <span class="schedule-eyebrow">心得统计</span>
+          <span class="rs-hint">{{ reviewedEvents.length }} 篇 · {{ reviewFilter === 'all' ? '全部类型' : SCHEDULE_EVENT_TYPE_LABELS[reviewFilter] }}</span>
+          <AppIcon name="chevronDown" :size="16" class="rs-chev" :class="{ flip: statsOpen }" />
+        </button>
+        <div v-if="statsOpen" class="rs-rings">
+          <button
+            v-for="r in reviewTypeRings" :key="r.key"
+            class="rs-ring" :class="{ on: reviewFilter === r.key, zero: !r.count }"
+            :style="{ '--tint': SCHEDULE_EVENT_TYPE_COLORS[r.key] }"
+            :aria-label="`${r.label} ${r.count} 篇`"
+            @click="toggleTypeFilter(r.key)"
+          >
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <circle class="rs-track" cx="24" cy="24" r="20" />
+              <circle class="rs-bar" cx="24" cy="24" r="20" :stroke-dasharray="`${(r.pct / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`" />
+            </svg>
+            <span class="rs-num"><strong>{{ r.count }}</strong><small>{{ r.pct }}%</small></span>
+            <small class="rs-label">{{ r.label }}</small>
+          </button>
+        </div>
+      </section>
+
       <section v-if="pendingReviews.length" class="review-group workspace-card" aria-labelledby="pending-title">
         <div class="section-head">
           <div>
@@ -474,11 +783,8 @@ async function syncToCalendar() {
             <p>结束后当场记两句，比一周后回忆准得多</p>
           </div>
         </div>
-        <button v-for="ev in pendingReviews" :key="ev.id" class="review-pending" @click="openReview(ev)">
-          <span class="plan-mark">
-            <img v-if="markOf(ev).icon" :src="markOf(ev).icon" alt="">
-            <span v-else :style="{ background: markOf(ev).color, color: markOf(ev).lightText ? '#fff' : '#171717' }">{{ markOf(ev).letter }}</span>
-          </span>
+        <button v-for="ev in pendingReviews" :key="ev.id" class="review-pending" @click="openNote(ev)">
+          <CompanyMark :name="companyName(ev)" :size="42" />
           <span class="plan-copy">
             <strong>{{ planName(ev) }}</strong>
             <small class="plan-when">{{ fullWhen(ev.startTime) }} · 还没写心得</small>
@@ -491,7 +797,7 @@ async function syncToCalendar() {
         <div class="section-head wall-head">
           <div>
             <h2>复盘心得</h2>
-            <p>点开一张可以继续往下写</p>
+            <p>点开一张就是笔记本，读到哪写到哪</p>
           </div>
         </div>
         <div class="toolbar">
@@ -503,6 +809,14 @@ async function syncToCalendar() {
               @click="reviewFilter = t.key"
             >{{ t.label }}<em>{{ t.count }}</em></button>
           </div>
+          <div v-if="allTags.length" class="pill-row tag-filter">
+            <button class="filter-pill" :class="{ on: reviewTagFilter === null }" @click="reviewTagFilter = null">不限标签</button>
+            <button
+              v-for="t in allTags" :key="t"
+              class="filter-pill" :class="{ on: reviewTagFilter === t }"
+              @click="reviewTagFilter = reviewTagFilter === t ? null : t"
+            >{{ t }}</button>
+          </div>
           <label class="search-box">
             <AppIcon name="search" :size="15" />
             <input v-model="reviewKeyword" placeholder="搜索计划名、心得内容或公司…" autocomplete="off">
@@ -510,36 +824,49 @@ async function syncToCalendar() {
         </div>
       </template>
 
-      <div v-if="reviewNotes.length" class="note-wall">
-        <button
-          v-for="ev in reviewNotes" :key="ev.id"
-          class="note-card"
-          :style="{ '--tint': SCHEDULE_EVENT_TYPE_COLORS[ev.eventType] }"
-          @click="openReview(ev)"
+      <div v-if="reviewNotes.length" class="note-wall-wrap">
+        <section
+          v-for="group in reviewGroups"
+          :key="group.key"
+          class="note-month-group"
+          :aria-label="`${group.label}，${group.notes.length} 篇心得`"
         >
-          <span class="note-head">
-            <span class="note-mark">
-              <img v-if="markOf(ev).icon" :src="markOf(ev).icon" alt="">
-              <span v-else :style="{ background: markOf(ev).color, color: markOf(ev).lightText ? '#fff' : '#171717' }">{{ markOf(ev).letter }}</span>
-            </span>
-            <span class="note-id">
-              <strong>{{ planName(ev) }}</strong>
-              <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roundOf(ev)"> · {{ roundOf(ev) }}</template></small>
-            </span>
-          </span>
-          <p class="note-body">{{ ev.review }}</p>
-          <span class="note-foot">
-            <time :datetime="ev.startTime">{{ fullWhen(ev.startTime) }}</time>
-            <AppIcon name="chevronRight" :size="13" />
-          </span>
-        </button>
+          <p class="note-month"><strong>{{ group.label }}</strong><em>{{ group.notes.length }} 篇</em></p>
+          <div class="note-wall">
+            <button
+              v-for="ev in group.notes" :key="ev.id"
+              class="note-card"
+              :style="{ '--note-c': noteColorOf(ev) }"
+              @click="openNote(ev)"
+            >
+              <span class="note-tape" aria-hidden="true"></span>
+              <span class="note-head">
+                <CompanyMark :name="companyName(ev)" :size="28" />
+                <span class="note-id">
+                  <strong>{{ planName(ev) }}</strong>
+                  <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roundOf(ev)"> · {{ roundOf(ev) }}</template></small>
+                </span>
+              </span>
+              <p class="note-body">{{ noteSnippet(ev) }}</p>
+              <span v-if="ev.reviewTags?.length" class="note-tags">
+                <span v-for="t in visibleNoteTags(ev)" :key="t" class="note-tag">{{ t }}</span>
+                <span v-if="hiddenNoteTags(ev)" class="note-tag note-tag-more">+{{ hiddenNoteTags(ev) }}</span>
+              </span>
+              <span class="note-foot">
+                <time :datetime="ev.startTime">{{ fullWhen(ev.startTime) }}</time>
+                <span class="note-len">{{ noteLen(ev) }} 字</span>
+                <AppIcon name="chevronRight" :size="13" />
+              </span>
+            </button>
+          </div>
+        </section>
       </div>
 
       <EmptyState
         v-if="!reviewedEvents.length"
         icon="book"
         title="还没有写过心得"
-        hint="日程一结束，列表那行的右侧就会出现「写心得」，点开弹窗写两句，就会汇总到这里。"
+        hint="日程一结束，列表那行的右侧就会出现「写心得」，点开像日记一样的笔记本写两句，就会汇总到这里。"
       />
       <EmptyState
         v-else-if="!reviewNotes.length"
@@ -570,10 +897,7 @@ async function syncToCalendar() {
       <div v-if="selectedEvents.length" class="plan-list calendar-plan-list">
         <div v-for="(ev, i) in selectedEvents" :key="ev.id" class="plan-row" :style="{ '--i': i }">
           <button class="plan-main" @click="openEdit(ev)">
-            <span class="plan-mark">
-              <img v-if="markOf(ev).icon" :src="markOf(ev).icon" alt="">
-              <span v-else :style="{ background: markOf(ev).color, color: markOf(ev).lightText ? '#fff' : '#171717' }">{{ markOf(ev).letter }}</span>
-            </span>
+            <CompanyMark :name="companyName(ev)" :size="42" />
             <span class="plan-copy">
               <strong>{{ companyName(ev) }}</strong>
               <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roleName(ev) !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]"> · {{ roleName(ev) }}</template></small>
@@ -586,7 +910,7 @@ async function syncToCalendar() {
             class="plan-note"
             :class="{ filled: !!ev.review?.trim() }"
             :aria-label="ev.review ? `查看 ${companyName(ev)} 的心得` : `为 ${companyName(ev)} 写心得`"
-            @click="openReview(ev)"
+            @click="openNote(ev)"
           >
             <AppIcon :name="ev.review?.trim() ? 'book' : 'edit'" :size="15" />
             <span>{{ ev.review?.trim() ? '看心得' : '写心得' }}</span>
@@ -651,32 +975,126 @@ async function syncToCalendar() {
       </div>
     </Sheet>
 
-    <Sheet v-if="reviewTarget" :title="reviewTarget.review?.trim() ? '这一场的心得' : '写下这一场的心得'" @close="reviewTarget = null">
-      <div class="note-owner">
-        <span class="plan-mark">
-          <img v-if="markOf(reviewTarget).icon" :src="markOf(reviewTarget).icon" alt="">
-          <span v-else :style="{ background: markOf(reviewTarget).color, color: markOf(reviewTarget).lightText ? '#fff' : '#171717' }">{{ markOf(reviewTarget).letter }}</span>
-        </span>
-        <span class="plan-copy">
-          <strong>{{ planName(reviewTarget) }}</strong>
-          <small class="review-meta">
-            {{ SCHEDULE_EVENT_TYPE_LABELS[reviewTarget.eventType] }}<template v-if="roundOf(reviewTarget)"> · {{ roundOf(reviewTarget) }}</template> · {{ fullWhen(reviewTarget.startTime) }}
-          </small>
-        </span>
+    <!-- 全屏心得笔记本：阅读与编辑是同一张纸，点开就能直接往下写 -->
+    <Transition name="reader">
+      <div v-if="noteTarget" class="note-editor" role="dialog" aria-label="心得笔记本">
+        <article class="ne-card">
+          <header class="ne-head">
+            <CompanyMark :name="companyName(noteTarget)" :size="44" />
+            <div class="nr-head-copy">
+              <p class="nb-date">{{ nbDate(noteTarget) }}<i v-if="statusOf(noteTarget)" class="live-badge"><span class="live-dot" />进行中</i></p>
+              <strong class="nr-title">{{ planName(noteTarget) }}<template v-if="roundOf(noteTarget)"> · {{ roundOf(noteTarget) }}</template></strong>
+              <small class="nr-sub">
+                <span class="event-type-dot" :style="{ background: SCHEDULE_EVENT_TYPE_COLORS[noteTarget.eventType] }" />
+                {{ SCHEDULE_EVENT_TYPE_LABELS[noteTarget.eventType] }} · {{ fullWhen(noteTarget.startTime) }}
+              </small>
+            </div>
+            <button class="icon-btn" aria-label="保存并关闭" @click="closeNote"><AppIcon name="close" :size="18" /></button>
+          </header>
+
+          <!-- 便签纸：纸张风格（白/米/牛皮）单独选，默认白纸；胶带压角，像贴在桌面上的手写便签 -->
+          <div class="ne-desk">
+            <div class="ne-sheet" :style="{ '--paper-c': paperColor }">
+              <span class="ne-tape" aria-hidden="true"></span>
+              <div
+                ref="noteEditorEl"
+                class="ne-input"
+                contenteditable="true"
+                role="textbox"
+                aria-multiline="true"
+                aria-label="心得正文"
+                data-placeholder="像写日记一样把这一场讲清楚：被问了什么、哪里没答好、下一轮补什么…"
+                @input="onNoteInput"
+              ></div>
+            </div>
+            <small class="nb-count" :class="{ over: noteOverLimit }">{{ noteTextLen }}/{{ NOTE_MAX_TEXT }}</small>
+          </div>
+
+          <div class="review-tags">
+            <div class="review-tags-head">
+              <span class="review-tags-title">标签</span>
+              <small class="review-tags-hint">打几个标签，复盘墙里就能按它筛</small>
+            </div>
+            <div class="tag-list">
+              <button
+                v-for="t in visibleDraftTags" :key="t" type="button"
+                class="tag-chip on" @click="removeTag(t)"
+              >{{ t }}<AppIcon name="close" :size="12" /></button>
+              <button
+                v-if="hiddenSelectedCount > 0" type="button"
+                class="tag-chip tag-more" @click="selectedExpanded = !selectedExpanded"
+              >{{ selectedExpanded ? '收起' : `展开 ${hiddenSelectedCount} 个` }}
+                <AppIcon :name="selectedExpanded ? 'chevronDown' : 'chevronRight'" :size="12" />
+              </button>
+              <input
+                v-model="tagInput" class="tag-input" :maxlength="12"
+                placeholder="加标签…" @keydown.enter.prevent="addTagFromInput" @blur="addTagFromInput"
+              >
+            </div>
+            <div class="tag-suggest">
+              <button
+                v-for="t in visibleTagSuggestions" :key="t" type="button"
+                class="tag-chip" :class="{ on: draftTags.includes(t) }"
+                :disabled="!draftTags.includes(t) && draftTags.length >= MAX_TAGS"
+                @click="toggleTag(t)"
+              >{{ t }}</button>
+              <button v-if="hiddenTagCount > 0" type="button" class="tag-chip tag-more" @click="tagsExpanded = !tagsExpanded">
+                {{ tagsExpanded ? '收起' : `更多 ${hiddenTagCount} 个` }}
+                <AppIcon :name="tagsExpanded ? 'chevronDown' : 'chevronRight'" :size="12" />
+              </button>
+            </div>
+          </div>
+          <div class="prompt-row">
+            <button v-for="p in REVIEW_PROMPTS" :key="p" class="prompt-chip" @click="appendPrompt(p)">{{ p }}</button>
+          </div>
+
+          <div class="ne-actions">
+            <button v-if="reviewPlainText(noteTarget.review ?? '').trim()" class="btn-danger" @click="clearNote"><AppIcon name="trash" :size="16" /> 清空</button>
+            <button class="btn-primary" @click="closeNote">完成</button>
+          </div>
+        </article>
+
+        <!-- 插链接：不用弹窗，就在工具栏上方输入，确认后按记住的选区原位插入 -->
+        <div v-if="linkDraft !== null" class="ne-linkbar">
+          <input
+            v-model="linkDraft" class="ne-link-input" type="url" inputmode="url"
+            placeholder="输入链接，如 https://…"
+            @keydown.enter.prevent="confirmLink"
+          >
+          <button class="btn-ghost btn-sm ne-link-cancel" @click="linkDraft = null">取消</button>
+          <button class="btn-primary btn-sm ne-link-ok" @click="confirmLink">插入</button>
+        </div>
+
+        <!-- 工具栏常驻底部：加粗 / 图片 / 链接 / 纸张 / 便签色，不随长文滚走。
+             「纸张」是里面写的本子（白/米/牛皮），「便签色」是外头那张墙上的便签——两个概念分开选。 -->
+        <div class="ne-toolbar">
+          <button class="ne-tool" aria-label="加粗" @pointerdown.prevent="boldSelection"><b>B</b></button>
+          <button class="ne-tool" aria-label="插入图片" @pointerdown.prevent="insertImage"><AppIcon name="image" :size="17" /></button>
+          <button class="ne-tool" aria-label="插入链接" @pointerdown.prevent="insertLink"><AppIcon name="link" :size="17" /></button>
+          <span class="ne-sep" aria-hidden="true" />
+          <div class="ne-group" role="group" aria-label="纸张风格">
+            <span class="ne-group-name">纸张</span>
+            <button
+              v-for="p in NOTE_PAPERS" :key="p.key"
+              class="ne-paper" :class="{ on: draftPaper === p.key }"
+              :aria-pressed="draftPaper === p.key"
+              @pointerdown.prevent="pickPaper(p.key)"
+            >{{ p.label }}</button>
+          </div>
+          <span class="ne-sep" aria-hidden="true" />
+          <div class="ne-group" role="group" aria-label="便签颜色">
+            <span class="ne-group-name">便签色</span>
+            <button
+              v-for="c in NOTE_COLORS" :key="c"
+              class="ne-swatch" :class="{ on: draftColor === c }"
+              :style="{ background: c }" :aria-label="`便签色 ${c}`"
+              @pointerdown.prevent="pickColor(c)"
+            />
+            <button class="ne-swatch-auto" :class="{ on: !draftColor }" aria-label="便签色跟随日程类型配色" @pointerdown.prevent="pickColor(null)">类型色</button>
+          </div>
+        </div>
+        <input ref="imageInputEl" type="file" accept="image/*" class="ne-file" @change="onPickImage">
       </div>
-      <div class="prompt-row">
-        <button v-for="p in REVIEW_PROMPTS" :key="p" class="prompt-chip" @click="appendPrompt(p)">{{ p }}</button>
-      </div>
-      <div class="field">
-        <label>这一场发生了什么</label>
-        <textarea v-model="reviewDraft" rows="7" :maxlength="REVIEW_MAX" placeholder="被问了什么、哪里没答好、下一轮要补什么…"></textarea>
-        <small class="field-help">{{ reviewDraft.trim().length }}/{{ REVIEW_MAX }}</small>
-      </div>
-      <div class="sheet-actions">
-        <button v-if="reviewTarget.review" class="btn-danger" @click="clearReview"><AppIcon name="trash" :size="16" /> 清空</button>
-        <button class="btn-ghost" @click="reviewTarget = null">关闭</button>
-        <button class="btn-primary" @click="saveReview">保存</button>
-      </div>
-    </Sheet>
+    </Transition>
   </div>
 </template>

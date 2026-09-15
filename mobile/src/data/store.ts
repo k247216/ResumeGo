@@ -4,6 +4,7 @@ import { isTerminalStage, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LA
 import type { ScheduleEvent } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
 import { resumeMarkOf, type ResumeMarkName } from './resumeMark'
+import { normalizeNoteColor, normalizeNotePaper } from '../constants/noteColors'
 
 export const DEFAULT_INTERVIEW_ROUNDS = 2
 
@@ -89,17 +90,73 @@ function normalizeDb(input: unknown): DbShape {
   if (!input || typeof input !== 'object') return base
   const raw = input as Partial<DbShape>
   return {
-    targets: Array.isArray(raw.targets) ? raw.targets : [],
-    stageEvents: Array.isArray(raw.stageEvents) ? raw.stageEvents : [],
-    schedules: Array.isArray(raw.schedules) ? raw.schedules : [],
-    resumes: Array.isArray(raw.resumes) ? raw.resumes : [],
-    versions: Array.isArray(raw.versions) ? raw.versions : [],
-    reminders: raw.reminders && typeof raw.reminders === 'object' ? raw.reminders : {},
+    // 备份是外部输入：集合内每个条目也要卫生处理，坏 id / 坏日期 / 重复 id 不该进运行时。
+    targets: saneItems(raw.targets, () => true),
+    stageEvents: saneItems(raw.stageEvents, (e) => validDateString(e.occurredAt)),
+    schedules: saneItems(raw.schedules, (e) => validDateString(e.startTime)),
+    resumes: saneItems(raw.resumes, () => true),
+    versions: saneItems(raw.versions, (v) => saneId(v.resumeId) != null),
+    reminders: saneReminders(raw.reminders),
     seq: Number.isFinite(Number(raw.seq)) && Number(raw.seq) > 0 ? Number(raw.seq) : 0,
   }
 }
 
-function persist() { storage.set(DB_KEY, JSON.stringify(db)) }
+/** 只接受正整数 id；JSON 里的键都是字符串，Number() 兜底转换。 */
+function saneId(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+function validDateString(value: unknown): boolean {
+  return typeof value === 'string' && !Number.isNaN(new Date(value).getTime())
+}
+/** 逐条剔除：非对象、无有效 id、id 重复、以及没通过字段校验的条目。 */
+function saneItems<T extends { id: number }>(list: unknown, ok: (item: Record<string, unknown>) => boolean): T[] {
+  if (!Array.isArray(list)) return []
+  const out: T[] = []
+  const seen = new Set<number>()
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue
+    const item = raw as Record<string, unknown>
+    const id = saneId(item.id)
+    if (id == null || seen.has(id) || !ok(item)) continue
+    seen.add(id)
+    out.push({ ...item, id } as unknown as T)
+  }
+  return out
+}
+/** reminders 只留「日程 id → 正的有限分钟数」，其余键值对一律丢弃。 */
+function saneReminders(raw: unknown): Record<number, number> {
+  const out: Record<number, number> = {}
+  if (!raw || typeof raw !== 'object') return out
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const id = saneId(key)
+    const minutes = Number(value)
+    if (id != null && Number.isFinite(minutes) && minutes > 0) out[id] = minutes
+  }
+  return out
+}
+
+const PERSIST_DELAY_MS = 300
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * 深层 watch 对每次变更（包括心得每敲一个字）都触发全量 JSON.stringify，
+ * 同步写 localStorage 会拖慢输入节奏。改成 300ms 尾随合并；
+ * 页面隐藏/关闭时立刻冲刷，保证「切走就锁屏杀进程」的场景也不丢最后一次改动。
+ */
+function persist() {
+  if (persistTimer != null) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => { persistTimer = null; flushPersist() }, PERSIST_DELAY_MS)
+}
+/** 立刻把当前库写进本地存储：导入备份、清空工作区这类「下一刻就可能被回收」的时刻必须走这条。 */
+export function flushPersist() {
+  if (persistTimer != null) { clearTimeout(persistTimer); persistTimer = null }
+  storage.set(DB_KEY, JSON.stringify(db))
+}
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  const flushOnLeave = () => { if (persistTimer != null) flushPersist() }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushOnLeave() })
+  window.addEventListener('pagehide', flushOnLeave)
+}
 
 function load(): DbShape {
   const raw = storage.get(DB_KEY)
@@ -130,6 +187,11 @@ function hydrate(db: DbShape) {
   for (const schedule of db.schedules) {
     schedule.notes = schedule.notes ?? null
     schedule.review = schedule.review ?? null
+    schedule.reviewTags = schedule.reviewTags ?? []
+    // 便签底色只认调色板内的值——备份导入的任何别的颜色都当脏数据丢回 null。
+    schedule.reviewColor = normalizeNoteColor(schedule.reviewColor)
+    // 纸张风格同理：白名单外的值（含旧数据缺省）一律归成白纸。
+    schedule.reviewPaper = normalizeNotePaper(schedule.reviewPaper)
   }
   for (const resume of db.resumes) {
     resume.mark = resume.mark ?? resumeMarkOf(resume.id)
@@ -303,6 +365,8 @@ export function setTargetOutcome(id: number, outcome: TargetOutcome | null, roun
 export function stageEventsOf(id: number): StageEvent[] {
   return db.stageEvents.filter((e) => e.targetId === id).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
 }
+/** 全部阶段记录（漏斗统计用）：每个事件都带着 targetId。 */
+export function listStageEvents(): Array<StageEvent & { targetId: number }> { return db.stageEvents }
 export function linkResume(id: number, resumeVersionId: number | null) {
   const t = db.targets.find((x) => x.id === id); if (t) { t.resumeVersionId = resumeVersionId; t.updatedAt = iso(new Date()) }
 }
@@ -337,9 +401,13 @@ export function setReminder(id: number, minutes: number) {
   else delete db.reminders[id]
 }
 /** 复盘心得独立于 notes：notes 是赛前要看的（会议链接、注意事项），心得是赛后写的，两者生命周期完全不同。 */
-export function setScheduleReview(id: number, review: string) {
+export function setScheduleReview(id: number, review: string, color?: string | null, paper?: string) {
   const e = db.schedules.find((x) => x.id === id); if (!e) return
   e.review = review.trim() || null
+  // color 不传 = 不动现有底色；显式传 null = 回到「跟随类型色」。
+  if (color !== undefined) e.reviewColor = normalizeNoteColor(color)
+  // paper 不传 = 不动现有纸张；传了就归一到白纸/米色/牛皮。
+  if (paper !== undefined) e.reviewPaper = normalizeNotePaper(paper)
   e.updatedAt = iso(new Date())
 }
 /** 写过心得的日程，最近一场在前——复盘视图只看这一份，不必把没结束的安排也拉进来。 */
@@ -347,6 +415,24 @@ export function listReviews(): ScheduleEvent[] {
   return db.schedules
     .filter((e) => !!e.review?.trim())
     .sort((a, b) => b.startTime.localeCompare(a.startTime))
+}
+/** 心得标签独立于正文：维护一份去重、裁剪后的标签，正文清空不影响已打的标签。 */
+export function setReviewTags(id: number, tags: string[]) {
+  const e = db.schedules.find((x) => x.id === id); if (!e) return
+  const clean = Array.from(new Set(tags.map((t) => t.trim()).filter(Boolean))).slice(0, 12)
+  e.reviewTags = clean
+  e.updatedAt = iso(new Date())
+}
+/** 所有心得里出现过的标签，按出现次数倒序——复盘墙的标签筛选直接复用这份。 */
+export function listReviewTags(): string[] {
+  const freq = new Map<string, number>()
+  for (const ev of db.schedules) {
+    for (const t of ev.reviewTags ?? []) {
+      if (!t) continue
+      freq.set(t, (freq.get(t) ?? 0) + 1)
+    }
+  }
+  return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t)
 }
 
 // ── 简历（导入文件版）──
@@ -476,7 +562,7 @@ export function importBackup(json: string): { ok: boolean; message?: string; res
   next.seq = maxId
   Object.assign(db, next)
   hydrate(db)
-  persist()
+  flushPersist()
   clearQuarantinedData()
   return {
     ok: true,

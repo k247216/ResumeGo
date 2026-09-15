@@ -63,6 +63,12 @@
   --pastel-lilac: #dfd3ed;
   /* 品牌 logo 多为透明底 + 深色字（腾讯蓝字），底板必须恒为浅色，暗色主题下也不能跟 --surface 走。 */
   --logo-plate: #ffffff;
+  /* 心得便签稿纸：三种本子纸（白/米/牛皮）+ 纸上行线。暗色主题在下方成套覆盖。 */
+  --paper-white: #ffffff;
+  --paper-cream: #f7f1e1;
+  --paper-kraft: #dcbc8f;
+  --paper-line: rgba(96, 82, 46, .16);
+  --paper-tape: rgba(255, 255, 255, .45);
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
     'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
@@ -101,6 +107,11 @@
   --pastel-yellow: #4b4021;
   --pastel-lilac: #40344d;
   --logo-plate: #e9e9e6;
+  --paper-white: #302d29;
+  --paper-cream: #2a2620;
+  --paper-kraft: #453726;
+  --paper-line: rgba(255, 246, 214, .13);
+  --paper-tape: rgba(255, 255, 255, .10);
   color-scheme: dark;
 }
 
@@ -261,18 +272,6 @@ button { font-family: inherit; }
 }
 
 .card-head { display: flex; align-items: center; gap: var(--space-3); }
-.logo-mark {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  font-size: 18px;
-  font-weight: 700;
-  user-select: none;
-}
-.logo-img { flex: 0 0 auto; width: 36px; height: 36px; object-fit: contain; }
 .head-copy { min-width: 0; flex: 1; }
 .head-copy h3 {
   margin: 0;
@@ -385,6 +384,25 @@ button { font-family: inherit; }
   transform: translateY(6px);
 }
 .connector.filled { background: color-mix(in srgb, var(--brand) 40%, transparent); }
+/* ── 蛇形时间轴：双列卡片一行放不下，把管线拐个弯，全部阶段名都能显示 ── */
+.pipeline-wrap { flex-wrap: wrap; row-gap: 2px; }
+.pipeline-wrap .pipeline-item { flex: 0 0 calc(100% / var(--mid, 3)); }
+/* 蛇形列窄，标签允许溢出节点居中显示（点下方是空白，不会压到连线） */
+.pipeline-wrap .node-label {
+  max-width: none; overflow: visible;
+  white-space: nowrap; justify-self: center;
+  text-overflow: clip; padding-inline: 0;
+}
+/* 拐弯：右侧竖线把上排终点接去下排起点（两排各占 mid 列，竖线对齐最后一列中点） */
+.pipeline-turn { flex: 0 0 100%; position: relative; height: 18px; }
+.pipeline-turn::after {
+  content: ''; position: absolute;
+  right: calc(50% / var(--mid, 3)); transform: translateX(50%);
+  top: -5px; bottom: 7px;
+  width: 2px; border-radius: 1px;
+  background: var(--line-subtle);
+}
+.pipeline-turn.filled::after { background: color-mix(in srgb, var(--brand) 40%, transparent); }
 
 /* ── 行内 chip / 元信息 ── */
 .chip-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -1201,9 +1219,6 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .schedule-focus-head h1 { margin: 0; color: var(--ink); font-size: 21px; font-weight: 760; letter-spacing: -.025em; }
 .schedule-focus-count { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; background: rgba(255, 255, 255, .62); color: var(--copy); font-size: 11px; font-weight: 700; }
 .schedule-focus-event { display: flex; align-items: center; gap: 11px; width: 100%; padding: 0; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
-.schedule-focus-logo { display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 auto; overflow: hidden; border-radius: 16px; background: rgba(255, 255, 255, .76); box-shadow: 0 1px 0 rgba(17, 19, 21, .05); }
-.schedule-focus-logo img { width: 34px; height: 34px; object-fit: contain; }
-.schedule-focus-logo > span { display: grid; place-items: center; width: 100%; height: 100%; font-size: 17px; font-weight: 800; }
 .schedule-focus-copy { display: grid; min-width: 0; flex: 1; gap: 4px; }
 .schedule-focus-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 750; }
 .schedule-focus-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--copy); font-size: 12px; }
@@ -1287,7 +1302,7 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   display: grid;
   grid-template-rows: 42px 32px minmax(94px, auto);
   justify-items: center;
-  width: 104px;
+  width: auto;
   min-width: 104px;
 }
 .timeline-date {
@@ -1319,13 +1334,14 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   background: var(--surface);
   box-shadow: 0 0 0 3px var(--brand-soft);
 }
-.timeline-events { display: flex; align-items: start; justify-content: center; gap: 7px; width: 100%; }
+.timeline-events { display: flex; flex-wrap: wrap; align-items: start; justify-content: center; gap: 7px; width: 100%; padding-inline: 3px; }
 .timeline-event {
   display: grid;
   justify-items: center;
   gap: 4px;
-  width: 98px;
-  min-width: 98px;
+  width: auto;
+  min-width: 84px;
+  max-width: 104px;
   min-height: 84px;
   border: 0;
   background: none;
@@ -1333,22 +1349,18 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   color: var(--copy);
   cursor: pointer;
 }
+/* 一天装不下的日程收进小圆牌，点开月历看全——比无限撑高时间轴直观 */
+.timeline-more {
+  display: grid; place-items: center; align-self: start;
+  width: 26px; height: 26px; margin-top: 4px;
+  border: 1px dashed var(--line-strong); border-radius: 50%;
+  background: var(--surface-subtle); color: var(--copy);
+  font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.timeline-more:active { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
 .timeline-event-copy { display: grid; justify-items: center; min-width: 0; max-width: 100%; line-height: 1.2; }
 .timeline-event-copy strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 650; color: var(--ink); }
 .timeline-event-copy small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 550; font-variant-numeric: tabular-nums; color: var(--copy); }
-.timeline-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  overflow: hidden;
-  border: 1px solid var(--line-subtle);
-  border-radius: 12px;
-  background: var(--logo-plate);
-  box-shadow: var(--shadow-card);
-}
-.timeline-mark img { width: 24px; height: 24px; object-fit: contain; }
-.timeline-mark > span { display: grid; place-items: center; width: 100%; height: 100%; font-size: 13px; font-weight: 750; }
 .plan-block { margin-top: var(--space-5); }
 .plan-list {
   overflow: hidden;
@@ -1378,19 +1390,6 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   cursor: pointer;
 }
 .plan-main:active { background: var(--surface-hover); }
-.plan-mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  overflow: hidden;
-  flex: 0 0 auto;
-  border: 1px solid var(--line-subtle);
-  border-radius: 13px;
-  background: var(--logo-plate);
-}
-.plan-mark img { width: 30px; height: 30px; object-fit: contain; }
-.plan-mark > span { display: grid; place-items: center; width: 100%; height: 100%; font-size: 16px; font-weight: 750; }
 .plan-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
 .plan-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
 .plan-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--copy); font-size: 12px; }
@@ -1470,8 +1469,19 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 }
 .review-pending:active { border-color: var(--brand); }
 .review-pending .plan-copy { flex: 1; }
-/* 心得便签墙：卡片自带公司图标与计划名，所以按时间平铺、不再按公司分组套娃 */
-.note-wall { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
+/* 心得便签墙：按月分组，卡片自带公司图标与计划名，组内平铺、不再按公司分组套娃 */
+.note-wall-wrap { display: grid; }
+.note-month {
+  display: flex; align-items: center; gap: 9px;
+  margin: 18px 0 6px; color: var(--copy);
+}
+.note-month strong { flex: 0 0 auto; color: var(--ink); font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; }
+.note-month em { flex: 0 0 auto; color: var(--text-disabled); font-size: var(--fs-nano); font-style: normal; font-variant-numeric: tabular-nums; }
+/* 月份标题右侧的引导线：一屏几十张便签时，靠它把「哪一段是哪个月」缝起来 */
+.note-month::after { content: ''; flex: 1; height: 1px; min-width: 12px; background: var(--line-subtle); }
+.note-wall { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 15px 12px; padding-top: 7px; }
+/* 卡片不再倾斜、不再贴胶带：底色全部来自用户选的便签色（--note-c），
+   浅色/深色主题都用 color-mix 混到 surface 上，整面墙彩色而端正。 */
 .note-card {
   position: relative;
   display: flex;
@@ -1479,32 +1489,38 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   gap: 9px;
   min-width: 0;
   padding: 12px 12px 10px;
-  border: 1px solid color-mix(in srgb, var(--tint) 20%, var(--line-subtle));
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--tint) 5%, var(--surface));
-  box-shadow: 0 1px 0 rgba(17, 19, 21, .02), 0 10px 18px -16px rgba(16, 24, 40, .6);
+  border: 1px solid color-mix(in srgb, var(--note-c) 30%, var(--line-subtle));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--note-c) 12%, var(--surface));
+  box-shadow: 0 1px 0 rgba(17, 19, 21, .02), 0 14px 22px -16px rgba(16, 24, 40, .6);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
-  transition: transform .15s var(--ease-out);
+  transition: transform .18s var(--ease-out), box-shadow .18s var(--ease-out);
 }
-.note-card:active { transform: scale(.985); }
-/* 通栏的题头色带：类型色集中在这里，正文那半张纸保持干净 */
+.note-card:active {
+  transform: scale(.985);
+  box-shadow: 0 1px 0 rgba(17, 19, 21, .03), 0 4px 10px -8px rgba(16, 24, 40, .5);
+}
+/* 顶部胶带压着纸边：便签的识别符号，卡片本身保持端正不歪 */
+.note-tape {
+  position: absolute; top: -7px; left: 50%;
+  width: 50px; height: 15px;
+  transform: translateX(-50%) rotate(-2.2deg);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--note-c) 30%, var(--paper-tape));
+  box-shadow: 0 2px 4px rgba(16, 24, 40, .10);
+  pointer-events: none;
+}
+/* 通栏的题头色带：便签色集中在这里，正文那半张纸保持干净 */
 .note-head {
   display: flex; align-items: center; gap: 8px; min-width: 0;
   margin: -12px -12px 0;
   padding: 10px 12px 9px;
-  border-bottom: 1px solid color-mix(in srgb, var(--tint) 15%, transparent);
-  border-radius: 14px 14px 0 0;
-  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--note-c) 24%, transparent);
+  border-radius: 15px 15px 0 0;
+  background: color-mix(in srgb, var(--note-c) 22%, var(--surface));
 }
-.note-mark {
-  display: grid; place-items: center; flex: 0 0 auto;
-  width: 28px; height: 28px; overflow: hidden;
-  border: 1px solid var(--line-subtle); border-radius: 9px; background: var(--logo-plate);
-}
-.note-mark img { width: 20px; height: 20px; object-fit: contain; }
-.note-mark > span { display: grid; place-items: center; width: 100%; height: 100%; font-size: 13px; font-weight: 750; }
 .note-id { display: grid; min-width: 0; gap: 1px; }
 .note-id strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
 .note-id small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--fs-micro); }
@@ -1514,11 +1530,13 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   color: var(--ink); font-size: 13.5px; line-height: 1.62; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .note-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  display: flex; align-items: center; gap: 7px;
   margin-top: auto; padding-top: 8px;
-  border-top: 1px dashed color-mix(in srgb, var(--tint) 26%, var(--line));
+  border-top: 1px dashed color-mix(in srgb, var(--note-c) 30%, var(--line));
   color: var(--muted); font-size: var(--fs-nano); font-variant-numeric: tabular-nums;
 }
+.note-foot time { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-len { flex: 0 0 auto; color: var(--text-disabled); }
 .note-foot svg { flex: 0 0 auto; color: var(--text-disabled); }
 @media (max-width: 340px) { .note-wall { grid-template-columns: minmax(0, 1fr); } }
 .note-owner { display: flex; align-items: center; gap: 11px; margin: -2px 0 14px; }
@@ -1532,6 +1550,55 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 }
 .prompt-chip:active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
 
+/* 心得标签：像手机上那样一排可点可加的胶囊 */
+.review-tags { display: grid; gap: 8px; margin: 2px 0 14px; }
+.review-tags-head { display: flex; align-items: baseline; gap: 8px; }
+.review-tags-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.review-tags-hint { color: var(--muted); font-size: var(--fs-micro); }
+.tag-list { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 11px; border: 1px solid var(--line-subtle); border-radius: 999px;
+  background: var(--surface-subtle); color: var(--copy);
+  font: inherit; font-size: var(--fs-caption); font-weight: 650; line-height: 1.4; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.tag-chip.on {
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  background: var(--brand-soft); color: var(--brand);
+}
+.tag-chip:disabled { opacity: .4; cursor: not-allowed; }
+.tag-input {
+  min-width: 84px; flex: 1 1 86px; max-width: 172px;
+  padding: 5px 2px; border: 0; border-bottom: 1px dashed var(--line-subtle);
+  background: transparent; color: var(--ink);
+  font: inherit; font-size: var(--fs-caption);
+}
+.tag-input::placeholder { color: var(--text-disabled); }
+.tag-input:focus { outline: none; border-bottom-color: var(--brand); }
+.tag-suggest { display: flex; flex-wrap: wrap; gap: 7px; }
+.tag-filter { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; }
+.tag-filter::-webkit-scrollbar { display: none; }
+/* 正文写成「一页纸」的感觉：更宽的内边距、更松的行距，弱化表单感 */
+.review-doc { margin-bottom: 4px; }
+.review-doc textarea {
+  padding: 13px 13px; line-height: 1.72; font-size: 14px;
+  background: var(--surface-subtle);
+}
+.note-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.note-tag {
+  padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--note-c) 16%, var(--surface));
+  color: color-mix(in srgb, var(--note-c) 78%, var(--ink));
+  font-size: 11px; font-weight: 650; white-space: nowrap;
+}
+/* 卡片上放不下的标签收进「+N」，少的时候这一枚根本不会出现 */
+.note-tag-more {
+  padding: 2px 7px;
+  border: 1px dashed color-mix(in srgb, var(--note-c) 42%, var(--line));
+  background: transparent; color: var(--muted);
+}
+
 /* 求职目标：在平板/横屏宽度保留两列卡片，手机窄屏自动回落单列 */
 .targets-grid { display: grid; gap: var(--space-3); }
 .target-card { border: 0; min-height: 214px; }
@@ -1542,11 +1609,20 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .target-tone-lilac { background: var(--surface); }
 .target-card .stage-pill { background: rgba(255, 255, 255, .7) !important; color: var(--ink) !important; }
 .targets-grid.is-double { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-@media (max-width: 399px) {
-  .targets-grid.is-double .card { padding: 12px; }
-  .targets-grid.is-double .head-side { gap: 2px; }
-  .targets-grid.is-double .stage-pill { padding-inline: 7px; }
-}
+/* 双列是紧凑模式，做取舍：隐藏右上状态胶囊与页脚（详情页里都有）、隐藏阶段日期；
+   时间轴改为蛇形两行（StagePipeline 的 wrap 模式），阶段名全部保留。 */
+.target-card.compact { min-height: 0; padding: 12px; }
+.target-card.compact .card-head { gap: 7px; }
+.target-card.compact .head-copy h3 { font-size: 13.5px; }
+.target-card.compact .head-copy small { font-size: 10.5px; }
+.target-card.compact .stage-pill { display: none; }
+.target-card.compact .menu-trigger { width: 26px; height: 26px; }
+.target-card.compact .pipeline { margin: 10px 0 6px; }
+.target-card.compact .node { gap: 3px; }
+.target-card.compact .node-label { font-size: 10px; }
+.target-card.compact .node-time { display: none; }
+.target-card.compact .chip { padding: 4px 8px; font-size: 10.5px; }
+.target-card.compact .chip-meta { display: none; }
 @media (min-width: 520px) {
   .targets-grid .card { height: 100%; }
 }
@@ -1578,6 +1654,191 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .btn-danger:active { transform: scale(.97); }
 button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .icon-btn:disabled, .fab:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── 求职漏斗统计 ── */
+.funnel { display: flex; flex-direction: column; gap: 12px; padding: 6px 0 4px; }
+.funnel-row {
+  display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 10px;
+  animation: card-in .34s var(--ease-spring) both; animation-delay: var(--d, 0ms);
+}
+.funnel-label { font-size: var(--fs-label); color: var(--copy); white-space: nowrap; }
+.funnel-bar-wrap { height: 18px; border-radius: 6px; background: var(--surface-subtle); overflow: hidden; }
+/* 逐行生长动画：宽度从 0 长到目标值，配合行级 stagger 形成节奏 */
+.funnel-bar {
+  height: 100%; border-radius: 6px; width: var(--w, 0%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 72%, #fff), var(--c) 55%);
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .28);
+  animation: funnel-bar-in .8s var(--ease-out) both; animation-delay: calc(var(--d, 0ms) + 60ms);
+  transition: width .3s var(--ease-out);
+}
+@keyframes funnel-bar-in { from { width: 0; } }
+.funnel-num { display: grid; justify-items: end; min-width: 52px; gap: 1px; }
+.funnel-num strong { font-size: 15px; font-weight: 750; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.funnel-num small { font-size: var(--fs-nano); color: var(--muted); white-space: nowrap; }
+.chip-zero { opacity: .55; }
+.chip strong { font-variant-numeric: tabular-nums; }
+
+/* ── 日程「进行中」徽标 ── */
+.live-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 6px; padding: 2px 7px; border-radius: 999px;
+  font-size: var(--fs-nano); font-style: normal; font-weight: 700; line-height: 1.4;
+  color: var(--brand); background: var(--brand-soft); vertical-align: 2px;
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.72); } }
+
+/* ── 全屏心得笔记本：阅读 = 编辑，同一张纸 ── */
+.nb-date { margin: 0; font-size: var(--fs-nano); letter-spacing: .06em; color: var(--muted); }
+.nb-count { display: block; text-align: right; font-size: var(--fs-nano); color: var(--muted); }
+.nb-count.over { color: var(--danger); font-weight: 700; }
+.tag-more { color: var(--brand); border-style: dashed; }
+
+.note-editor {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; flex-direction: column;
+  /* 桌面：比画布暖一度的底，衬出中间那张便签纸 */
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(255, 252, 240, .05), transparent 60%),
+    color-mix(in srgb, #8a6f4d 10%, var(--canvas));
+}
+.ne-card {
+  width: min(680px, 100%); margin: 0 auto; flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: calc(var(--space-4) + env(safe-area-inset-top, 0px)) var(--space-4) var(--space-4);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ne-head { display: flex; align-items: flex-start; gap: 12px; }
+/* 便签纸：纸张风格由纸张选择器给（白/米/牛皮，--paper-c 是整个 CSS 变量引用）；
+   圆角 + 投影 + 顶部胶带，是一张贴在桌上的纸，不是「一个窗口」 */
+.ne-desk { display: grid; justify-items: stretch; gap: 6px; }
+.ne-sheet {
+  position: relative;
+  padding: 30px 16px 20px 20px;
+  border-radius: 4px 4px 14px 14px;
+  background: var(--paper-c, var(--paper-white));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .25) inset,
+    0 2px 4px rgba(16, 24, 40, .14),
+    0 18px 30px -18px rgba(16, 24, 40, .5);
+}
+/* 胶带压在纸的顶边中央，微微歪着——它是「便签」的识别，不是装饰 */
+.ne-tape {
+  position: absolute; top: -9px; left: 50%;
+  width: 66px; height: 19px;
+  transform: translateX(-50%) rotate(-2.4deg);
+  border-radius: 2px;
+  background: var(--paper-tape);
+  box-shadow: 0 2px 4px rgba(16, 24, 40, .10);
+  pointer-events: none;
+}
+.ne-input {
+  min-height: 280px; outline: none;
+  font-size: 15px; line-height: 28px; color: var(--ink);
+  overflow-wrap: anywhere; word-break: break-word;
+  background-image: repeating-linear-gradient(180deg, transparent 0 27px, var(--paper-line) 27px 28px);
+  background-attachment: local;
+}
+.ne-input:focus-visible { box-shadow: none; }
+.ne-input:empty::before { content: attr(data-placeholder); color: color-mix(in srgb, var(--ink) 38%, transparent); pointer-events: none; }
+.ne-input p { margin: 0; }
+.ne-input img { display: block; max-width: 100%; margin: 6px 0; border-radius: 10px; }
+.ne-input a { color: var(--brand); text-decoration: underline; word-break: break-all; }
+.ne-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* 插链接的输入条：出现在工具栏上方，不弹窗、不丢纸面上下文 */
+.ne-linkbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  width: min(680px, 100%); margin: 0 auto;
+  padding: 8px var(--space-4);
+  border-top: 1px dashed var(--line);
+  background: var(--surface);
+}
+.ne-link-input {
+  flex: 1; min-width: 0;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-subtle); color: var(--ink); font: inherit; font-size: 13.5px;
+}
+.ne-link-input:focus { outline: none; border-color: var(--brand); }
+/* 工具栏常驻底部：加粗 / 图片 / 链接 / 便签底色，不随长文滚走 */
+.ne-toolbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 7px;
+  width: min(680px, 100%); margin: 0 auto;
+  padding: 8px var(--space-4) calc(8px + var(--safe-bottom));
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line-subtle);
+  /* 放不下就换行——便签色/纸张藏进横向滚动区等于没这个功能 */
+  flex-wrap: wrap; row-gap: 6px; scrollbar-width: none;
+}
+.ne-toolbar::-webkit-scrollbar { display: none; }
+.ne-tool {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 38px; height: 38px; border: 1px solid var(--line-subtle); border-radius: 11px;
+  background: var(--surface-subtle); color: var(--copy);
+  font: inherit; font-size: 15px; cursor: pointer;
+}
+.ne-tool:active { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.ne-tool b { font-weight: 800; }
+.ne-sep { flex: 0 0 auto; width: 1px; height: 22px; margin-inline: 2px; background: var(--line); }
+/* 工具栏分组：纸张是一组、便签色是一组——两个概念分开摆，用户不用猜。 */
+.ne-group { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.ne-group-name { flex: 0 0 auto; font-size: 10.5px; color: var(--muted); letter-spacing: .04em; }
+.ne-paper {
+  flex: 0 0 auto; padding: 5px 9px;
+  border: 1px solid var(--line); border-radius: 9px;
+  font: inherit; font-size: 11px; color: var(--copy); cursor: pointer;
+}
+.ne-paper.on { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.ne-swatch {
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--surface); cursor: pointer;
+}
+.ne-swatch.on { border-color: var(--ink); }
+.ne-swatch-auto {
+  flex: 0 0 auto; padding: 6px 10px; border: 1px dashed var(--line); border-radius: 999px;
+  background: none; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer;
+}
+.ne-swatch-auto.on { color: var(--ink); border-color: var(--line-strong); }
+.ne-actions { display: flex; gap: var(--space-3); margin-top: 12px; }
+.ne-actions > * { flex: 1; }
+.ne-head .nr-head-copy { flex: 1; display: grid; gap: 3px; min-width: 0; }
+.nr-title { font-size: 19px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); line-height: 1.3; }
+.nr-sub { display: flex; align-items: center; gap: 6px; font-size: var(--fs-caption); color: var(--muted); }
+.reader-enter-active, .reader-leave-active { transition: opacity .22s var(--ease-out), transform .22s var(--ease-out); }
+.reader-enter-from, .reader-leave-to { opacity: 0; transform: translateY(14px); }
+
+/* ── 复盘统计环 ── */
+.review-stats { padding: 0; overflow: hidden; }
+.rs-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 12px 14px; background: transparent; border: 0; cursor: pointer;
+}
+.rs-hint { flex: 1; text-align: right; font-size: var(--fs-caption); color: var(--muted); }
+.rs-chev { color: var(--muted); transition: transform .25s var(--ease-out); }
+.rs-chev.flip { transform: rotate(180deg); }
+.rs-rings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 14px 14px; }
+.rs-ring {
+  position: relative; display: grid; place-items: center; gap: 2px;
+  padding: 8px 4px 6px; border-radius: 12px; border: 1px solid transparent;
+  background: var(--surface-subtle); cursor: pointer;
+}
+.rs-ring.on { border-color: var(--tint); background: var(--surface-hover); }
+.rs-ring svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+.rs-track { fill: none; stroke: var(--line-subtle); stroke-width: 4.5; }
+.rs-bar {
+  fill: none; stroke: var(--tint); stroke-width: 4.5; stroke-linecap: round;
+  opacity: .9; transition: stroke-dasharray .5s var(--ease-out);
+}
+.rs-ring.zero .rs-bar { stroke: var(--line); }
+.rs-num { position: absolute; top: 26px; display: grid; justify-items: center; line-height: 1; }
+.rs-num strong { font-size: 14px; font-weight: 750; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rs-num small { font-size: 9.5px; color: var(--muted); }
+.rs-label { font-size: var(--fs-nano); color: var(--copy); margin-top: 2px; }
+
+
 
 /* ── 设计化空态 EmptyState ── */
 .empty-state {
