@@ -3,13 +3,15 @@ import { computed } from 'vue'
 import type { JobProject, TargetStage } from '../types/project'
 import { TARGET_STAGE_COLORS, isTerminalStage, normalizeTargetStage } from '../types/project'
 import { outcomeLabelOf } from '../data/store'
-import { companyMark } from '../constants/companyBrands'
 import StagePipeline from './StagePipeline.vue'
 import AppIcon from './AppIcon.vue'
+import CompanyMark from './CompanyMark.vue'
 
 const props = defineProps<{
   target: JobProject
   index: number
+  /** 双列布局的紧凑模式：图标缩小、阶段名只留当前节点、页脚收起——宽度减半时必须做取舍。 */
+  compact?: boolean
   resumeLabel?: string | null
   stageTimes?: Partial<Record<TargetStage, string>>
 }>()
@@ -22,7 +24,6 @@ const emit = defineEmits<{
 }>()
 
 const stage = computed(() => normalizeTargetStage(props.target.stage))
-const mark = computed(() => companyMark(props.target.name))
 const pillStyle = computed(() => {
   const color = TARGET_STAGE_COLORS[stage.value]
   return { background: `color-mix(in srgb, ${color} 12%, transparent)`, color }
@@ -53,10 +54,9 @@ function recentLabel(): string {
 </script>
 
 <template>
-  <article class="card workspace-card target-card" :class="[`target-tone-${pastelTone}`, { archived: target.status === 'archived' }]" :style="{ '--i': Math.min(index, 8) }" @click="emit('open')">
+  <article class="card workspace-card target-card" :class="[`target-tone-${pastelTone}`, { archived: target.status === 'archived', compact: props.compact }]" :style="{ '--i': Math.min(index, 8) }" @click="emit('open')">
     <header class="card-head">
-      <img v-if="mark.icon" class="logo-img" :src="mark.icon" alt="" aria-hidden="true">
-      <span v-else class="logo-mark" :style="{ background: mark.color, color: mark.lightText ? '#fff' : '#1b1b1b' }">{{ mark.letter }}</span>
+      <CompanyMark :name="target.name" :size="compact ? 30 : 40" />
       <div class="head-copy">
         <h3>{{ target.name }}</h3>
         <small>{{ target.targetRole || target.industry || '求职目标' }}<template v-if="target.location"> · {{ target.location }}</template></small>
@@ -67,15 +67,15 @@ function recentLabel(): string {
       </div>
     </header>
 
-    <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :interview-rounds="target.interviewRounds" :interview-round="target.interviewRound" @change="(s) => emit('stage', s)" @round="(r) => emit('round', r)" />
+    <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :wrap="compact" :interview-rounds="target.interviewRounds" :interview-round="target.interviewRound" @change="(s) => emit('stage', s)" @round="(r) => emit('round', r)" />
 
     <div class="chip-row">
       <button v-if="resumeLabel" class="chip" @click.stop="emit('open')"><AppIcon name="file" :size="14" /> {{ resumeLabel }}</button>
       <button v-else class="chip dashed" @click.stop="emit('link-resume')"><AppIcon name="plus" :size="13" /> 绑定简历</button>
-      <span v-if="locked" class="chip-meta">已标记「{{ outcomeLabelOf(target) }}」· 锁定</span>
+      <span v-if="locked && !compact" class="chip-meta">已标记「{{ outcomeLabelOf(target) }}」· 锁定</span>
     </div>
 
-    <footer class="card-foot">
+    <footer v-if="!compact" class="card-foot">
       <span>创建于 {{ shortDate(target.createdAt) }}</span>
       <span>·</span>
       <span>{{ recentLabel() }}</span>

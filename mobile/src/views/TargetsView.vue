@@ -9,21 +9,30 @@ import EmptyState from '../components/EmptyState.vue'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import {
-  createTarget, currentVersionOf, deleteTarget, getReminder, linkResume, listResumes, listTargets,
+  createTarget, currentVersionOf, deleteTarget, getReminder, linkResume, listResumes, listSchedules, listStageEvents, listTargets,
   interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, reopenTarget, resumeLabel, restoreTarget,
   setInterviewRound, setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, snapshotTarget,
   stageEventsOf, schedulesOfTarget, updateApplication,
 } from '../data/store'
 import type { TargetSnapshot } from '../data/store'
+import { computeFunnel } from '../data/funnel'
 import { cancelReminder } from '../data/notifications'
 import { headEllipsis } from '../data/resumeFile'
 import { SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
 import type { JobProject, TargetOutcome, TargetStage } from '../types/project'
-import { TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage, stageFlowRank } from '../types/project'
+import { TARGET_OUTCOME_LABELS, TARGET_STAGE_COLORS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage, stageFlowRank } from '../types/project'
 
 const search = ref('')
 const filter = ref<'all' | TargetStage | 'outcome' | 'archived'>('all')
 const layoutMode = ref<1 | 2>(1)
+const statsOpen = ref(false)
+
+/** 漏斗按全部目标（含归档）统计——被拒和放弃也是转化链路上的真实终点。 */
+const funnel = computed(() => computeFunnel(listTargets(), listStageEvents(), listSchedules()))
+const funnelMax = computed(() => Math.max(1, ...funnel.value.rows.map((r) => r.reached)))
+function barWidth(reached: number): string {
+  return `${reached ? Math.max(4, (reached / funnelMax.value) * 100) : 0}%`
+}
 
 const createOpen = ref(false)
 const newName = ref('')
@@ -280,6 +289,11 @@ function onLinkResume(versionId: number | null) {
         <h1 class="page-title">求职目标</h1>
         <p class="page-sub">以公司为单位管理进度 · {{ countOf('all') }} 个计划</p>
       </div>
+      <div class="head-actions">
+        <button class="icon-btn" aria-label="求职漏斗统计" title="求职漏斗统计" @click="statsOpen = true">
+          <AppIcon name="chart" :size="18" />
+        </button>
+      </div>
       <div class="view-switch" aria-label="目标卡片布局">
         <button :class="{ on: layoutMode === 1 }" aria-label="一列布局" title="一列布局" @click="layoutMode = 1"><AppIcon name="list" :size="16" /></button>
         <button :class="{ on: layoutMode === 2 }" aria-label="两列布局" title="两列布局" @click="layoutMode = 2"><AppIcon name="grid" :size="16" /></button>
@@ -308,6 +322,7 @@ function onLinkResume(versionId: number | null) {
         :key="t.id"
         :target="t"
         :index="i"
+        :compact="layoutMode === 2"
         :resume-label="resumeLabel(t.resumeVersionId)"
         :stage-times="stageTimesOf(t)"
         @open="openDetail(t)"
@@ -445,6 +460,38 @@ function onLinkResume(versionId: number | null) {
       <div class="sheet-actions">
         <button class="btn-ghost" @click="detailTarget = null">关闭</button>
         <button class="btn-primary" @click="saveApplication">保存投递信息</button>
+      </div>
+    </Sheet>
+
+    <!-- 求职漏斗统计 -->
+    <Sheet v-if="statsOpen" title="求职漏斗" @close="statsOpen = false">
+      <p class="theme-intro">统计「到达过」每个阶段的目标数——后来被拒的也留在它到过的格子里，这样才算转化率。</p>
+      <div class="funnel">
+        <div v-for="(row, i) in funnel.rows" :key="row.stage" class="funnel-row" :style="{ '--d': `${i * 70}ms` }">
+          <span class="funnel-label">{{ row.label }}</span>
+          <div class="funnel-bar-wrap">
+            <div class="funnel-bar" :style="{ '--w': barWidth(row.reached), '--c': TARGET_STAGE_COLORS[row.stage] }" />
+          </div>
+          <span class="funnel-num">
+            <strong>{{ row.reached }}</strong>
+            <small v-if="row.rate != null">转化 {{ row.rate }}%</small>
+            <small v-else>起点</small>
+          </span>
+        </div>
+      </div>
+      <p class="section-kicker">结果分布</p>
+      <div class="chip-row">
+        <span
+          v-for="o in funnel.outcomes" :key="o.stage" class="chip"
+          :style="o.count ? { borderColor: TARGET_STAGE_COLORS[o.stage], color: TARGET_STAGE_COLORS[o.stage] } : undefined"
+          :class="{ 'chip-zero': !o.count }"
+        >{{ o.label }} <strong>{{ o.count }}</strong></span>
+      </div>
+      <p class="chip-meta" style="margin-top:10px">
+        共 {{ funnel.total }} 个目标 · 未归档 {{ funnel.active }} 个 · 已出结果 {{ funnel.settled }} 个 · 已归档 {{ funnel.archived }} 个
+      </p>
+      <div class="sheet-actions">
+        <button class="btn-primary" @click="statsOpen = false">关闭</button>
       </div>
     </Sheet>
   </div>

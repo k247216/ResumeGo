@@ -6,7 +6,7 @@ import EmptyState from '../components/EmptyState.vue'
 import ResumeMark from '../components/ResumeMark.vue'
 import Sheet from '../components/Sheet.vue'
 import {
-  addResumeVersion, currentVersionOf, deleteResume, getResume, renameResume,
+  addResumeVersion, currentVersionOf, deleteResume, getResume, listTargets, renameResume,
   setCurrentVersion, setVersionNote, versionsOf,
 } from '../data/store'
 import { headEllipsis, humanSize, isSupportedResume, middleEllipsis, previewResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT, shareResumeFile, type ResumePreview } from '../data/resumeFile'
@@ -15,6 +15,7 @@ import { appendPromptLine } from '../data/prompt'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { resumeMarkOf } from '../data/resumeMark'
+import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,12 @@ const resumeId = Number(route.params.id)
 const resume = computed(() => getResume(resumeId))
 const versions = computed(() => versionsOf(resumeId))
 const current = computed(() => currentVersionOf(resumeId))
+
+/** 这份简历的任意版本被哪些求职目标绑定着——投递出去的痕迹，比版本号本身更有信息量。 */
+const usedBy = computed(() => {
+  const versionIds = new Set(versions.value.map((v) => v.id))
+  return listTargets().filter((t) => t.resumeVersionId != null && versionIds.has(t.resumeVersionId))
+})
 
 const preview = ref<ResumePreview>({ kind: 'none' })
 const loading = ref(false)
@@ -199,6 +206,18 @@ function short(v: string): string {
       <span v-if="current.note" class="note-text">{{ current.note }}</span>
       <span v-else class="note-empty">这一版投了什么岗位、改了什么，点一下写一句</span>
     </button>
+
+    <!-- 被哪些计划使用：绑定该简历任意版本的求职目标 -->
+    <section v-if="usedBy.length" class="resume-usedby" aria-label="被哪些计划使用">
+      <p class="section-kicker">被这些计划使用</p>
+      <div class="list">
+        <div v-for="t in usedBy" :key="t.id" class="setting-row" style="cursor: default">
+          <span class="event-type-dot" style="background: var(--brand)" />
+          <span class="s-label">{{ t.name }}</span>
+          <span class="s-value">{{ TARGET_STAGE_LABELS[normalizeTargetStage(t.stage)] }}</span>
+        </div>
+      </div>
+    </section>
 
     <!-- 预览：PDF 内嵌 / MD 渲染 / 缺失兜底 -->
     <div class="doc-stage">

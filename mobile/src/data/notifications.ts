@@ -178,3 +178,24 @@ export async function previewReminder(event: ScheduleEvent): Promise<ReminderOut
   fireWebNotification(`测试提醒：${event.title}`, '如果你看到这条，提醒链路是通的')
   return 'web'
 }
+
+/**
+ * 取消系统里所有已排入的提醒，返回真正撤掉的条数。
+ *
+ * 「清空本机记录」和「恢复备份」都必须先跑这一遍：库里的意图被清空或整份替换之后，
+ * 系统里那批通知不会自己消失，会在预定时间弹出来，指向一条已经不存在的日程。
+ * 而 armAllReminders 只负责把新库里的提醒排进去，管不到新库里已经没有的旧通知。
+ */
+export async function cancelAllReminders(): Promise<number> {
+  if (!Capacitor.isNativePlatform()) return 0
+  try {
+    const pending = await LocalNotifications.getPending()
+    const ids = pending.notifications.map((item) => item.id)
+    if (!ids.length) return 0
+    await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) })
+    return ids.length
+  } catch {
+    // 拿不到待触发列表时不能假装成功：调用方据此决定要不要告诉用户「已取消 N 条」。
+    return 0
+  }
+}

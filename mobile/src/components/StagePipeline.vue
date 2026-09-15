@@ -11,6 +11,8 @@ const props = defineProps<{
   interviewRound?: number
   /** 允许点已完成的阶段退回。列表卡片不开（轻点就会改进度，太容易误伤），详情面板开并由父层加确认。 */
   allowBackward?: boolean
+  /** 双列卡片的蛇形布局：一行放不下时把时间轴拐个弯，全部阶段名都能显示。 */
+  wrap?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'change', stage: TargetStage): void
@@ -32,6 +34,29 @@ const nodes = computed<PipelineNode[]>(() => [
   { key: 'hr', stage: 'hr' as TargetStage, label: TARGET_STAGE_LABELS.hr },
   { key: 'offer', stage: 'offer' as TargetStage, label: TARGET_STAGE_LABELS.offer },
 ])
+
+/** 蛇形两行的切分点：上排 ceil(n/2) 个，下排剩下的倒序排（从右往左走）。 */
+const wrapMid = computed(() => Math.ceil(nodes.value.length / 2))
+const rowTop = computed(() => nodes.value.slice(0, wrapMid.value))
+const rowBottom = computed(() => nodes.value.slice(wrapMid.value).slice().reverse())
+const turnFilled = computed(() => {
+  const cur = indexOfCurrent()
+  return cur >= wrapMid.value - 1
+})
+/** 蛇形下排的连线：下排从右往左走，节点 i（原始序）左侧那段在进度过了 i 时点亮。 */
+function stepBack(node: { stage: TargetStage; round?: number }): boolean {
+  const i = nodes.value.findIndex((item) => item.stage === node.stage && item.round === node.round)
+  return indexOfCurrent() >= i
+}
+/** 蛇形模式下每列只有半张卡的 1/3~1/4 宽，用短标签保证「已拿 Offer」这类长名不截断。 */
+function shortLabel(node: PipelineNode): string {
+  if (node.stage === 'applied') return '投递'
+  if (node.stage === 'offer') return 'Offer'
+  return node.label
+}
+function labelOf(node: PipelineNode): string {
+  return props.wrap ? shortLabel(node) : node.label
+}
 
 function indexOfCurrent(): number {
   if (isTerminalStage(props.stage) && props.stage !== 'offer') return -1
@@ -56,7 +81,38 @@ function disabled(node: { stage: TargetStage }): boolean {
 </script>
 
 <template>
-  <ol class="pipeline">
+  <!-- 蛇形两行：上排从左到右，拐弯下去，下排从右到左收在 Offer -->
+  <ol v-if="wrap" class="pipeline pipeline-wrap" :style="{ '--mid': wrapMid }">
+    <li v-for="(node, i) in rowTop" :key="node.key" class="pipeline-item">
+      <button
+        type="button"
+        class="node"
+        :class="stepState(node)"
+        :disabled="disabled(node)"
+        @click.stop="node.stage === 'interview' ? emit('round', node.round!) : emit('change', node.stage)"
+      >
+        <span class="dot" />
+        <span class="node-label">{{ labelOf(node) }}</span>
+      </button>
+      <span v-if="i < rowTop.length - 1" class="connector" :class="{ filled: indexOfCurrent() >= 0 && i < indexOfCurrent() }" />
+    </li>
+    <li class="pipeline-turn" :class="{ filled: turnFilled }" aria-hidden="true" />
+    <li v-for="(node, i) in rowBottom" :key="node.key" class="pipeline-item">
+      <button
+        type="button"
+        class="node"
+        :class="stepState(node)"
+        :disabled="disabled(node)"
+        @click.stop="node.stage === 'interview' ? emit('round', node.round!) : emit('change', node.stage)"
+      >
+        <span class="dot" />
+        <span class="node-label">{{ labelOf(node) }}</span>
+      </button>
+      <span v-if="i < rowBottom.length - 1" class="connector" :class="{ filled: stepBack(node) }" />
+    </li>
+  </ol>
+
+  <ol v-else class="pipeline">
     <li v-for="(node, i) in nodes" :key="node.key" class="pipeline-item">
       <button
         type="button"
@@ -66,7 +122,7 @@ function disabled(node: { stage: TargetStage }): boolean {
         @click.stop="node.stage === 'interview' ? emit('round', node.round!) : emit('change', node.stage)"
       >
         <span class="dot" />
-        <span class="node-label">{{ node.label }}</span>
+        <span class="node-label">{{ labelOf(node) }}</span>
         <span v-if="props.times?.[node.stage] && node.stage !== 'interview'" class="node-time">{{ props.times[node.stage] }}</span>
       </button>
       <span v-if="i < nodes.length - 1" class="connector" :class="{ filled: indexOfCurrent() >= 0 && i < indexOfCurrent() }" />

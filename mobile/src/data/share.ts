@@ -77,15 +77,24 @@ export function shareErrorMessage(err: unknown): string {
 }
 
 /**
- * 返回用户实际选中的收件端包名；拿不到（Web 降级或系统未回报）时为 null，调用方据此决定要不要说「已发送」。
- *
+ * 分享的真实落点。
+ * 原来的 `string | null` 把三件事压成了一个 null：用户在面板里返回、Web 降级下载、
+ * 以及「成功但系统没回报包名」。调用方拿到 null 只能什么都不说，
+ * 于是用户点了导出、界面毫无反应，分不清是取消了还是卡住了。
+ */
+export type ShareOutcome =
+  | { status: 'shared'; target: string | null }
+  | { status: 'cancelled' }
+  | { status: 'downloaded' }
+
+/**
  * 落盘目录必须是 CACHE：Filesystem 插件把 DOCUMENTS/EXTERNAL_STORAGE 视为「公共目录」，
  * 写入前会先申请 READ/WRITE_EXTERNAL_STORAGE——Android 13 起该权限已不存在，申请必被拒，
  * 于是 writeFile 直接 reject，分享面板根本没机会弹出。CACHE 走 getCacheDir()，
  * 免权限且已被 android/app/src/main/res/xml/file_paths.xml 的 cache-path 覆盖，FileProvider 能签发出 URI。
  */
-export async function shareFile(p: SharePayload): Promise<string | null> {
-  if (!Capacitor.isNativePlatform()) { downloadAsFile(p); return null }
+export async function shareFileEx(p: SharePayload): Promise<ShareOutcome> {
+  if (!Capacitor.isNativePlatform()) { downloadAsFile(p); return { status: 'downloaded' } }
   const { Filesystem, Directory } = await import('@capacitor/filesystem')
   const { Share } = await import('@capacitor/share')
   const fileName = shareFileName(p.fileName, p.blob.type)
@@ -96,9 +105,18 @@ export async function shareFile(p: SharePayload): Promise<string | null> {
   })
   try {
     const res = await Share.share({ title: p.subject ?? fileName, url: written.uri, dialogTitle: p.dialogTitle ?? '分享' })
-    return res.activityType || null
+    return { status: 'shared', target: res.activityType || null }
   } catch (err) {
-    if (isShareCancelled(err)) return null
+    if (isShareCancelled(err)) return { status: 'cancelled' }
     throw err
   }
+}
+
+/**
+ * 只关心收件端包名的调用方继续用这个：拿不到包名（取消、Web 降级、系统未回报）时为 null。
+ * 需要区分「取消」和「已下载」的场景请改用 shareFileEx。
+ */
+export async function shareFile(p: SharePayload): Promise<string | null> {
+  const outcome = await shareFileEx(p)
+  return outcome.status === 'shared' ? outcome.target : null
 }

@@ -4,14 +4,14 @@ import AppIcon from '../components/AppIcon.vue'
 import Sheet from '../components/Sheet.vue'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
-import { shareErrorMessage, shareFile, shareTargetName } from '../data/share'
+import { shareErrorMessage, shareFileEx, shareTargetName } from '../data/share'
 import {
   exportBackup, hasQuarantinedData, importBackup, listResumes, listSchedules, listTargets,
   resetWorkspace, storageFaultMessage,
 } from '../data/store'
 import { getTheme, setTheme, THEME_OPTIONS, type Theme } from '../data/theme'
 import { armAllReminders, collectReminderDiagnostics, type ReminderDiagnostics, type ReminderReport } from '../data/reminders'
-import { previewReminder, REMINDER_OUTCOME_MESSAGES, requestExactAlarmPermission, requestNotificationPermission } from '../data/notifications'
+import { cancelAllReminders, previewReminder, REMINDER_OUTCOME_MESSAGES, requestExactAlarmPermission, requestNotificationPermission } from '../data/notifications'
 import type { ScheduleEvent } from '../types/schedule'
 
 const appVersion = __APP_VERSION__
@@ -119,14 +119,17 @@ async function onExport() {
   const json = exportBackup()
   exporting.value = true
   try {
-    const target = await shareFile({
+    const outcome = await shareFileEx({
       fileName: `zhida-backup-${new Date().toISOString().slice(0, 10)}.json`,
       blob: new Blob([json], { type: 'application/json' }),
       subject: '职达备份',
       dialogTitle: '导出备份',
     })
-    const label = shareTargetName(target)
-    if (target) toast(label ? `备份已交给${label} · 不含简历文件本体` : '备份已交给所选应用 · 不含简历文件本体')
+    // 三种落点必须各说各的：只报「已交给某应用」会让取消和浏览器下载都变成静默。
+    if (outcome.status === 'downloaded') { toast('备份已下载到本机 · 不含简历文件本体'); return }
+    if (outcome.status === 'cancelled') { toast('已取消导出'); return }
+    const label = shareTargetName(outcome.target)
+    toast(label ? `备份已交给${label} · 不含简历文件本体` : '备份已交给所选应用 · 不含简历文件本体')
   } catch (err) {
     toast(shareErrorMessage(err))
   } finally {
@@ -148,6 +151,9 @@ async function onImportFile(e: Event) {
     danger: true,
   })
   if (!ok) return
+  // 先把系统里旧库排下的通知撤干净：importBackup 会整份替换 reminders，
+  // 新库里已经没有的那些日程，旧通知仍会在预定时间弹出来指向一条不存在的日程。
+  await cancelAllReminders()
   const res = importBackup(text)
   if (!res.ok) { toast(res.message ?? '恢复失败'); return }
   const summary = res.restored
@@ -155,7 +161,7 @@ async function onImportFile(e: Event) {
   const report = await armAllReminders()
   await refreshDiagnostics()
   toast(summary
-    ? `已恢复 ${summary.targets} 个目标 · ${summary.schedules} 条日程 · ${reminderReportLine(report) || '无需重排提醒'}`
+    ? `已恢复 ${summary.targets} 个目标 · ${summary.schedules} 条日程 · ${summary.resumes} 份简历 · ${reminderReportLine(report) || '无需重排提醒'}`
     : '记录已恢复')
 }
 
@@ -169,8 +175,10 @@ async function onReset() {
   if (!ok) return
   const res = await resetWorkspace()
   if (!res.ok) { toast(res.message ?? '清空失败'); return }
+  // 库清空了，但系统里排好的通知不会自己消失，会在预定时间弹出指向已删除的日程。
+  const cleared = await cancelAllReminders()
   await refreshDiagnostics()
-  toast('工作区已清空')
+  toast(cleared ? `工作区已清空 · 同时撤回 ${cleared} 条系统提醒` : '工作区已清空')
 }
 </script>
 
