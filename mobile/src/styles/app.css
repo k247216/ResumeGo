@@ -1841,6 +1841,25 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .pb-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .pb-tags .tag-chip { font-size: 11px; }
 .pb-open { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: var(--brand); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+/* 高频标签聚合条：点一根即按标签筛墙，与统计环共用开合 */
+.rs-tagbars { display: grid; gap: 7px; margin-top: 14px; }
+.rs-tagbar { display: grid; grid-template-columns: 76px 1fr 34px; align-items: center; gap: 10px; padding: 0; border: none; background: none; font: inherit; cursor: pointer; text-align: left; }
+.rs-tagbar .rt-name { font-size: 12.5px; color: var(--copy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-tagbar .rt-track { display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--brand) 10%, transparent); overflow: hidden; }
+.rs-tagbar .rt-track i { display: block; height: 100%; border-radius: 4px; background: var(--brand); transition: width .3s ease; }
+.rs-tagbar .rt-num { font-size: 12px; color: var(--muted); text-align: right; }
+.rs-tagbar.on .rt-name { color: var(--brand); font-weight: 800; }
+.rs-tagbar.on .rt-track i { background: color-mix(in srgb, var(--brand) 55%, var(--ink)); }
+/* 求职季报告：复用 metric-card，网格三列 */
+.report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: 14px; }
+.report-insight { grid-column: 1 / -1; margin: 4px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+/* 全局搜索结果：分组行，点了就走 */
+.search-results { display: grid; gap: 4px; margin-top: var(--space-3); }
+.search-group { margin: 8px 0 2px; font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.search-row { display: grid; gap: 2px; padding: 10px 12px; border: none; border-radius: 10px; background: none; font: inherit; text-align: left; cursor: pointer; }
+.search-row:active { background: var(--surface-subtle); }
+.search-row strong { font-size: 13.5px; color: var(--ink); }
+.search-row small { font-size: 12px; color: var(--muted); }
 .ne-head .nr-head-copy { flex: 1; display: grid; gap: 3px; min-width: 0; }
 .nr-title { font-size: 19px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); line-height: 1.3; }
 .nr-sub { display: flex; align-items: center; gap: 6px; font-size: var(--fs-caption); color: var(--muted); }

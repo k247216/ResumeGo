@@ -10,8 +10,8 @@ import {
   markBackupNow, resetWorkspace, storageFaultMessage,
 } from '../data/store'
 import { getTheme, setTheme, THEME_OPTIONS, type Theme } from '../data/theme'
-import { armAllReminders, collectReminderDiagnostics, type ReminderDiagnostics, type ReminderReport } from '../data/reminders'
-import { cancelAllReminders, previewReminder, REMINDER_OUTCOME_MESSAGES, requestExactAlarmPermission, requestNotificationPermission } from '../data/notifications'
+import { armAllReminders, armReviewNudges, collectReminderDiagnostics, type ReminderDiagnostics, type ReminderReport } from '../data/reminders'
+import { cancelAllReminders, previewReminder, REMINDER_OUTCOME_MESSAGES, requestExactAlarmPermission, requestNotificationPermission, reviewNudgeEnabled, setReviewNudgeEnabled } from '../data/notifications'
 import type { ScheduleEvent } from '../types/schedule'
 
 const appVersion = __APP_VERSION__
@@ -39,6 +39,15 @@ const diag = ref<ReminderDiagnostics | null>(null)
 const diagBusy = ref(false)
 const guideOpen = ref(false)
 const exporting = ref(false)
+const nudgeOn = ref(reviewNudgeEnabled())
+
+/** 开 → 给所有未来笔试/面试补挂复盘提醒；关 → 全部撤掉。系统状态始终跟设置一致。 */
+async function toggleNudge() {
+  nudgeOn.value = !nudgeOn.value
+  setReviewNudgeEnabled(nudgeOn.value)
+  await armReviewNudges()
+  toast(nudgeOn.value ? '面后复盘提醒已开启，已为未来的面试/笔试排上' : '面后复盘提醒已关闭')
+}
 
 const permissionLabel = computed(() => {
   const state = diag.value?.permission
@@ -249,6 +258,12 @@ async function onReset() {
         <span class="s-label">{{ diagBusy ? '正在排入系统…' : '重新排入系统' }}</span>
         <span class="s-value">修好后点一次 ›</span>
       </button>
+      <div class="setting-row diag-row">
+        <span class="sr-ic"><AppIcon name="edit" :size="18" /></span>
+        <span class="s-label">面后复盘提醒</span>
+        <span class="s-value">结束后 2 小时提醒写心得</span>
+        <button class="btn-ghost btn-sm" :aria-pressed="nudgeOn" @click="toggleNudge">{{ nudgeOn ? '关闭' : '开启' }}</button>
+      </div>
       <button class="setting-row hint-row" @click="testReminder">
         <span class="sr-ic"><AppIcon name="bell" :size="18" /></span>
         <span class="s-label">发送测试提醒</span>

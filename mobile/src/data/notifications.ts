@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import type { ScheduleEvent } from '../types/schedule'
+import { eventEndsAt } from '../types/schedule'
 
 const pendingTimers = new Map<number, ReturnType<typeof setTimeout>>()
 
@@ -211,4 +212,62 @@ export async function cancelAllReminders(): Promise<number> {
     // 拿不到待触发列表时不能假装成功：调用方据此决定要不要告诉用户「已取消 N 条」。
     return 0
   }
+}
+
+// ── 面后复盘提醒：提醒链的最后一环——面后 2 小时推一把「该写复盘了」，写完即撤 ──
+
+/** 复盘提醒的独立通知 id 段：日程 id + 200000（测试提醒占 100000 段），互不踩。 */
+export const NUDGE_ID_OFFSET = 200_000
+
+const NUDGE_KEY = 'zhida-review-nudge'
+/** 复盘提醒开关，默认开。记在本机不进库：换机恢复的是数据，习惯设置留在设备上。 */
+export function reviewNudgeEnabled(): boolean {
+  try { return localStorage.getItem(NUDGE_KEY) !== 'off' } catch { return true }
+}
+export function setReviewNudgeEnabled(on: boolean) {
+  try { localStorage.setItem(NUDGE_KEY, on ? 'on' : 'off') } catch { /* 存不了就按默认开 */ }
+}
+
+/** 撤掉某场日程的面后复盘提醒（写完心得、删日程时都要撤）。 */
+export function cancelReviewNudge(eventId: number): void {
+  const nudgeId = eventId + NUDGE_ID_OFFSET
+  const timer = pendingTimers.get(nudgeId)
+  if (timer) { clearTimeout(timer); pendingTimers.delete(nudgeId) }
+  if (Capacitor.isNativePlatform()) {
+    void LocalNotifications.cancel({ notifications: [{ id: nudgeId }] }).catch(() => undefined)
+  }
+}
+
+/**
+ * 给一场已排期的笔试/面试挂「面后写复盘」提醒：结束后 2 小时触发。
+ * 与赛前提醒共用渠道；结束时刻按 endTime 算，没填则按开始 + 1 小时估。
+ * 调用方负责确认：开关已开、事件在未来、还没写过心得。
+ */
+export async function scheduleReviewNudge(event: ScheduleEvent): Promise<ReminderOutcome> {
+  cancelReviewNudge(event.id)
+  const fireAt = eventEndsAt(event) + 2 * 3600_000
+  if (fireAt <= Date.now()) return 'skipped-past'
+
+  if (Capacitor.isNativePlatform()) {
+    if (await notificationPermissionState() !== 'granted') return 'denied'
+    const channel = (await ensureReminderChannel()) ? REMINDER_CHANNEL.id : undefined
+    try {
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: event.id + NUDGE_ID_OFFSET,
+          title: '该写复盘了',
+          body: `${event.title} 已结束，趁记忆新鲜记两句`,
+          schedule: { at: new Date(fireAt), allowWhileIdle: true },
+          ...(channel ? { channelId: channel } : {}),
+        }],
+      })
+      return 'scheduled'
+    } catch {
+      return 'failed'
+    }
+  }
+
+  const timer = setTimeout(() => fireWebNotification('该写复盘了', `${event.title} 已结束，趁记忆新鲜记两句`), fireAt - Date.now())
+  pendingTimers.set(event.id + NUDGE_ID_OFFSET, timer)
+  return 'web'
 }

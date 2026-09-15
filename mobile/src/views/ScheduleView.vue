@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import CompanyMark from '../components/CompanyMark.vue'
 import PickerField from '../components/PickerField.vue'
@@ -9,13 +10,15 @@ import { headEllipsis } from '../data/resumeFile'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { ensureReviewHtml, sanitizeReviewHtml, reviewPlainText, compressImageToDataUrl, escapeHtml } from '../data/noteHtml'
+import { renderReviewCard } from '../data/reviewCard'
+import { shareErrorMessage, shareFileEx, shareTargetName } from '../data/share'
 import { NOTE_COLORS, NOTE_PAPERS, normalizeNotePaper } from '../constants/noteColors'
 import { parseInviteText } from '../data/parseInvite'
 import {
   createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listTargets,
   recordScheduleResult, setReminder, setReviewTags, setScheduleReview, updateSchedule,
 } from '../data/store'
-import { requestNotificationPermission, scheduleReminder, cancelReminder, pendingNotificationIds, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
+import { requestNotificationPermission, scheduleReminder, cancelReminder, pendingNotificationIds, reviewNudgeEnabled, scheduleReviewNudge, cancelReviewNudge, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS, eventStatus, isEventFinished, scheduleTimeError } from '../types/schedule'
 import { isTerminalStage, TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
@@ -39,6 +42,29 @@ const targetOptions = computed(() => listTargets().map((t) => ({
 })))
 
 const viewMode = ref<'agenda' | 'month' | 'review'>('agenda')
+const router = useRouter()
+
+// ── 全局搜索：目标 / 日程 / 心得一框搜完，找东西不用回忆它在哪个 tab ──
+const searchOpen = ref(false)
+const searchKw = ref('')
+const searchResults = computed(() => {
+  const kw = searchKw.value.trim().toLowerCase()
+  if (!kw) return { targets: [], schedules: [], reviews: [] }
+  const targets = listTargets()
+    .filter((t) => `${t.name} ${t.targetRole ?? ''} ${t.location ?? ''} ${t.notes ?? ''}`.toLowerCase().includes(kw))
+    .slice(0, 5)
+  const schedules = listSchedules()
+    .filter((e) => `${e.title} ${e.notes ?? ''}`.toLowerCase().includes(kw))
+    .slice(0, 6)
+  const reviews = listReviews()
+    .filter((e) => `${planName(e)} ${noteSnippet(e)}`.toLowerCase().includes(kw))
+    .slice(0, 6)
+  return { targets, schedules, reviews }
+})
+const searchEmpty = computed(() => searchKw.value.trim() &&
+  !searchResults.value.targets.length && !searchResults.value.schedules.length && !searchResults.value.reviews.length)
+function openSearch() { searchKw.value = ''; searchOpen.value = true }
+function searchGoTargets() { searchOpen.value = false; router.push('/targets') }
 
 // ── 提醒排入状态：把「ROM 有没有偷偷吃掉通知」摆到用户眼前，而不是藏在设置页 ──
 const armedIds = ref<Set<number> | null>(null)
@@ -280,6 +306,35 @@ const reviewTypeCounts = computed(() => TYPES.map((type) => ({
   count: reviewedEvents.value.filter((ev) => ev.eventType === type).length,
 })).filter((item) => item.count > 0))
 
+// ── 标签聚合：复盘从「记录」升维成「能看趋势」——挂点都记在哪些标签上，一眼见底 ──
+const reviewTagStats = computed(() => {
+  const counts = new Map<string, number>()
+  for (const ev of reviewedEvents.value) {
+    for (const t of ev.reviewTags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1)
+  }
+  const top = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8)
+  const max = top[0]?.[1] ?? 1
+  return top.map(([tag, count]) => ({ tag, count, pct: Math.round((count / max) * 100) }))
+})
+
+// ── 求职季报告：给用户一个「总结时刻」——投了多少、走到哪、卡在哪，数据全是现成的 ──
+const reportOpen = ref(false)
+const seasonReport = computed(() => {
+  const targets = listTargets()
+  const stageOf = (t: ReturnType<typeof listTargets>[number]) => normalizeTargetStage(t.stage)
+  const offered = targets.filter((t) => stageOf(t) === 'offer').length
+  const failed = targets.filter((t) => ['screened_out', 'rejected', 'closed'].includes(stageOf(t))).length
+  const active = targets.filter((t) => t.status === 'active' && !isTerminalStage(stageOf(t))).length
+  const interviews = finishedEvents.value.filter((e) => e.eventType === 'interview' || e.eventType === 'exam').length
+  const topTag = reviewTagStats.value[0]
+  const insight = topTag
+    ? `心得里最常出现的是「${topTag.tag}」，下轮复习从它开始。`
+    : '多写几篇心得并打上标签，就能看到自己的挂点分布。'
+  return { active, offered, failed, interviews, coverage: reviewCoverage.value, insight }
+})
+
 /**
  * 便签按月份分组。reviewNotes 已是时间倒序，所以顺序扫一遍即可连续成组。
  * 一屏几十张便签时纯平铺会失去节奏，月份标题是唯一能让人「找回位置」的视觉锚点。
@@ -438,6 +493,8 @@ function closeNote() {
   setReviewTags(ev.id, draftTags.value)
   noteTarget.value = null
   if (text && reviewPlainText(prev).trim() !== text) toast('心得已保存')
+  // 心得写完了，「该写复盘了」的提醒就没有存在的理由，立刻撤掉。
+  if (text) cancelReviewNudge(ev.id)
   // 写完心得正是用户对「这场打得到底怎样」记忆最新鲜的时刻，顺手把目标状态也对齐。
   if (text) void maybeAskOutcome(ev)
 }
@@ -472,8 +529,40 @@ function skipOutcome() {
   if (ev) updateSchedule(ev.id, { outcomePrompted: true })
   outcomeAsk.value = null
 }
-async function clearNote() {
+/** 把当前纸面上的心得生成分享长图：发给导师/朋友求指点，纯本地渲染零网络。 */
+const cardBusy = ref(false)
+async function shareReviewCard() {
+  if (!noteTarget.value || cardBusy.value) return
   const ev = noteTarget.value
+  cardBusy.value = true
+  try {
+    // 分享的是纸面上此刻的内容：改了还没关笔记本也能把新版分享出去。
+    const text = reviewPlainText(sanitizeReviewHtml(noteEditorEl.value?.innerHTML ?? '')).trim()
+    if (!text) { toast('先写点内容再分享'); return }
+    const blob = await renderReviewCard({
+      company: companyName(ev),
+      typeLabel: SCHEDULE_EVENT_TYPE_LABELS[ev.eventType],
+      dateLabel: nbDate(ev),
+      text,
+      tags: ev.reviewTags ?? [],
+    })
+    if (!blob) { toast('生成图片失败'); return }
+    const outcome = await shareFileEx({
+      fileName: `zhida-review-${ev.id}.png`,
+      blob,
+      subject: '面试复盘',
+      dialogTitle: '分享复盘',
+    })
+    if (outcome.status === 'cancelled') { toast('已取消分享'); return }
+    if (outcome.status === 'downloaded') { toast('长图已下载到本机'); return }
+    const label = shareTargetName(outcome.target)
+    toast(label ? `长图已交给${label}` : '长图已交给所选应用')
+  } catch (err) {
+    toast(shareErrorMessage(err))
+  } finally { cardBusy.value = false }
+}
+
+async function clearNote() {  const ev = noteTarget.value
   if (!ev) return
   const prevHtml = ev.review ?? ''
   const prevTags = ev.reviewTags ?? []
@@ -492,6 +581,7 @@ async function clearNote() {
   })
   if (!ok) return
   setScheduleReview(ev.id, '', null)
+  cancelReviewNudge(ev.id)
   setReviewTags(ev.id, [])
   const el = noteEditorEl.value
   if (el) el.innerHTML = ''
@@ -666,6 +756,11 @@ async function submit() {
     // toast 只有一个槽位，提醒失败必须并进最后一句，否则会被「日程已创建」盖掉。
     if (outcome !== 'scheduled') reminderNote = ` · ${REMINDER_OUTCOME_MESSAGES[outcome]}`
   } else { cancelReminder(id) }
+  // 提醒链最后一环：面后 2 小时推一把「该写复盘了」；写完心得、删日程时都会撤掉。
+  if ((payload.eventType === 'exam' || payload.eventType === 'interview') && reviewNudgeEnabled()) {
+    const ev = listSchedules().find((e) => e.id === id)
+    if (ev) await scheduleReviewNudge(ev)
+  }
   sheetOpen.value = false
   toast(`${editing.value ? '日程已更新' : '日程已创建'}${reminderNote}`)
   void refreshArmed()
@@ -681,6 +776,7 @@ async function remove() {
   })
   if (!ok) return
   cancelReminder(ev.id)
+  cancelReviewNudge(ev.id)
   deleteSchedule(ev.id)
   sheetOpen.value = false
   if (noteTarget.value?.id === ev.id) noteTarget.value = null
@@ -714,6 +810,9 @@ async function syncToCalendar() {
         <span class="schedule-clock">{{ nowClock }}</span>
       </div>
       <div class="head-actions">
+        <button class="icon-btn" aria-label="全局搜索" @click="openSearch">
+          <AppIcon name="search" :size="19" />
+        </button>
         <button class="icon-btn" :class="{ on: viewMode === 'month' }" :aria-label="viewMode === 'month' ? '返回日程列表' : '打开月历'" @click="showView('month')">
           <AppIcon name="calendar" :size="19" />
         </button>
@@ -891,6 +990,36 @@ async function syncToCalendar() {
             <span class="rs-num"><strong>{{ r.count }}</strong><small>{{ r.pct }}%</small></span>
             <small class="rs-label">{{ r.label }}</small>
           </button>
+        </div>
+        <!-- 高频标签：复盘从记录升维成趋势——挂点都记在哪，一眼见底；点一根即按标签筛墙 -->
+        <div v-if="statsOpen && reviewTagStats.length" class="rs-tagbars">
+          <button
+            v-for="s in reviewTagStats" :key="s.tag"
+            class="rs-tagbar" :class="{ on: reviewTagFilter === s.tag }"
+            :aria-label="`${s.tag} ${s.count} 篇`"
+            @click="reviewTagFilter = reviewTagFilter === s.tag ? null : s.tag"
+          >
+            <span class="rt-name">{{ s.tag }}</span>
+            <span class="rt-track"><i :style="{ width: `${s.pct}%` }" /></span>
+            <span class="rt-num">{{ s.count }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 求职季报告：投了多少、走到哪、卡在哪——给用户一个总结时刻 -->
+      <section v-if="finishedEvents.length || listTargets().length" class="review-stats workspace-card" aria-label="求职季报告">
+        <button class="rs-toggle" :aria-expanded="reportOpen" @click="reportOpen = !reportOpen">
+          <span class="schedule-eyebrow">求职季报告</span>
+          <span class="rs-hint">{{ seasonReport.active }} 个进行中 · {{ seasonReport.offered }} 个 Offer</span>
+          <AppIcon name="chevronDown" :size="16" class="rs-chev" :class="{ flip: reportOpen }" />
+        </button>
+        <div v-if="reportOpen" class="report-grid">
+          <div class="metric-card pastel-mint"><strong>{{ seasonReport.active }}</strong><small>进行中</small></div>
+          <div class="metric-card pastel-yellow"><strong>{{ seasonReport.interviews }}</strong><small>笔试/面试</small></div>
+          <div class="metric-card pastel-pink"><strong>{{ seasonReport.coverage }}%</strong><small>复盘覆盖</small></div>
+          <div class="metric-card pastel-lilac"><strong>{{ seasonReport.offered }}</strong><small>已拿 Offer</small></div>
+          <div class="metric-card pastel-mint"><strong>{{ seasonReport.failed }}</strong><small>未通过/放弃</small></div>
+          <p class="report-insight">{{ seasonReport.insight }}</p>
         </div>
       </section>
 
@@ -1168,6 +1297,7 @@ async function syncToCalendar() {
 
           <div class="ne-actions">
             <button v-if="reviewPlainText(noteTarget.review ?? '').trim()" class="btn-danger" @click="clearNote"><AppIcon name="trash" :size="16" /> 清空</button>
+            <button class="btn-ghost" :disabled="cardBusy" @click="shareReviewCard"><AppIcon name="share" :size="16" /> {{ cardBusy ? '生成中…' : '分享图' }}</button>
             <button class="btn-primary" @click="closeNote">完成</button>
           </div>
         </article>
@@ -1244,6 +1374,36 @@ async function syncToCalendar() {
       <div class="sheet-actions">
         <button class="btn-ghost" @click="pasteOpen = false">取消</button>
         <button class="btn-primary" @click="applyPaste">解析并预填</button>
+      </div>
+    </Sheet>
+
+    <!-- 全局搜索：目标 / 日程 / 心得一框搜完，结果直接跳到能动手的地方 -->
+    <Sheet v-if="searchOpen" title="全局搜索" @close="searchOpen = false">
+      <input v-model="searchKw" class="paste-input" placeholder="搜目标、日程、心得…" />
+      <div class="search-results">
+        <template v-if="searchResults.targets.length">
+          <p class="search-group">求职目标</p>
+          <button v-for="t in searchResults.targets" :key="`t${t.id}`" class="search-row" @click="searchGoTargets">
+            <strong>{{ t.name }}</strong>
+            <small>{{ TARGET_STAGE_LABELS[normalizeTargetStage(t.stage)] }}<template v-if="t.targetRole"> · {{ t.targetRole }}</template></small>
+          </button>
+        </template>
+        <template v-if="searchResults.schedules.length">
+          <p class="search-group">日程</p>
+          <button v-for="ev in searchResults.schedules" :key="`s${ev.id}`" class="search-row" @click="searchOpen = false; openEdit(ev)">
+            <strong>{{ planName(ev) }} · {{ ev.title }}</strong>
+            <small>{{ fullWhen(ev.startTime) }}</small>
+          </button>
+        </template>
+        <template v-if="searchResults.reviews.length">
+          <p class="search-group">心得</p>
+          <button v-for="ev in searchResults.reviews" :key="`r${ev.id}`" class="search-row" @click="searchOpen = false; openNote(ev)">
+            <strong>{{ planName(ev) }} · {{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}</strong>
+            <small>{{ headEllipsis(noteSnippet(ev), 40) }}</small>
+          </button>
+        </template>
+        <p v-if="searchEmpty" class="pb-quote muted">没有匹配的目标、日程或心得。</p>
+        <p v-else-if="!searchKw.trim()" class="pb-quote muted">输入关键词，找回任何一条记录。</p>
       </div>
     </Sheet>
   </div>
