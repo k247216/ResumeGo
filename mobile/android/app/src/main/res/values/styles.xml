@@ -17,7 +17,13 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <!-- 模板给的 splash.png 是 480x320 位图，会被拉伸到任意屏幕比例且仍是 Capacitor 默认图；纯色底不留模板痕迹 -->
+        <!-- 按库的标准属性配置：白底 + 居中卡通简历（复用 ic_launcher_fg，
+             底色跟随 @color/ic_launcher_background，改图标配色时启动屏自动跟着变），
+             并由 postSplashScreenTheme 在首帧后切回应用主题。
+             android:background 保留为兜底，值与 windowSplashScreenBackground 一致。 -->
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_fg</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:background">@color/ic_launcher_background</item>
     </style>
 </resources>

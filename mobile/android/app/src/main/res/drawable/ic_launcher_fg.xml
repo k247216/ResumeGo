@@ -1,16 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 「职达」拼音首字母 Z：一条等粗圆头折线，笔画 18dp。
-         关键点距画布中心最远 26.2dp，
-         加上 9dp 圆头端半径仍 < 36dp，故 72dp 正圆遮罩削不到任何一笔。
-         只描边不填充，主题图标（monochrome）取同一层，剪影与彩色版必然同源。 -->
-    <path
-        android:pathData="M35,36 L73,36 L35,72 L73,72"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="18"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+
+    <!-- 「卡通简历」：一张微倾的纸坐在白底上，靠描边和淡薄荷纸色与背景分层。
+         纸面自上而下 = 笑脸（卡通人格）+ 两行正文线（简历内容），
+         右下压一枚绿色对勾徽章（投递完成 / 拿到结果），右上星星、左上粉点点缀。
+
+         配色全部来自 App 设计系统：
+         - 描边/徽章 --brand #168B68
+         - 纸面      --pastel-mint 的更浅一档 #E9F6F0
+         - 正文线    --brand-soft 系 #93CDB6
+         - 星星      --pastel-yellow #F6E5AD，圆点 --pastel-pink #F5D7E6
+
+         adaptive icon 比例按可见区算（中心 72dp 即 18..90，安全区 21..87）。
+         所有元素都收在距中心 35.5dp 以内，圆形/圆角/方圆各种遮罩都不裁切：
+         - 纸张 36..72 × 30..80，旋转 -4° 后最远角约 33dp；
+         - 对勾徽章 (70,72.5) r10：最远点 34.8dp，故意压过纸张右缘制造轮廓缺口，
+           monochrome 剪影因此是「卡片 + 徽章 + 星星」而不是一块方块；
+         - 星星 (77.5,33) 外接 35dp、粉点 (29,33) 外接 34.8dp，均与纸张描边留出缝隙。
+         monochrome 复用本层（只取 alpha），剪影完整可辨。 -->
+    <group
+        android:rotation="-4"
+        android:pivotX="54"
+        android:pivotY="54">
+
+        <path
+            android:pathData="M42,30 h24 a6,6 0 0 1 6,6 v38 a6,6 0 0 1 -6,6 h-24 a6,6 0 0 1 -6,-6 v-38 a6,6 0 0 1 6,-6 z"
+            android:fillColor="#E9F6F0"
+            android:strokeColor="#168B68"
+            android:strokeWidth="4" />
+
+        <path
+            android:pathData="M46.5,46.5 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0"
+            android:fillColor="#168B68" />
+        <path
+            android:pathData="M61.5,46.5 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0"
+            android:fillColor="#168B68" />
+        <path
+            android:pathData="M46,53.5 Q54,60.5 62,53.5"
+            android:strokeColor="#168B68"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000" />
+
+        <path
+            android:pathData="M41,66 H67"
+            android:strokeColor="#93CDB6"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000" />
+        <path
+            android:pathData="M41,73 H56"
+            android:strokeColor="#93CDB6"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000" />
+
+        <path
+            android:pathData="M70,72.5 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0"
+            android:fillColor="#168B68" />
+        <path
+            android:pathData="M65.5,72.7 l3.4,3.6 l6.6,-7.6"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3.4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
+        <path
+            android:pathData="M77.5,29.5 L78.44,32.06 L81,33 L78.44,33.94 L77.5,36.5 L76.56,33.94 L74,33 L76.56,32.06 z"
+            android:fillColor="#F6E5AD" />
+        <path
+            android:pathData="M29,33 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0"
+            android:fillColor="#F5D7E6" />
+    </group>
 </vector>
