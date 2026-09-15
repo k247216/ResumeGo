@@ -33,3 +33,8 @@ outputs/
 /.playwright-cli/
 /agent-bridge/
 /design-qa.md
+
+# 本地调试输出（测试/构建命令的重定向残留，不入库）
+mobile/test_out*.txt
+mobile/build_out*.txt
+mobile/*.log
