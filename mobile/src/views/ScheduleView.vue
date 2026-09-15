@@ -12,12 +12,12 @@ import { ensureReviewHtml, sanitizeReviewHtml, reviewPlainText, compressImageToD
 import { NOTE_COLORS, NOTE_PAPERS, normalizeNotePaper } from '../constants/noteColors'
 import {
   createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listTargets,
-  setReminder, setReviewTags, setScheduleReview, updateSchedule,
+  recordScheduleResult, setReminder, setReviewTags, setScheduleReview, updateSchedule,
 } from '../data/store'
-import { requestNotificationPermission, scheduleReminder, cancelReminder, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
+import { requestNotificationPermission, scheduleReminder, cancelReminder, pendingNotificationIds, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS, eventStatus, isEventFinished, scheduleTimeError } from '../types/schedule'
-import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import { isTerminalStage, TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
 import { eventsOnDate, timelineDates } from '../data/timeline'
 import { addToDeviceCalendar } from '../data/calendar'
 import type { CalendarHandoff } from '../data/calendar'
@@ -38,6 +38,20 @@ const targetOptions = computed(() => listTargets().map((t) => ({
 })))
 
 const viewMode = ref<'agenda' | 'month' | 'review'>('agenda')
+
+// ── 提醒排入状态：把「ROM 有没有偷偷吃掉通知」摆到用户眼前，而不是藏在设置页 ──
+const armedIds = ref<Set<number> | null>(null)
+void refreshArmed()
+async function refreshArmed() {
+  armedIds.value = await pendingNotificationIds()
+}
+/** '' = 不显示（没设提醒 / 无法核实 / 已开始）；'ok' 已排入；'miss' 未排入——就是 ROM 吃通知的证据。 */
+function armStateOf(ev: ScheduleEvent): '' | 'ok' | 'miss' {
+  if (getReminder(ev.id) <= 0) return ''
+  if (!armedIds.value) return ''
+  if (eventStatus(ev, now.value) !== 'upcoming') return ''
+  return armedIds.value.has(ev.id) ? 'ok' : 'miss'
+}
 const now0 = new Date()
 const monthCursor = ref({ y: now0.getFullYear(), m: now0.getMonth() })
 const selectedDay = ref(new Date().toDateString())
@@ -377,6 +391,39 @@ function closeNote() {
   setReviewTags(ev.id, draftTags.value)
   noteTarget.value = null
   if (text && reviewPlainText(prev).trim() !== text) toast('心得已保存')
+  // 写完心得正是用户对「这场打得到底怎样」记忆最新鲜的时刻，顺手把目标状态也对齐。
+  if (text) void maybeAskOutcome(ev)
+}
+
+// ── 复盘联动推进：过了推进阶段/轮次，挂了标记结果——别让看板停在「过去填的样子」 ──
+const outcomeAsk = ref<ScheduleEvent | null>(null)
+async function maybeAskOutcome(ev: ScheduleEvent) {
+  if (ev.outcomePrompted) return
+  if (eventStatus(ev, now.value) !== 'finished') return
+  // 只问笔试和面试：跟进电话、其他事项谈不上「过/挂」，硬问反而烦人。
+  if (ev.eventType !== 'exam' && ev.eventType !== 'interview') return
+  const t = ev.jobProjectId == null ? null : listTargets().find((x) => x.id === ev.jobProjectId)
+  if (!t || isTerminalStage(normalizeTargetStage(t.stage))) return
+  // 等 toast 落定再弹，避免两个浮层打架
+  await new Promise((r) => setTimeout(r, 650))
+  if (!noteTarget.value && !outcomeAsk.value) outcomeAsk.value = ev
+}
+function askOutcome(passed: boolean) {
+  const ev = outcomeAsk.value
+  if (!ev) return
+  // 无论选哪边都记「问过」：跳过的用户不想被反复追问，状态可去目标页手动调。
+  updateSchedule(ev.id, { outcomePrompted: true })
+  outcomeAsk.value = null
+  const res = recordScheduleResult(ev.id, passed)
+  if (!res.ok) { toast(res.message ?? '状态未更新'); return }
+  if (!passed) { toast('已记录「未通过」，目标状态已锁定'); return }
+  if (res.round) { toast(`本轮通过，进入第 ${res.round} 面`); return }
+  if (res.stage) { toast(`已推进到「${TARGET_STAGE_LABELS[res.stage]}」`) }
+}
+function skipOutcome() {
+  const ev = outcomeAsk.value
+  if (ev) updateSchedule(ev.id, { outcomePrompted: true })
+  outcomeAsk.value = null
 }
 async function clearNote() {
   const ev = noteTarget.value
@@ -574,6 +621,7 @@ async function submit() {
   } else { cancelReminder(id) }
   sheetOpen.value = false
   toast(`${editing.value ? '日程已更新' : '日程已创建'}${reminderNote}`)
+  void refreshArmed()
 }
 async function remove() {
   if (!editing.value) return
@@ -648,7 +696,7 @@ async function syncToCalendar() {
           </button>
           <div class="schedule-focus-meta">
             <div><small>距离开始</small><strong>{{ countdownLabel(nextEvent) }}</strong></div>
-            <div><small>提醒</small><strong>{{ getReminder(nextEvent.id) > 0 ? `提前 ${getReminder(nextEvent.id)} 分钟` : '未设置' }}</strong></div>
+            <div><small>提醒</small><strong>{{ getReminder(nextEvent.id) > 0 ? `提前 ${getReminder(nextEvent.id)} 分钟` : '未设置' }}<em v-if="armStateOf(nextEvent) === 'ok'" class="arm-tag ok">已排入</em><em v-else-if="armStateOf(nextEvent) === 'miss'" class="arm-tag miss">未排入</em></strong></div>
           </div>
         </template>
         <div v-else class="schedule-focus-empty">
@@ -707,6 +755,9 @@ async function syncToCalendar() {
                 <strong>{{ companyName(ev) }}<template v-if="statusOf(ev)"><i class="live-badge"><span class="live-dot" />进行中</i></template></strong>
                 <small>{{ SCHEDULE_EVENT_TYPE_LABELS[ev.eventType] }}<template v-if="roleName(ev) !== SCHEDULE_EVENT_TYPE_LABELS[ev.eventType]"> · {{ roleName(ev) }}</template></small>
                 <small class="plan-when">{{ fullWhen(ev.startTime) }}<template v-if="ev.notes"> · {{ ev.notes }}</template></small>
+                <small v-if="armStateOf(ev)" class="r-arm" :class="armStateOf(ev)">
+                  <i class="r-arm-dot" aria-hidden="true" />{{ armStateOf(ev) === 'ok' ? '提醒已排入系统' : '提醒未排入' }}
+                </small>
               </span>
               <AppIcon name="chevronRight" :size="18" class="plan-chev" />
             </button>
@@ -1096,5 +1147,24 @@ async function syncToCalendar() {
         <input ref="imageInputEl" type="file" accept="image/*" class="ne-file" @change="onPickImage">
       </div>
     </Transition>
+
+    <!-- 复盘联动推进：写完心得顺手问一句结果，目标状态跟着长准，不用用户再去目标页手动改 -->
+    <Sheet v-if="outcomeAsk" title="这场的结果是？" @close="skipOutcome">
+      <p class="oc-lead">
+        {{ companyName(outcomeAsk) }} · {{ SCHEDULE_EVENT_TYPE_LABELS[outcomeAsk.eventType] }}已结束。
+        对齐一下目标状态，看板和漏斗才会反映真实进度。
+      </p>
+      <div class="oc-actions">
+        <button class="oc-btn oc-pass" @click="askOutcome(true)">
+          <strong>过了</strong>
+          <small>推进到下一环</small>
+        </button>
+        <button class="oc-btn oc-fail" @click="askOutcome(false)">
+          <strong>挂了</strong>
+          <small>标记结果并锁定</small>
+        </button>
+      </div>
+      <button class="btn-ghost oc-skip" @click="skipOutcome">先不定，之后在目标页里调</button>
+    </Sheet>
   </div>
 </template>

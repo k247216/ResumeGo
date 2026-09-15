@@ -4,6 +4,7 @@ import {
   interviewRoundOf, interviewRoundsOf, listResumes, listReviews, listReviewTags, listSchedules, listTargets, reopenTarget, resetWorkspace, restoreTarget,
   setInterviewRound, setInterviewRounds,
   setReminder, setReviewTags, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateSchedule, linkResume,
+  recordScheduleResult,
 } from './store'
 
 describe('求职目标阶段规则', () => {
@@ -309,6 +310,79 @@ describe('便签底色', () => {
     expect(listSchedules().find((item) => item.id === a.id)?.reviewColor).toBeNull()
     setScheduleReview(a.id, '<p>xyz</p>', 'javascript:alert(1)')
     expect(listSchedules().find((item) => item.id === a.id)?.reviewColor).toBeNull()
+  })
+})
+
+describe('复盘联动推进', () => {
+  it('面试通过且还有下一面：只推进轮次，不进下一阶段', () => {
+    const t = createTarget('轮次推进测试')
+    setStage(t.id, 'interview')
+    setInterviewRounds(t.id, 3)
+    const ev = scheduleOf('轮次推进测试 一面', '2026-03-01T02:00:00.000Z', t.id)
+
+    const res = recordScheduleResult(ev.id, true)
+
+    expect(res.ok).toBe(true)
+    expect(res.stage).toBe('interview')
+    expect(res.round).toBe(2)
+    expect(interviewRoundOf(t)).toBe(2)
+    expect(t.stage).toBe('interview')
+  })
+
+  it('最后一面通过：推进到 HR 面', () => {
+    const t = createTarget('终面推进测试')
+    setStage(t.id, 'interview')
+    setInterviewRounds(t.id, 2)
+    setInterviewRound(t.id, 2)
+    const ev = scheduleOf('终面推进测试 二面', '2026-03-02T02:00:00.000Z', t.id)
+
+    const res = recordScheduleResult(ev.id, true)
+
+    expect(res.ok).toBe(true)
+    expect(res.stage).toBe('hr')
+    expect(t.stage).toBe('hr')
+  })
+
+  it('笔试通过会把落后的状态追平：目标还在投递中也要直接进面试', () => {
+    const t = createTarget('状态追平测试')
+    const ev = scheduleOf('状态追平测试 笔试', '2026-03-03T02:00:00.000Z', t.id)
+    updateSchedule(ev.id, { eventType: 'exam' })
+
+    const res = recordScheduleResult(ev.id, true)
+
+    expect(res.ok).toBe(true)
+    expect(res.stage).toBe('interview')
+    expect(t.stage).toBe('interview')
+  })
+
+  it('挂了：按日程类型标记结果并进入终态锁定', () => {
+    const t = createTarget('挂科标记测试')
+    setInterviewRounds(t.id, 3)
+    setStage(t.id, 'interview')
+    const ev = scheduleOf('挂科标记测试 二面', '2026-03-04T02:00:00.000Z', t.id)
+
+    const res = recordScheduleResult(ev.id, false)
+
+    expect(res.ok).toBe(true)
+    expect(t.stage).toBe('screened_out')
+    expect(t.outcome).toBe('interview_failed')
+    expect(t.outcomeRound).toBe(1)
+    // 终态锁定：之后任何阶段改动都被拒
+    expect(setStage(t.id, 'offer').ok).toBe(false)
+  })
+
+  it('未关联目标的日程如实拒绝，不悄悄吞掉', () => {
+    const ev = scheduleOf('无主日程', '2026-03-05T02:00:00.000Z')
+    const res = recordScheduleResult(ev.id, true)
+    expect(res.ok).toBe(false)
+    expect(res.message).toContain('未关联')
+  })
+
+  it('问询标记一旦写入就持久，旧数据缺省视为没问过', () => {
+    const ev = scheduleOf('问询标记', '2026-03-06T02:00:00.000Z')
+    expect(listSchedules().find((item) => item.id === ev.id)?.outcomePrompted).toBe(false)
+    updateSchedule(ev.id, { outcomePrompted: true })
+    expect(listSchedules().find((item) => item.id === ev.id)?.outcomePrompted).toBe(true)
   })
 })
 

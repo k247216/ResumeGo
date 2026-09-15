@@ -106,6 +106,19 @@ export async function pendingNotificationCount(): Promise<number | null> {
   } catch { return null }
 }
 
+/**
+ * 系统当前挂着的待触发通知 id 集合——通知 id 就是日程 id，
+ * 所以能精确回答「这一场的提醒还在不在系统里」。
+ * 浏览器环境无法核实，返回 null，调用方相应隐藏状态戳而不是乱报。
+ */
+export async function pendingNotificationIds(): Promise<Set<number> | null> {
+  if (!Capacitor.isNativePlatform()) return null
+  try {
+    const res = await LocalNotifications.getPending()
+    return new Set(res.notifications.map((n) => n.id))
+  } catch { return null }
+}
+
 function fireWebNotification(title: string, body: string) {
   try {
     if ('Notification' in window && Notification.permission === 'granted') {

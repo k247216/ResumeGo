@@ -15,6 +15,8 @@ export interface ScheduleEvent {
   reviewColor?: string | null
   /** 编辑器的纸张风格（plain 白 / cream 米 / kraft 牛皮），与便签色无关。 */
   reviewPaper?: string | null
+  /** 「这场的结果是？」问过即 true，之后不再打扰；用户当时跳过也算问过，可去目标页手动推进。 */
+  outcomePrompted?: boolean | null
   jobDescriptionId: number | null
   jobProjectId: number | null
   createdAt: string

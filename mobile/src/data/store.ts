@@ -1,7 +1,7 @@
 import { reactive, watch } from 'vue'
 import type { JobProject, StageEvent, TargetOutcome, TargetStage } from '../types/project'
 import { isTerminalStage, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
-import type { ScheduleEvent } from '../types/schedule'
+import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
 import { resumeMarkOf, type ResumeMarkName } from './resumeMark'
 import { normalizeNoteColor, normalizeNotePaper } from '../constants/noteColors'
@@ -192,6 +192,8 @@ function hydrate(db: DbShape) {
     schedule.reviewColor = normalizeNoteColor(schedule.reviewColor)
     // 纸张风格同理：白名单外的值（含旧数据缺省）一律归成白纸。
     schedule.reviewPaper = normalizeNotePaper(schedule.reviewPaper)
+    // 问询标记只做布尔归一，旧数据缺省视为没问过。
+    schedule.outcomePrompted = !!schedule.outcomePrompted
   }
   for (const resume of db.resumes) {
     resume.mark = resume.mark ?? resumeMarkOf(resume.id)
@@ -362,6 +364,45 @@ export function setTargetOutcome(id: number, outcome: TargetOutcome | null, roun
   t.updatedAt = iso(new Date())
   return { ok: true }
 }
+/**
+ * 复盘联动：把「这场的结果」落回目标的状态机。
+ * 过了 → 推进阶段；面试轮次内通过只推进轮次；日程类型给出的「保底环位」比当前阶段更靠后时按它推进
+ * （用户忘了更新状态，笔试都面完了目标还挂在投递中，就靠这一步追平）。
+ * 挂了 → 按日程类型标记结果（exam→笔试未通过、interview→第 N 面未通过），进入终态锁定。
+ * 复用 setStage/setTargetOutcome，阶段事件与锁定规则不用第二份实现。
+ */
+export function recordScheduleResult(scheduleId: number, passed: boolean): { ok: boolean; message?: string; stage?: TargetStage; round?: number } {
+  const e = db.schedules.find((x) => x.id === scheduleId)
+  if (!e) return { ok: false, message: '日程不存在' }
+  const t = e.jobProjectId == null ? undefined : db.targets.find((x) => x.id === e.jobProjectId)
+  if (!t) return { ok: false, message: '该日程未关联求职目标' }
+  if (!passed) {
+    const outcome: TargetOutcome = e.eventType === 'exam' ? 'exam_failed' : 'interview_failed'
+    const res = setTargetOutcome(t.id, outcome, interviewRoundOf(t))
+    return res.ok ? { ok: true, stage: normalizeTargetStage(t.stage) } : res
+  }
+  const cur = normalizeTargetStage(t.stage)
+  if (isTerminalStage(cur)) return { ok: false, message: '该计划已有最终结果，状态已锁定' }
+  const flow: TargetStage[] = ['applied', 'exam', 'interview', 'hr', 'offer']
+  // 面试轮次内通过：只推进轮次，不进下一阶段（还有下一面要打）
+  if (cur === 'interview' && e.eventType === 'interview') {
+    const rounds = interviewRoundsOf(t)
+    const round = interviewRoundOf(t)
+    if (round < rounds) {
+      const res = setInterviewRound(t.id, round + 1)
+      return res.ok ? { ok: true, stage: 'interview', round: round + 1 } : res
+    }
+  }
+  const idx = flow.indexOf(cur)
+  let next = idx >= 0 && idx < flow.length - 1 ? flow[idx + 1] : null
+  // 这场日程类型本身的下一环是推进的保底位：笔试过了至少进面试，面试过了至少进 HR 面。
+  const typeFloor: Partial<Record<ScheduleEventType, TargetStage>> = { exam: 'interview', interview: 'hr' }
+  const floor = typeFloor[e.eventType]
+  if (floor && (next === null || stageFlowRank(floor) > stageFlowRank(next))) next = floor
+  if (!next || stageFlowRank(next) <= stageFlowRank(cur)) return { ok: true, stage: cur }
+  const res = setStage(t.id, next)
+  return res.ok ? { ok: true, stage: next } : res
+}
 export function stageEventsOf(id: number): StageEvent[] {
   return db.stageEvents.filter((e) => e.targetId === id).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
 }
@@ -377,7 +418,7 @@ export function listSchedules(): ScheduleEvent[] {
 }
 export function createSchedule(req: Omit<ScheduleEvent, 'id' | 'createdAt' | 'updatedAt'>): ScheduleEvent {
   const now = iso(new Date())
-  const event: ScheduleEvent = { ...req, id: nextId(), createdAt: now, updatedAt: now }
+  const event: ScheduleEvent = { ...req, id: nextId(), outcomePrompted: false, createdAt: now, updatedAt: now }
   db.schedules.push(event)
   return event
 }
