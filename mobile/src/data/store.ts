@@ -583,6 +583,37 @@ export interface RestoreSummary {
   reminders: number
 }
 export function exportBackup(): string { return JSON.stringify(db, null, 2) }
+
+/** 恢复前的内容预览：先把备份里有什么念给用户听，再让用户决定覆不覆盖本机。 */
+export function backupSummaryOf(json: string): { ok: boolean; message?: string; targets: number; schedules: number; resumes: number; reminders: number; reviews: number } {
+  let parsed: unknown
+  try { parsed = JSON.parse(json) } catch { return { ok: false, message: '文件不是有效的 JSON，无法作为备份恢复', targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0 } }
+  const raw = parsed as Partial<DbShape>
+  if (!Array.isArray(raw?.targets) || !Array.isArray(raw?.schedules)) {
+    return { ok: false, message: '备份格式不正确（缺少目标/日程清单）', targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0 }
+  }
+  const reviews = (raw.schedules as Array<{ review?: unknown }>).filter((s) => typeof s.review === 'string' && s.review.trim()).length
+  return {
+    ok: true,
+    targets: raw.targets.length,
+    schedules: raw.schedules.length,
+    resumes: Array.isArray(raw.resumes) ? raw.resumes.length : 0,
+    reminders: raw.reminders && typeof raw.reminders === 'object' ? Object.keys(raw.reminders).length : 0,
+    reviews,
+  }
+}
+
+const BACKUP_KEY = 'zhida-last-backup-at'
+/** 备份时刻记在本机（不进库）：它描述的是「这台设备多久没落地一份备份」，跟着库走反而失真。 */
+export function markBackupNow() { storage.set(BACKUP_KEY, new Date().toISOString()) }
+/** 距上次成功备份的天数；从未备份过返回 null，让 UI 说「从未备份」而不是编一个 0。 */
+export function lastBackupAgeDays(): number | null {
+  const raw = storage.get(BACKUP_KEY)
+  if (!raw) return null
+  const t = new Date(raw).getTime()
+  if (!Number.isFinite(t)) return null
+  return Math.floor((Date.now() - t) / 86_400_000)
+}
 export function importBackup(json: string): { ok: boolean; message?: string; restored?: RestoreSummary } {
   let parsed: unknown
   try { parsed = JSON.parse(json) } catch { return { ok: false, message: '解析备份失败' } }

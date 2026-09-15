@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  createSchedule, createTarget, currentVersionOf, deleteResume, deleteSchedule, deleteTarget, flushPersist, getReminder, getResume, importBackup, importResume,
-  interviewRoundOf, interviewRoundsOf, listResumes, listReviews, listReviewTags, listSchedules, listTargets, reopenTarget, resetWorkspace, restoreTarget,
+  backupSummaryOf, createSchedule, createTarget, currentVersionOf, deleteResume, deleteSchedule, deleteTarget, exportBackup, flushPersist, getReminder, getResume, importBackup, importResume,
+  interviewRoundOf, interviewRoundsOf, lastBackupAgeDays, listResumes, listReviews, listReviewTags, listSchedules, listTargets, markBackupNow, reopenTarget, resetWorkspace, restoreTarget,
   setInterviewRound, setInterviewRounds,
   setReminder, setReviewTags, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateSchedule, linkResume,
   recordScheduleResult,
@@ -383,6 +383,36 @@ describe('复盘联动推进', () => {
     expect(listSchedules().find((item) => item.id === ev.id)?.outcomePrompted).toBe(false)
     updateSchedule(ev.id, { outcomePrompted: true })
     expect(listSchedules().find((item) => item.id === ev.id)?.outcomePrompted).toBe(true)
+  })
+})
+
+describe('备份内容预览与备份时间', () => {
+  it('backupSummaryOf 念出备份里有什么：目标/日程/心得/简历/提醒各自计数', () => {
+    const t = createTarget('预览计数目标')
+    const ev = scheduleOf('预览计数日程', '2026-03-07T02:00:00.000Z', t.id)
+    setScheduleReview(ev.id, '写一篇心得用于计数')
+    setReminder(ev.id, 30)
+    const json = exportBackup()
+
+    const summary = backupSummaryOf(json)
+
+    expect(summary.ok).toBe(true)
+    expect(summary.targets).toBe(listTargets().length)
+    expect(summary.schedules).toBe(listSchedules().length)
+    expect(summary.reviews).toBeGreaterThanOrEqual(1)
+    expect(summary.reminders).toBeGreaterThanOrEqual(1)
+  })
+
+  it('坏 JSON 与缺关键清单的文件如实拒绝，不给出误导性计数', () => {
+    expect(backupSummaryOf('不是JSON').ok).toBe(false)
+    expect(backupSummaryOf('{"foo":1}').ok).toBe(false)
+  })
+
+  it('备份时间：从未备份返回 null，标记后按天计数', () => {
+    resetWorkspace()
+    expect(lastBackupAgeDays()).toBeNull()
+    markBackupNow()
+    expect(lastBackupAgeDays()).toBe(0)
   })
 })
 

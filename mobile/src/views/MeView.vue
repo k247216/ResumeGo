@@ -6,8 +6,8 @@ import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { shareErrorMessage, shareFileEx, shareTargetName } from '../data/share'
 import {
-  exportBackup, hasQuarantinedData, importBackup, listResumes, listSchedules, listTargets,
-  resetWorkspace, storageFaultMessage,
+  backupSummaryOf, exportBackup, hasQuarantinedData, importBackup, lastBackupAgeDays, listResumes, listSchedules, listTargets,
+  markBackupNow, resetWorkspace, storageFaultMessage,
 } from '../data/store'
 import { getTheme, setTheme, THEME_OPTIONS, type Theme } from '../data/theme'
 import { armAllReminders, collectReminderDiagnostics, type ReminderDiagnostics, type ReminderReport } from '../data/reminders'
@@ -23,6 +23,17 @@ const resumeCount = computed(() => listResumes().length)
 const scheduleCount = computed(() => listSchedules().length)
 const faultMessage = ref<string | null>(storageFaultMessage())
 const quarantined = ref(hasQuarantinedData())
+
+// ── 数据保全：把「多久没备份」摆出来，别让用户在换机那天才第一次想起备份 ──
+const backupAge = ref<number | null | undefined>(undefined) // undefined = 还没读
+function refreshBackupAge() { backupAge.value = lastBackupAgeDays() }
+const backupAgeLabel = computed(() => {
+  if (backupAge.value === undefined) return ''
+  if (backupAge.value === null) return '从未备份'
+  if (backupAge.value === 0) return '今天刚备份'
+  return `${backupAge.value} 天前`
+})
+const backupStale = computed(() => backupAge.value === null || (typeof backupAge.value === 'number' && backupAge.value > 14))
 
 const diag = ref<ReminderDiagnostics | null>(null)
 const diagBusy = ref(false)
@@ -61,7 +72,10 @@ async function refreshDiagnostics() {
   faultMessage.value = storageFaultMessage()
   quarantined.value = hasQuarantinedData()
 }
-onMounted(refreshDiagnostics)
+onMounted(() => {
+  refreshDiagnostics()
+  refreshBackupAge()
+})
 
 /** 一条都没进系统时必须说清原因，否则「0 条已排入」会被读成恢复失败或恢复成功。 */
 function reminderReportLine(report: ReminderReport): string {
@@ -126,8 +140,9 @@ async function onExport() {
       dialogTitle: '导出备份',
     })
     // 三种落点必须各说各的：只报「已交给某应用」会让取消和浏览器下载都变成静默。
-    if (outcome.status === 'downloaded') { toast('备份已下载到本机 · 不含简历文件本体'); return }
+    if (outcome.status === 'downloaded') { markBackupNow(); refreshBackupAge(); toast('备份已下载到本机 · 不含简历文件本体'); return }
     if (outcome.status === 'cancelled') { toast('已取消导出'); return }
+    markBackupNow(); refreshBackupAge()
     const label = shareTargetName(outcome.target)
     toast(label ? `备份已交给${label} · 不含简历文件本体` : '备份已交给所选应用 · 不含简历文件本体')
   } catch (err) {
@@ -144,9 +159,12 @@ async function onImportFile(e: Event) {
   if (!file) return
   const text = await file.text()
   input.value = ''
+  // 恢复前先把备份里有什么念出来：「将恢复 X 个目标」比一句泛泛的「覆盖当前数据」值得信。
+  const summary = backupSummaryOf(text)
+  if (!summary.ok) { toast(summary.message ?? '备份无法识别'); return }
   const ok = await confirmAction({
     title: '用这份备份覆盖当前数据？',
-    message: '本机现有的求职目标、日程和简历记录会被替换，此操作不可撤销。建议先导出一次备份。',
+    message: `将恢复 ${summary.targets} 个目标 · ${summary.schedules} 条日程（含 ${summary.reviews} 篇心得） · ${summary.resumes} 份简历 · ${summary.reminders} 条提醒。本机现有记录会被整体替换，此操作不可撤销。建议先导出一次备份。`,
     confirmLabel: '覆盖恢复',
     danger: true,
   })
@@ -156,11 +174,11 @@ async function onImportFile(e: Event) {
   await cancelAllReminders()
   const res = importBackup(text)
   if (!res.ok) { toast(res.message ?? '恢复失败'); return }
-  const summary = res.restored
   // 恢复出来的提醒意图不会自动进系统，必须立刻重排，否则换机后一路静默。
   const report = await armAllReminders()
   await refreshDiagnostics()
-  toast(summary
+  refreshBackupAge()
+  toast(summary.ok
     ? `已恢复 ${summary.targets} 个目标 · ${summary.schedules} 条日程 · ${summary.resumes} 份简历 · ${reminderReportLine(report) || '无需重排提醒'}`
     : '记录已恢复')
 }
@@ -254,6 +272,14 @@ async function onReset() {
 
     <p class="section-kicker">数据</p>
     <div class="list">
+      <div class="setting-row diag-row">
+        <span class="sr-ic"><AppIcon name="download" :size="18" /></span>
+        <span class="s-label">上次备份</span>
+        <span class="s-value">
+          {{ backupAgeLabel }}
+          <i v-if="backupStale" class="diag-flag">建议备份</i>
+        </span>
+      </div>
       <button class="setting-row hint-row" :disabled="exporting" @click="onExport">
         <span class="sr-ic"><AppIcon name="download" :size="18" /></span>
         <span class="s-label">{{ exporting ? '正在生成备份…' : '导出备份' }}</span>

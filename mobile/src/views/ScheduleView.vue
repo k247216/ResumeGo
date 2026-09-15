@@ -10,6 +10,7 @@ import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { ensureReviewHtml, sanitizeReviewHtml, reviewPlainText, compressImageToDataUrl, escapeHtml } from '../data/noteHtml'
 import { NOTE_COLORS, NOTE_PAPERS, normalizeNotePaper } from '../constants/noteColors'
+import { parseInviteText } from '../data/parseInvite'
 import {
   createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listTargets,
   recordScheduleResult, setReminder, setReviewTags, setScheduleReview, updateSchedule,
@@ -52,6 +53,52 @@ function armStateOf(ev: ScheduleEvent): '' | 'ok' | 'miss' {
   if (eventStatus(ev, now.value) !== 'upcoming') return ''
   return armedIds.value.has(ev.id) ? 'ok' : 'miss'
 }
+
+// ── 粘贴式快速录入：把通知原文整段粘进来，核心动作的成本砍掉一半 ──
+const pasteOpen = ref(false)
+const pasteText = ref('')
+function openPaste() { pasteText.value = ''; pasteOpen.value = true }
+function applyPaste() {
+  const text = pasteText.value.trim()
+  if (!text) { toast('先粘贴通知原文'); return }
+  const r = parseInviteText(text, new Date(), listTargets().map((t) => t.name))
+  const target = r.company ? listTargets().find((t) => t.name === r.company) : null
+  const titleBits = [r.company ?? '', r.roundLabel ?? SCHEDULE_EVENT_TYPE_LABELS[r.eventType]].filter(Boolean)
+  form.value = {
+    title: titleBits.join(' ') || '新日程',
+    eventType: r.eventType,
+    // 时间认不出就先给明天同一时刻：用户必经表单核对，不会把错误时间存进去。
+    start: r.startTime ? toLocalInput(r.startTime) : toLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()),
+    end: '', notes: text, reminder: 30,
+    jobProjectId: target?.id ?? null,
+  }
+  pasteOpen.value = false
+  editing.value = null
+  sheetOpen.value = true
+  if (!r.dateKnown) toast('日期没认出来，先按「明天」预填，请核对')
+  else if (!r.timeKnown) toast('具体时间没认出来，暂按上午 10 点，请核对')
+  else if (!r.company) toast('已识别时间和类型，公司名请确认')
+}
+
+// ── 战前速览：面试前 24 小时，把这家公司的历史复盘推到眼前——复盘的价值在下一场之前 ──
+const PRE_BATTLE_WINDOW = 24 * 3600_000
+const preBattle = computed(() => {
+  const ev = nextEvent.value
+  if (!ev) return null
+  if (ev.eventType !== 'exam' && ev.eventType !== 'interview') return null
+  const diff = new Date(ev.startTime).getTime() - now.value
+  if (diff > PRE_BATTLE_WINDOW || diff < -60 * 60_000) return null
+  if (ev.jobProjectId == null) return null
+  const past = listSchedules()
+    .filter((x) => x.jobProjectId === ev.jobProjectId && x.id !== ev.id
+      && isEventFinished(x, now.value) && !!x.review?.trim())
+    .sort((a, b) => b.startTime.localeCompare(a.startTime))
+  const last = past[0] ?? null
+  const tagCount = new Map<string, number>()
+  for (const p of past) for (const t of p.reviewTags ?? []) tagCount.set(t, (tagCount.get(t) ?? 0) + 1)
+  const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => t)
+  return { ev, last, tags }
+})
 const now0 = new Date()
 const monthCursor = ref({ y: now0.getFullYear(), m: now0.getMonth() })
 const selectedDay = ref(new Date().toDateString())
@@ -709,6 +756,23 @@ async function syncToCalendar() {
         </div>
       </section>
 
+      <!-- 战前速览：24 小时内开考/开面时，把这家公司的历史复盘推回眼前——上场被问了什么，这轮别再栽一次 -->
+      <section v-if="preBattle" class="pre-battle workspace-card" aria-label="战前速览">
+        <div class="pb-head">
+          <span class="schedule-eyebrow">战前速览 · 24 小时内</span>
+          <AppIcon name="book" :size="15" />
+        </div>
+        <strong class="pb-title">{{ companyName(preBattle.ev) }} · {{ SCHEDULE_EVENT_TYPE_LABELS[preBattle.ev.eventType] }}</strong>
+        <template v-if="preBattle.last">
+          <p class="pb-quote">「{{ headEllipsis(reviewPlainText(preBattle.last.review ?? ''), 72) }}」</p>
+          <div v-if="preBattle.tags.length" class="pb-tags">
+            <span v-for="t in preBattle.tags" :key="t" class="tag-chip">{{ t }}</span>
+          </div>
+          <button class="pb-open" @click="openNote(preBattle.last)">回看那篇心得 <AppIcon name="chevronRight" :size="14" /></button>
+        </template>
+        <p v-else class="pb-quote muted">这家你还没写过心得。面完回来补一篇，下一场就有了。</p>
+      </section>
+
       <section class="timeline-block schedule-month workspace-card" aria-labelledby="timeline-title">
         <div class="section-head">
           <div>
@@ -745,7 +809,10 @@ async function syncToCalendar() {
       <section class="plan-block schedule-list workspace-card" aria-labelledby="plan-title">
         <div class="section-head">
           <h2 id="plan-title">面试计划</h2>
-          <button class="inline-action add-action" @click="openCreate"><AppIcon name="plus" :size="15" /> 添加日程</button>
+          <span class="head-actions-gap">
+            <button class="inline-action add-action" @click="openPaste"><AppIcon name="edit" :size="15" /> 粘贴录入</button>
+            <button class="inline-action add-action" @click="openCreate"><AppIcon name="plus" :size="15" /> 添加日程</button>
+          </span>
         </div>
         <div v-if="planEvents.length" class="plan-list">
           <div v-for="(ev, i) in planEvents" :key="ev.id" class="plan-row" :style="{ '--i': Math.min(i, 8) }">
@@ -1165,6 +1232,19 @@ async function syncToCalendar() {
         </button>
       </div>
       <button class="btn-ghost oc-skip" @click="skipOutcome">先不定，之后在目标页里调</button>
+    </Sheet>
+
+    <!-- 粘贴录入：面试通知原文一粘，公司/时间/类型先填好九成，剩下一成在表单里确认 -->
+    <Sheet v-if="pasteOpen" title="粘贴通知，自动填日程" @close="pasteOpen = false">
+      <p class="oc-lead">把面试 / 笔试通知的原文整段粘进来——公司、日期、时间、轮次能认的都替你填好，提交前在表单里核对一遍。</p>
+      <textarea
+        v-model="pasteText" class="paste-input" rows="6"
+        placeholder="例如：【腾讯】邀请您参加后端开发工程师岗位的一面。时间：9月18日（周五）下午2:30…"
+      ></textarea>
+      <div class="sheet-actions">
+        <button class="btn-ghost" @click="pasteOpen = false">取消</button>
+        <button class="btn-primary" @click="applyPaste">解析并预填</button>
+      </div>
     </Sheet>
   </div>
 </template>
