@@ -196,8 +196,47 @@ const savedRange = ref<Range | null>(null)
 const savedText = ref('')
 /** 链接输入条：null = 收起；空串 = 展开待输入。 */
 const linkDraft = ref<string | null>(null)
-/** 抽屉（标签 + 提示语 + 清空/分享图）：默认收起，让正文纸面吃满屏幕；把手条一点向上展开。 */
-const drawerOpen = ref(false)
+/** 抽屉（标签 + 提示语 + 清空/分享图）：无痕化交互。0~1 的展开比例由细线抓握驱动——
+ *  拖动时比例实时跟手（关过渡），松手按阈值吸附全开/全关；轻点细线等于切换。 */
+const drawerRatio = ref(0)
+const drawerMax = ref(0)
+const drawerDragging = ref(false)
+const drawerInnerEl = ref<HTMLElement | null>(null)
+const drawerHeight = computed(() => `${(drawerRatio.value * drawerMax.value).toFixed(1)}px`)
+function measureDrawer() {
+  const el = drawerInnerEl.value
+  if (!el) return
+  // 内容特别多时给个上限，超出部分在抽屉内滚动，别让抽屉吃掉整张纸
+  drawerMax.value = Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.55))
+}
+function setDrawer(open: boolean) {
+  measureDrawer()
+  drawerRatio.value = open ? 1 : 0
+}
+let gripStartY = 0
+let gripStartRatio = 0
+let gripMoved = false
+function onGripDown(e: PointerEvent) {
+  measureDrawer()
+  gripStartY = e.clientY
+  gripStartRatio = drawerRatio.value
+  gripMoved = false
+  drawerDragging.value = true
+  try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch { /* 合成事件/已释放时照常工作 */ }
+}
+function onGripMove(e: PointerEvent) {
+  if (!drawerDragging.value) return
+  const dy = gripStartY - e.clientY
+  if (Math.abs(dy) > 4) gripMoved = true
+  drawerRatio.value = Math.min(1, Math.max(0, gripStartRatio + dy / Math.max(drawerMax.value, 1)))
+}
+function onGripUp(e: PointerEvent) {
+  if (!drawerDragging.value) return
+  drawerDragging.value = false
+  try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* 已释放 */ }
+  if (!gripMoved) { setDrawer(drawerRatio.value <= 0.5); return }
+  drawerRatio.value = drawerRatio.value > 0.3 ? 1 : 0
+}
 
 /** 纸张风格 → 纸面底色：白/米/牛皮是三种「本子」，与外面的便签色互不相干。 */
 const PAPER_BG: Record<string, string> = {
@@ -390,7 +429,7 @@ function openNote(ev: ScheduleEvent) {
   savedRange.value = null
   savedText.value = ''
   linkDraft.value = null
-  drawerOpen.value = false
+  drawerRatio.value = 0
   noteOverLimit.value = false
   // 编辑器节点要等下一拍才挂上（Transition 分支渲染），先填内容再统计字数
   nextTick(() => {
@@ -1271,10 +1310,13 @@ async function syncToCalendar() {
             <small class="nb-count" :class="{ over: noteOverLimit }">{{ noteTextLen }}/{{ NOTE_MAX_TEXT }}</small>
           </div>
 
-          <!-- 抽屉：标签 + 提示语 + 清空/分享图，默认收起。把手条贴在纸面下方，一点向上拉开——
-               平时正文纸面吃满整屏，写完要归类时再拉开，像拉开写字台抽屉。 -->
-          <div class="ne-drawer" :class="{ open: drawerOpen }">
-            <div class="ne-drawer-inner">
+          <!-- 抽屉：标签 + 提示语 + 清空/分享图，默认收起。由下方那根细线驱动：
+               轻点开合，按住上下拖则跟手展开（拖动时关掉过渡，松手按阈值吸附）。 -->
+          <div class="ne-drawer" :class="{ dragging: drawerDragging }" :style="{ height: drawerHeight }">
+            <div ref="drawerInnerEl" class="ne-drawer-inner">
+              <button class="ne-drawer-collapse" aria-label="收起标签与操作" @click="setDrawer(false)">
+                <AppIcon name="chevronDown" :size="16" />
+              </button>
               <div class="review-tags">
                 <div class="review-tags-head">
                   <span class="review-tags-title">标签</span>
@@ -1318,12 +1360,14 @@ async function syncToCalendar() {
               </div>
             </div>
           </div>
-          <!-- 把手条：抽屉沿。显示当前标签数，开合都点它 -->
-          <button class="ne-handle" :aria-expanded="drawerOpen" @click="drawerOpen = !drawerOpen">
-            <AppIcon name="chevronDown" :size="14" class="ne-handle-chev" :class="{ flip: drawerOpen }" />
-            <span>{{ drawerOpen ? '收起标签与操作' : '标签与操作' }}</span>
-            <small v-if="draftTags.length">{{ draftTags.length }} 个标签</small>
-          </button>
+          <!-- 无痕抓握线：一根细线，不像按钮——向上拖功能全部跟手带出来，向下拖或点右上角轻钮收起 -->
+          <div
+            class="ne-grip" role="button" tabindex="0"
+            :aria-expanded="drawerRatio > 0.5" aria-label="标签与操作"
+            @pointerdown="onGripDown" @pointermove="onGripMove"
+            @pointerup="onGripUp" @pointercancel="onGripUp"
+            @keydown.enter.prevent="setDrawer(drawerRatio <= 0.5)"
+          ><i class="ne-grip-line" aria-hidden="true" /></div>
         </article>
 
         <!-- 插链接：不用弹窗，就在工具栏上方输入，确认后按记住的选区原位插入 -->

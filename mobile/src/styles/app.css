@@ -1530,12 +1530,13 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
   color: var(--ink); font-size: 13.5px; line-height: 1.62; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .note-foot {
-  display: flex; align-items: center; gap: 7px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px 7px;
   margin-top: auto; padding-top: 8px;
   border-top: 1px dashed color-mix(in srgb, var(--note-c) 30%, var(--line));
   color: var(--muted); font-size: var(--fs-nano); font-variant-numeric: tabular-nums;
 }
-.note-foot time { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 日期完整显示：放不下折行，不省略号截字——「9月15日 周二 1…」没有信息量 */
+.note-foot time { flex: 1 1 auto; min-width: 0; white-space: normal; line-height: 1.4; }
 .note-len { flex: 0 0 auto; color: var(--text-disabled); }
 .note-foot svg { flex: 0 0 auto; color: var(--text-disabled); }
 @media (max-width: 340px) { .note-wall { grid-template-columns: minmax(0, 1fr); } }
@@ -1552,7 +1553,7 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 
 /* 心得标签：像手机上那样一排可点可加的胶囊 */
 .review-tags { display: grid; gap: 8px; margin: 0; }
-.review-tags-head { display: flex; align-items: baseline; gap: 8px; }
+.review-tags-head { display: flex; align-items: baseline; gap: 8px; padding-right: 34px; }
 .review-tags-title { font-size: 13px; font-weight: 700; color: var(--ink); }
 .review-tags-hint { color: var(--muted); font-size: var(--fs-micro); }
 .tag-list { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
@@ -1807,33 +1808,40 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
   background: none; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer;
 }
 .ne-swatch-auto.on { color: var(--ink); border-color: var(--line-strong); }
-/* 抽屉：标签 + 提示语 + 清空/分享图。0fr→1fr 的高度过渡，展开时把纸面向上让位 */
+/* 抽屉：标签 + 提示语 + 清空/分享图。高度由 grip 拖拽/轻点驱动（0~内容高），
+   拖动中加 .dragging 关掉过渡实现跟手，松手吸附时过渡回来 */
 .ne-drawer {
   flex: 0 0 auto;
-  display: grid; grid-template-rows: 0fr;
-  transition: grid-template-rows .26s var(--ease-out);
+  overflow: hidden; height: 0;
+  transition: height .28s var(--ease-out);
 }
-.ne-drawer.open { grid-template-rows: 1fr; }
+.ne-drawer.dragging { transition: none; }
 .ne-drawer-inner {
-  overflow: hidden; min-height: 0;
+  position: relative;
   display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
 }
-.ne-drawer.open .ne-drawer-inner { padding-bottom: 2px; }
 .ne-drawer-actions { display: flex; gap: var(--space-3); }
 .ne-drawer-actions > * { flex: 1; }
-/* 把手条：抽屉沿。虚线胶囊居中，标签数用品牌绿点出来 */
-.ne-handle {
-  flex: 0 0 auto;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 12px;
-  border: 1px dashed var(--line); border-radius: 999px;
-  background: var(--surface-subtle);
-  color: var(--muted); font: inherit; font-size: 12px; cursor: pointer;
+/* 展开时右上角的轻量收起钮：无框、muted 色，只在抽屉内浮着 */
+.ne-drawer-collapse {
+  position: absolute; top: -2px; right: 0;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border: none; border-radius: 50%;
+  background: none; color: var(--muted); cursor: pointer;
 }
-.ne-handle span { font-weight: 600; }
-.ne-handle small { color: var(--brand); font-weight: 700; }
-.ne-handle-chev { transition: transform .26s var(--ease-out); }
-.ne-handle-chev.flip { transform: rotate(180deg); }
+.ne-drawer-collapse:active { color: var(--ink); background: var(--surface-subtle); }
+/* 无痕抓握线：一根 44×4 的细线，不像按钮。上拖功能全部跟手带出，下拖/轻点/右上角轻钮收起 */
+.ne-grip {
+  flex: 0 0 auto;
+  display: flex; justify-content: center; align-items: center;
+  width: 100%; padding: 7px 0 3px;
+  border: none; background: none; cursor: pointer;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.ne-grip-line { width: 44px; height: 4px; border-radius: 2px; background: var(--line-strong); transition: background .2s; }
+.ne-grip:active .ne-grip-line { background: var(--ink); }
 /* 完成钮：工具栏最右，主色常驻——写完随时能走，不用先拉开抽屉 */
 .ne-done {
   flex: 0 0 auto; margin-left: auto;
@@ -1915,10 +1923,11 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 /* ── 复盘统计环 ── */
 .review-stats { padding: 0; overflow: hidden; }
 .rs-toggle {
-  display: flex; align-items: center; gap: 8px; width: 100%;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; width: 100%;
   padding: 12px 14px; background: transparent; border: 0; cursor: pointer;
 }
-.rs-hint { flex: 1; text-align: right; font-size: var(--fs-caption); color: var(--muted); }
+/* hint 整块不可拆不收缩：放得下就靠右，放不下整块掉到下一行——绝不逐字竖排挤压汉字 */
+.rs-hint { flex: 0 0 auto; margin-left: auto; text-align: right; font-size: var(--fs-caption); color: var(--muted); white-space: nowrap; }
 .rs-chev { color: var(--muted); transition: transform .25s var(--ease-out); }
 .rs-chev.flip { transform: rotate(180deg); }
 .rs-rings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 4px 14px 14px; }
