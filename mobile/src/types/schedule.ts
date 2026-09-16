@@ -116,12 +116,6 @@ export interface DisplayCalendarEvent {
   sourceName?: string
 }
 
-export interface ApiResponse<T> {
-  success: boolean
-  data: T
-  message: string | null
-}
-
 export const SCHEDULE_EVENT_TYPE_LABELS: Record<ScheduleEventType, string> = {
   interview: '面试',
   exam: '笔试',

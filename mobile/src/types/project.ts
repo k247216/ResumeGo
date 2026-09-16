@@ -127,9 +127,3 @@ export interface StageEvent {
   stage: TargetStage
   occurredAt: string
 }
-
-export interface ApiResponse<T> {
-  success: boolean
-  data: T
-  message?: string
-}
