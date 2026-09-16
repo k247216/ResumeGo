@@ -15,9 +15,10 @@ import { shareErrorMessage, shareFileEx, shareTargetName } from '../data/share'
 import { NOTE_COLORS, NOTE_PAPERS, normalizeNotePaper } from '../constants/noteColors'
 import { parseInviteText } from '../data/parseInvite'
 import {
-  createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listTargets,
+  createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listStageEvents, listTargets,
   recordScheduleResult, setReminder, setReviewTags, setScheduleReview, updateSchedule,
 } from '../data/store'
+import { stagePaceLine, stagePaceSummary } from '../data/stagePace'
 import { requestNotificationPermission, scheduleReminder, cancelReminder, pendingNotificationIds, reviewNudgeEnabled, scheduleReviewNudge, cancelReviewNudge, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS, eventStatus, isEventFinished, scheduleTimeError } from '../types/schedule'
@@ -384,7 +385,9 @@ const seasonReport = computed(() => {
   const insight = topTag
     ? `心得里最常出现的是「${topTag.tag}」，下轮复习从它开始。`
     : '多写几篇心得并打上标签，就能看到自己的挂点分布。'
-  return { active, offered, failed, interviews, coverage: reviewCoverage.value, insight }
+  // 节奏维度：数量之外还有时间——「卡在哪」没有天数就没有体感。
+  const pace = stagePaceLine(stagePaceSummary(listStageEvents(), listTargets(), now.value))
+  return { total: targets.length, active, offered, failed, interviews, coverage: reviewCoverage.value, insight, pace }
 })
 
 /**
@@ -1067,12 +1070,14 @@ async function syncToCalendar() {
           <AppIcon name="chevronDown" :size="16" class="rs-chev" :class="{ flip: reportOpen }" />
         </button>
         <div v-if="reportOpen" class="report-grid">
+          <div class="metric-card pastel-lilac"><strong>{{ seasonReport.total }}</strong><small>投递总数</small></div>
           <div class="metric-card pastel-mint"><strong>{{ seasonReport.active }}</strong><small>进行中</small></div>
           <div class="metric-card pastel-yellow"><strong>{{ seasonReport.interviews }}</strong><small>笔试/面试</small></div>
           <div class="metric-card pastel-pink"><strong>{{ seasonReport.coverage }}%</strong><small>复盘覆盖</small></div>
-          <div class="metric-card pastel-lilac"><strong>{{ seasonReport.offered }}</strong><small>已拿 Offer</small></div>
-          <div class="metric-card pastel-mint"><strong>{{ seasonReport.failed }}</strong><small>未通过/放弃</small></div>
+          <div class="metric-card pastel-mint"><strong>{{ seasonReport.offered }}</strong><small>已拿 Offer</small></div>
+          <div class="metric-card pastel-yellow"><strong>{{ seasonReport.failed }}</strong><small>未通过/放弃</small></div>
           <p class="report-insight">{{ seasonReport.insight }}</p>
+          <p v-if="seasonReport.pace" class="report-insight">{{ seasonReport.pace }}</p>
         </div>
       </section>
 

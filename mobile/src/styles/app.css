@@ -1892,7 +1892,9 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .pb-tags .tag-chip { font-size: 11px; }
 .pb-open { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: var(--brand); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 /* 高频标签聚合条：点一根即按标签筛墙，与统计环共用开合 */
-.rs-tagbars { display: grid; gap: 7px; margin-top: 14px; }
+/* 侧/底内边距必须 ≥ 圆角侵入区：父级 .review-stats 是 overflow:hidden 的 22px 圆角，
+   内容贴边就会被削字——这里 14px 与 .rs-rings 同一口径，保住最后一行汉字的完整 */
+.rs-tagbars { display: grid; gap: 7px; margin-top: 14px; padding: 0 14px 14px; }
 .rs-tagbar { display: grid; grid-template-columns: minmax(88px, auto) 1fr 34px; align-items: center; gap: 10px; padding: 0; border: none; background: none; font: inherit; cursor: pointer; text-align: left; }
 /* 标签名不省略号截断：最多两行折行——「反问质量高」这类六字标签是常态，截成「反问质…」没有信息量 */
 .rs-tagbar .rt-name { font-size: 12.5px; line-height: 1.35; color: var(--copy); white-space: normal; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1902,11 +1904,12 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .rs-tagbar.on .rt-name { color: var(--brand); font-weight: 800; }
 .rs-tagbar.on .rt-track i { background: color-mix(in srgb, var(--brand) 55%, var(--ink)); }
 /* 求职季报告：复用 metric-card，网格三列；字级与「我的」页指标卡同一套口径 */
-.report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: 14px; }
+.report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: 14px; padding: 0 14px 14px; }
 .report-grid .metric-card { display: grid; gap: 4px; align-content: start; min-width: 0; padding: 12px 11px; }
-.report-grid .metric-card strong { font-size: 21px; font-weight: 750; line-height: 1; letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.report-grid .metric-card small { font-size: 10.5px; font-weight: 500; line-height: 1.35; color: var(--muted); white-space: normal; }
-.report-insight { grid-column: 1 / -1; margin: 4px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+.report-grid .metric-card strong { font-size: 21px; font-weight: 750; line-height: 1.05; letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.report-grid .metric-card small { font-size: 11.5px; font-weight: 500; line-height: 1.4; color: var(--muted); white-space: normal; }
+/* 一句话洞察：浅色底衬成引用条，和便签墙的纸面质感同语言；字号提到 13px 保证可读性 */
+.report-insight { grid-column: 1 / -1; margin: 2px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-subtle); font-size: 13px; line-height: 1.75; color: var(--copy); }
 /* 全局搜索结果：分组行，点了就走 */
 .search-results { display: grid; gap: 4px; margin-top: var(--space-3); }
 .search-group { margin: 8px 0 2px; font-size: 11px; color: var(--muted); letter-spacing: .06em; }

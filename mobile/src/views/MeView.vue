@@ -9,6 +9,7 @@ import {
   backupSummaryOf, exportBackup, hasQuarantinedData, importBackup, lastBackupAgeDays, listResumes, listSchedules, listTargets,
   markBackupNow, resetWorkspace, storageFaultMessage,
 } from '../data/store'
+import { autoBackupStatus, type AutoBackupStatus } from '../data/autoBackup'
 import { getTheme, setTheme, THEME_OPTIONS, type Theme } from '../data/theme'
 import { armAllReminders, armReviewNudges, collectReminderDiagnostics, type ReminderDiagnostics, type ReminderReport } from '../data/reminders'
 import { cancelAllReminders, previewReminder, REMINDER_OUTCOME_MESSAGES, requestExactAlarmPermission, requestNotificationPermission, reviewNudgeEnabled, setReviewNudgeEnabled } from '../data/notifications'
@@ -34,6 +35,20 @@ const backupAgeLabel = computed(() => {
   return `${backupAge.value} 天前`
 })
 const backupStale = computed(() => backupAge.value === null || (typeof backupAge.value === 'number' && backupAge.value > 14))
+
+// ── 冷启动自动备份的状态展示：不标记「上次备份」（那个指标只认用户手动导出），
+//    否则自动备份会掩盖「换机前必须手动导出」这个真相。 ──
+const autoBackup = ref<AutoBackupStatus | null>(null)
+function refreshAutoBackup() { autoBackup.value = autoBackupStatus() }
+const autoBackupLabel = computed(() => {
+  const s = autoBackup.value
+  if (!s) return ''
+  if (s.error) return '未成功'
+  if (!s.at) return '等待首次启动'
+  const days = Math.floor((Date.now() - new Date(s.at).getTime()) / 86_400_000)
+  const when = days <= 0 ? '今天' : `${days} 天前`
+  return s.kept != null ? `${when} · 保留 ${s.kept} 份` : when
+})
 
 const diag = ref<ReminderDiagnostics | null>(null)
 const diagBusy = ref(false)
@@ -84,6 +99,7 @@ async function refreshDiagnostics() {
 onMounted(() => {
   refreshDiagnostics()
   refreshBackupAge()
+  refreshAutoBackup()
 })
 
 /** 一条都没进系统时必须说清原因，否则「0 条已排入」会被读成恢复失败或恢复成功。 */
@@ -295,6 +311,14 @@ async function onReset() {
           <i v-if="backupStale" class="diag-flag">建议备份</i>
         </span>
       </div>
+      <div v-if="autoBackup" class="setting-row diag-row">
+        <span class="sr-ic"><AppIcon name="download" :size="18" /></span>
+        <span class="s-label">自动备份</span>
+        <span class="s-value">
+          {{ autoBackupLabel }}
+          <i v-if="autoBackup.error" class="diag-flag">写入失败</i>
+        </span>
+      </div>
       <button class="setting-row hint-row" :disabled="exporting" @click="onExport">
         <span class="sr-ic"><AppIcon name="download" :size="18" /></span>
         <span class="s-label">{{ exporting ? '正在生成备份…' : '导出备份' }}</span>
@@ -314,7 +338,7 @@ async function onReset() {
     </div>
 
     <div class="about">
-      <p class="about-note">备份只含文本记录，简历 PDF/MD 文件本体需在新设备重新导入。</p>
+      <p class="about-note">冷启动会把整库 JSON 自动备份到 App 外部目录（每天一份、保留 7 份），防的是本机存储损坏；卸载或清除数据会连同清空，换机前请务必用「导出备份」把 JSON 存到你选的位置。备份只含文本记录，简历 PDF/MD 文件本体需在新设备重新导入。</p>
     </div>
 
     <Sheet v-if="themeOpen" title="选择主题" @close="themeOpen = false">
