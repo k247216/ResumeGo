@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import CompanyMark from '../components/CompanyMark.vue'
@@ -215,11 +215,21 @@ const drawerMax = ref(0)
 const drawerDragging = ref(false)
 const drawerInnerEl = ref<HTMLElement | null>(null)
 const drawerHeight = computed(() => `${(drawerRatio.value * drawerMax.value).toFixed(1)}px`)
+function visibleViewportHeight(): number {
+  // 键盘弹出时 visualViewport 会缩小——抽屉的上限跟着它走，而不是跟「布局视口」走
+  return typeof visualViewport !== 'undefined' ? visualViewport!.height : window.innerHeight
+}
 function measureDrawer() {
   const el = drawerInnerEl.value
   if (!el) return
   // 内容特别多时给个上限，超出部分在抽屉内滚动，别让抽屉吃掉整张纸
-  drawerMax.value = Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.55))
+  drawerMax.value = Math.min(el.scrollHeight, Math.round(visibleViewportHeight() * 0.45))
+}
+/** 键盘弹出/收起：视口一变就重测，抽屉永远只长在可见区域里。 */
+function onViewportResize() { if (drawerRatio.value > 0) measureDrawer() }
+if (typeof visualViewport !== 'undefined') {
+  visualViewport!.addEventListener('resize', onViewportResize)
+  onBeforeUnmount(() => visualViewport!.removeEventListener('resize', onViewportResize))
 }
 function setDrawer(open: boolean) {
   measureDrawer()
@@ -263,6 +273,8 @@ const visibleDraftTags = computed(() =>
   selectedExpanded.value ? draftTags.value : draftTags.value.slice(0, TAG_SELECTED_PREVIEW),
 )
 const hiddenSelectedCount = computed(() => Math.max(0, draftTags.value.length - TAG_SELECTED_PREVIEW))
+/** 标签「展开/收起」会改变内容高度：不重测就会发生「点了展开却被抽屉裁住」的假卡死。 */
+watch([tagsExpanded, selectedExpanded, () => draftTags.value.length, () => draftPaper.value], () => nextTick(measureDrawer))
 
 /** 心得墙卡片底色：没选便签色时跟随日程类型色（编辑器纸面由 reviewPaper 管，与此无关）。 */
 function noteColorOf(ev: ScheduleEvent): string {
@@ -1043,9 +1055,9 @@ async function syncToCalendar() {
         </div>
       </section>
 
-      <!-- 统计环：默认收起，点开看各类型占比；点环即按该类型筛选心得墙 -->
-      <section v-if="finishedEvents.length" class="review-stats workspace-card" aria-label="心得统计">
-        <button class="rs-toggle" :aria-expanded="statsOpen" @click="statsOpen = !statsOpen">
+      <!-- 统计与报告合并为一张卡：两个可折叠区，不再互相抢视觉焦点 -->
+      <section v-if="finishedEvents.length || listTargets().length" class="review-stats workspace-card" aria-label="统计与报告">
+        <button v-if="finishedEvents.length" class="rs-toggle" :aria-expanded="statsOpen" @click="statsOpen = !statsOpen">
           <span class="schedule-eyebrow">心得统计</span>
           <span class="rs-hint">{{ reviewedEvents.length }} 篇 · {{ reviewFilter === 'all' ? '全部类型' : SCHEDULE_EVENT_TYPE_LABELS[reviewFilter] }}</span>
           <AppIcon name="chevronDown" :size="16" class="rs-chev" :class="{ flip: statsOpen }" />
@@ -1079,10 +1091,7 @@ async function syncToCalendar() {
             <span class="rt-num">{{ s.count }}</span>
           </button>
         </div>
-      </section>
-
-      <!-- 求职季报告：投了多少、走到哪、卡在哪——给用户一个总结时刻 -->
-      <section v-if="finishedEvents.length || listTargets().length" class="review-stats workspace-card" aria-label="求职季报告">
+        <div v-if="finishedEvents.length" class="rs-divider" aria-hidden="true" />
         <button class="rs-toggle" :aria-expanded="reportOpen" @click="reportOpen = !reportOpen">
           <span class="schedule-eyebrow">求职季报告</span>
           <span class="rs-hint">{{ seasonReport.active }} 个进行中 · {{ seasonReport.offered }} 个 Offer</span>

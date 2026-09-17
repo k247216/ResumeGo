@@ -8,7 +8,7 @@ import PickerField from '../components/PickerField.vue'
 import ResumeMark from '../components/ResumeMark.vue'
 import Sheet from '../components/Sheet.vue'
 import {
-  createInterviewLog, currentVersionOf, deleteInterviewLog, deleteResume, importResume, listInterviewLogs, listResumes, listTargets, updateInterviewLog, versionsOf,
+  createInterviewLog, currentVersionOf, deleteInterviewLog, deleteResume, importResume, listInterviewLogs, listResumes, listSchedules, listTargets, updateInterviewLog, versionsOf,
 } from '../data/store'
 import { headEllipsis, humanSize, isSupportedResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT } from '../data/resumeFile'
 import { resumeMarkOf } from '../data/resumeMark'
@@ -68,11 +68,42 @@ const interviewLogs = computed(() => listInterviewLogs())
 const ivSheetOpen = ref(false)
 const ivEditing = ref<InterviewLog | null>(null)
 const ivReader = ref<InterviewLog | null>(null)
-const ivForm = ref({ title: '', targetId: null as number | null, raw: '' })
+const ivForm = ref({ title: '', link: '', raw: '', source: 'imported' as 'self' | 'imported' })
 const ivPreview = computed(() => (ivForm.value.raw.trim() ? parseInterview(ivForm.value.raw) : null))
-const ivTargetOptions = computed(() => listTargets().map((t) => ({ value: t.id, label: t.name })))
 
+/** 关联首选日程：日程自带公司与「第几面」，面经才能逐条对上；只选计划则是整线共享。 */
+const ivLinkOptions = computed(() => {
+  const day = (iso: string) => {
+    const d = new Date(iso)
+    return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()}`
+  }
+  const scheds = listSchedules()
+    .filter((s) => s.eventType === 'interview' || s.eventType === 'exam')
+    .sort((a, b) => b.startTime.localeCompare(a.startTime))
+    .map((s) => ({ value: `s${s.id}`, label: `${s.title} · ${day(s.startTime)}` }))
+  const targets = listTargets().map((t) => ({ value: `t${t.id}`, label: `${t.name}（整条投递线）` }))
+  return [...scheds, ...targets]
+})
+/** 解析关联选择：s 前缀 = 日程（targetId 跟着日程走），t 前缀 = 直接挂计划。 */
+function resolveIvLink(link: string): { targetId: number | null; scheduleId: number | null } {
+  if (link.startsWith('s')) {
+    const scheduleId = Number(link.slice(1))
+    const targetId = listSchedules().find((s) => s.id === scheduleId)?.jobProjectId ?? null
+    return { targetId, scheduleId }
+  }
+  if (link.startsWith('t')) return { targetId: Number(link.slice(1)), scheduleId: null }
+  return { targetId: null, scheduleId: null }
+}
+function linkOf(log: InterviewLog): string {
+  if (log.scheduleId != null) return `s${log.scheduleId}`
+  if (log.targetId != null) return `t${log.targetId}`
+  return ''
+}
 function ivTargetName(log: InterviewLog): string {
+  if (log.scheduleId != null) {
+    const s = listSchedules().find((x) => x.id === log.scheduleId)
+    if (s) return s.title
+  }
   return listTargets().find((t) => t.id === log.targetId)?.name ?? ''
 }
 function ivSnippet(log: InterviewLog): string {
@@ -85,13 +116,13 @@ function ivDate(iso: string): string {
 }
 function openIvCreate() {
   ivEditing.value = null
-  ivForm.value = { title: '', targetId: null, raw: '' }
+  ivForm.value = { title: '', link: '', raw: '', source: 'imported' }
   ivSheetOpen.value = true
 }
 function openIvEdit(log: InterviewLog) {
   ivEditing.value = log
   // 编辑只保留原文重构：正文永远由解析器生成，不存在两份真相。
-  ivForm.value = { title: log.title, targetId: log.targetId, raw: log.contentHtml.replace(/<[^>]+>/g, '\n').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim() }
+  ivForm.value = { title: log.title, link: linkOf(log), raw: log.contentHtml.replace(/<[^>]+>/g, '\n').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim(), source: log.source ?? 'imported' }
   ivReader.value = null
   ivSheetOpen.value = true
 }
@@ -104,11 +135,14 @@ function saveIv() {
     toast('粘贴的内容没有可用的正文')
     return
   }
+  const { targetId, scheduleId } = resolveIvLink(ivForm.value.link)
   if (ivEditing.value) {
-    updateInterviewLog(ivEditing.value.id, { title, targetId: ivForm.value.targetId, contentHtml: parsed.html, rounds: parsed.rounds, questions: parsed.questions, questionCount: parsed.questions.length })
+    // 问题清单变了，旧的「问过」勾选按新题数截断，防止越界勾选
+    const asked = (ivEditing.value.asked ?? []).filter((i) => i < parsed.questions.length)
+    updateInterviewLog(ivEditing.value.id, { title, targetId, scheduleId, source: ivForm.value.source, contentHtml: parsed.html, rounds: parsed.rounds, questions: parsed.questions, questionCount: parsed.questions.length, asked })
     toast('面经已更新')
   } else {
-    createInterviewLog(title, ivForm.value.targetId, parsed.html, parsed.rounds, parsed.questions)
+    createInterviewLog(title, targetId, parsed.html, parsed.rounds, parsed.questions, { source: ivForm.value.source, scheduleId })
     toast(`已收录 · ${parsed.rounds} 轮 · ${parsed.questions.length} 个问题`)
   }
   ivSheetOpen.value = false
@@ -125,14 +159,24 @@ async function removeIv(log: InterviewLog) {
   ivReader.value = null
   toast('面经已删除')
 }
+/** 阅读器的问题打卡：被问到的勾一下，这篇面经就从「看过」升级成「对照过的真题册」。 */
+function askedOf(log: InterviewLog): number[] { return log.asked ?? [] }
+function toggleAsked(log: InterviewLog, index: number) {
+  const cur = askedOf(log)
+  const next = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index]
+  updateInterviewLog(log.id, { asked: next })
+}
+function sourceLabel(log: InterviewLog): string {
+  return (log.source ?? 'imported') === 'self' ? '自记' : '搬运'
+}
 </script>
 
 <template>
   <div>
     <header class="page-head">
       <div class="grow">
-        <h1 class="page-title">我的资料</h1>
-        <p class="page-sub">简历与面经都只存本机 · {{ resumes.length }} 份简历 · {{ interviewLogs.length }} 篇面经</p>
+        <h1 class="page-title">我的装备</h1>
+        <p class="page-sub">简历递出去 · 面经带进场 · 只存本机</p>
       </div>
       <button v-if="tab === 'resumes'" class="icon-btn" aria-label="导入简历" :disabled="busy" @click="openPicker">
         <AppIcon name="upload" :size="18" />
@@ -191,11 +235,11 @@ async function removeIv(log: InterviewLog) {
       <div v-if="interviewLogs.length" class="iv-list">
         <button v-for="log in interviewLogs" :key="log.id" class="iv-card workspace-card" @click="ivReader = log">
           <span class="iv-card-head">
-            <CompanyMark v-if="log.targetId" :name="ivTargetName(log)" :size="30" />
+            <CompanyMark v-if="log.targetId || log.scheduleId != null" :name="ivTargetName(log)" :size="30" />
             <AppIcon v-else name="book" :size="22" />
             <span class="iv-copy">
-              <strong>{{ log.title }}</strong>
-              <small>{{ log.rounds }} 轮 · {{ log.questionCount }} 个问题<template v-if="log.targetId"> · {{ ivTargetName(log) }}</template></small>
+              <strong>{{ log.title }}<em class="iv-src" :class="(log.source ?? 'imported') === 'self' ? 'self' : 'imp'">{{ sourceLabel(log) }}</em></strong>
+              <small>{{ log.rounds }} 轮 · {{ log.questionCount }} 题<template v-if="ivTargetName(log)"> · {{ ivTargetName(log) }}</template><template v-if="askedOf(log).length"> · 已打卡 {{ askedOf(log).length }}/{{ log.questionCount }}</template></small>
             </span>
             <time>{{ ivDate(log.createdAt) }}</time>
           </span>
@@ -214,17 +258,28 @@ async function removeIv(log: InterviewLog) {
     <Sheet v-if="ivSheetOpen" :title="ivEditing ? '编辑面经' : '添加面经'" @close="ivSheetOpen = false">
       <div class="field"><label>标题</label><input v-model="ivForm.title" placeholder="如：字节跳动 后端一面面经"></div>
       <div class="field">
+        <label>来源</label>
+        <div class="iv-src-picker" role="radiogroup" aria-label="面经来源">
+          <button type="button" role="radio" :aria-checked="ivForm.source === 'imported'" :class="{ on: ivForm.source === 'imported' }" @click="ivForm.source = 'imported'">
+            <strong>搬运的</strong><small>别人发的公开面经</small>
+          </button>
+          <button type="button" role="radio" :aria-checked="ivForm.source === 'self'" :class="{ on: ivForm.source === 'self' }" @click="ivForm.source = 'self'">
+            <strong>自记的</strong><small>面完自己复述的真题</small>
+          </button>
+        </div>
+      </div>
+      <div class="field">
         <PickerField
-          :model-value="ivForm.targetId"
-          :options="ivTargetOptions"
-          label="关联求职目标"
-          title="选择求职目标"
+          :model-value="ivForm.link"
+          :options="ivLinkOptions"
+          label="关联场次（选到具体面试，才能对上第几面）"
+          title="这场面经对应哪场面试？"
           placeholder="不关联"
           clearable
           clear-label="不关联"
           searchable
           icon="target"
-          @update:model-value="(v) => ivForm.targetId = (v as number | null)"
+          @update:model-value="(v) => ivForm.link = (v as string)"
         />
       </div>
       <div class="field">
@@ -245,8 +300,22 @@ async function removeIv(log: InterviewLog) {
         <button class="icon-btn" aria-label="编辑面经" @click="openIvEdit(ivReader)"><AppIcon name="edit" :size="16" /></button>
       </div>
       <article class="ivr-paper" v-html="ivReader.contentHtml"></article>
+      <div v-if="ivReader.questions.length" class="ivr-questions">
+        <div class="ivrq-head">
+          <strong>问题打卡</strong>
+          <span>真的被问到的勾一下 · {{ askedOf(ivReader).length }}/{{ ivReader.questions.length }}</span>
+        </div>
+        <button
+          v-for="(q, i) in ivReader.questions" :key="i"
+          class="ivrq-item" :class="{ hit: askedOf(ivReader).includes(i) }"
+          @click="toggleAsked(ivReader, i)"
+        >
+          <span class="ivrq-box"><AppIcon v-if="askedOf(ivReader).includes(i)" name="check" :size="11" /></span>
+          <span class="ivrq-text">{{ q }}</span>
+        </button>
+      </div>
       <div class="ivr-foot">
-        <span class="ivr-meta">{{ ivReader.rounds }} 轮 · {{ ivReader.questionCount }} 个问题</span>
+        <span class="ivr-meta">{{ sourceLabel(ivReader) }} · {{ ivReader.rounds }} 轮 · {{ ivReader.questionCount }} 个问题</span>
         <button class="btn-danger" @click="removeIv(ivReader)"><AppIcon name="trash" :size="14" /> 删除</button>
       </div>
     </div>

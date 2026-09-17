@@ -99,7 +99,7 @@ function normalizeDb(input: unknown): DbShape {
     schedules: saneItems(raw.schedules, (e) => validDateString(e.startTime)),
     resumes: saneItems(raw.resumes, () => true),
     versions: saneItems(raw.versions, (v) => saneId(v.resumeId) != null),
-    interviewLogs: saneItems(raw.interviewLogs, (l) => typeof l.title === 'string' && !!l.title && typeof l.contentHtml === 'string'),
+    interviewLogs: saneInterviewLogs(raw.interviewLogs),
     milestones: saneMilestones(raw.milestones),
     reminders: saneReminders(raw.reminders),
     seq: Number.isFinite(Number(raw.seq)) && Number(raw.seq) > 0 ? Number(raw.seq) : 0,
@@ -139,6 +139,16 @@ function saneReminders(raw: unknown): Record<number, number> {
     if (id != null && Number.isFinite(minutes) && minutes > 0) out[id] = minutes
   }
   return out
+}
+/** 面经：标题+正文必填；来源 / 日程关联 / 已问勾选逐字段兜底，坏数据不进运行时。 */
+function saneInterviewLogs(list: unknown): InterviewLog[] {
+  return saneItems<InterviewLog>(list, (l) => typeof l.title === 'string' && !!l.title && typeof l.contentHtml === 'string').map((l) => ({
+    ...l,
+    targetId: saneId(l.targetId),
+    scheduleId: saneId(l.scheduleId),
+    source: l.source === 'self' ? 'self' : 'imported',
+    asked: Array.isArray(l.asked) ? l.asked.filter((n): n is number => Number.isInteger(n) && n >= 0) : [],
+  }))
 }
 /** 里程碑：标题必填、必须挂在某个目标下；kind / 图片 key / 日期逐字段兜底。 */
 function saneMilestones(list: unknown): Milestone[] {
@@ -600,14 +610,18 @@ export async function deleteResumeVersion(resumeId: number, versionId: number) {
 export function listInterviewLogs(): InterviewLog[] {
   return [...db.interviewLogs].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
-export function createInterviewLog(title: string, targetId: number | null, contentHtml: string, rounds: number, questions: string[]): InterviewLog {
+export function createInterviewLog(title: string, targetId: number | null, contentHtml: string, rounds: number, questions: string[], opts: { source?: 'self' | 'imported'; scheduleId?: number | null } = {}): InterviewLog {
   const now = iso(new Date())
-  const log: InterviewLog = { id: nextId(), title, targetId, rounds, questionCount: questions.length, contentHtml, questions, createdAt: now, updatedAt: now }
+  const log: InterviewLog = {
+    id: nextId(), title, targetId, rounds, questionCount: questions.length, contentHtml, questions,
+    source: opts.source ?? 'imported', scheduleId: opts.scheduleId ?? null, asked: [],
+    createdAt: now, updatedAt: now,
+  }
   db.interviewLogs.unshift(log)
   persist()
   return log
 }
-export function updateInterviewLog(id: number, patch: Partial<Pick<InterviewLog, 'title' | 'targetId' | 'contentHtml' | 'rounds' | 'questions' | 'questionCount'>>) {
+export function updateInterviewLog(id: number, patch: Partial<Pick<InterviewLog, 'title' | 'targetId' | 'contentHtml' | 'rounds' | 'questions' | 'questionCount' | 'source' | 'scheduleId' | 'asked'>>) {
   const log = db.interviewLogs.find((l) => l.id === id)
   if (!log) return
   Object.assign(log, patch, { updatedAt: iso(new Date()) })

@@ -137,6 +137,10 @@ export interface InterviewLog {
   title: string
   /** 关联的求职目标；面经常常先于目标存在，允许不关联。 */
   targetId: number | null
+  /** 首选关联：笔试/面试日程——日程自带公司与轮次，面经和「第几面」逐条对应；直接关联计划时为空。 */
+  scheduleId?: number | null
+  /** 来源：自己复述的真题（self）还是搬运的公开面经（imported）——阅读与信任层级不同。 */
+  source?: 'self' | 'imported'
   /** 解析出的轮次数（一面/二面/hr面…的段落数）。 */
   rounds: number
   /** 解析出的面试问题数。 */
@@ -145,6 +149,8 @@ export interface InterviewLog {
   contentHtml: string
   /** 解析出的问题原文，供战前速览直接引用。 */
   questions: string[]
+  /** 阅读器里勾了「真的被问到」的问题下标——面经从一篇文章变成可对照的真题册。 */
+  asked?: number[]
   createdAt: string
   updatedAt: string
 }

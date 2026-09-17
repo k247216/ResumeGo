@@ -153,7 +153,7 @@ html, body {
   overscroll-behavior-y: none;
 }
 
-#app { height: 100%; }
+#app { height: 100%; height: 100dvh; }
 
 button { font-family: inherit; }
 
@@ -162,6 +162,7 @@ button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   height: 100%;
+  height: 100dvh;
   max-width: 560px;
   margin: 0 auto;
   background: var(--canvas);
@@ -321,23 +322,42 @@ button { font-family: inherit; }
 .menu-trigger:active { background: var(--surface-hover); color: var(--ink); }
 
 /* ── 阶段管线（母版核心）── */
+/* 等宽时间轴：节点等距分布，连线用绝对定位锚在相邻圆点之间——
+   线长只由列宽决定，标签文字再长也不会把线挤得参差不齐。 */
 .pipeline {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   margin: 0;
   padding: 2px 0 0;
   list-style: none;
 }
-.pipeline-item { position: relative; flex: 1; display: flex; align-items: center; justify-content: flex-start; }
+.pipeline-item { position: relative; min-width: 0; }
+/* 线段：从本列圆点右缘拉到下一列圆点左缘；圆点 15px，留 10px 间隙。 */
+.pipeline-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 12.5px;
+  left: calc(50% + 10px);
+  right: calc(-50% + 10px);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line-subtle);
+}
+.pipeline-item.filled::after { background: color-mix(in srgb, var(--brand) 40%, transparent); }
 .node {
+  position: relative;
+  z-index: 1;
   display: grid;
   justify-items: center;
-  align-content: center;
+  align-content: start;
   gap: 5px;
   border: 0;
   background: none;
   padding: 6px 2px 8px;
   min-height: 44px;
+  width: 100%;
   color: var(--muted);
   cursor: pointer;
   min-width: 0;
@@ -374,35 +394,10 @@ button { font-family: inherit; }
 .node.current .node-label { color: var(--brand); font-weight: 700; }
 .node.done .node-label { color: var(--copy); }
 .node-time { font-size: var(--fs-nano); color: var(--muted); font-variant-numeric: tabular-nums; }
-.connector {
-  flex: 1;
-  height: 2px;
-  margin: 0 3px 15px;
-  border-radius: 1px;
-  background: var(--line-subtle);
-  align-self: flex-start;
-  transform: translateY(6px);
-}
-.connector.filled { background: color-mix(in srgb, var(--brand) 40%, transparent); }
-/* ── 蛇形时间轴：双列卡片一行放不下，把管线拐个弯，全部阶段名都能显示 ── */
-.pipeline-wrap { flex-wrap: wrap; row-gap: 2px; }
-.pipeline-wrap .pipeline-item { flex: 0 0 calc(100% / var(--mid, 3)); }
-/* 蛇形列窄，标签允许溢出节点居中显示（点下方是空白，不会压到连线） */
-.pipeline-wrap .node-label {
-  max-width: none; overflow: visible;
-  white-space: nowrap; justify-self: center;
-  text-overflow: clip; padding-inline: 0;
-}
-/* 拐弯：右侧竖线把上排终点接去下排起点（两排各占 mid 列，竖线对齐最后一列中点） */
-.pipeline-turn { flex: 0 0 100%; position: relative; height: 18px; }
-.pipeline-turn::after {
-  content: ''; position: absolute;
-  right: calc(50% / var(--mid, 3)); transform: translateX(50%);
-  top: -5px; bottom: 7px;
-  width: 2px; border-radius: 1px;
-  background: var(--line-subtle);
-}
-.pipeline-turn.filled::after { background: color-mix(in srgb, var(--brand) 40%, transparent); }
+/* 紧凑形态（双列卡片）：只留圆点，几何同源、线段等距，高度压到一半。 */
+.pipeline.mini .node { padding: 5px 0 2px; min-height: 26px; gap: 0; }
+.pipeline.mini .node .dot { width: 11px; height: 11px; }
+.pipeline.mini .pipeline-item:not(:last-child)::after { top: 9.5px; left: calc(50% + 8px); right: calc(-50% + 8px); }
 
 /* ── 行内 chip / 元信息 ── */
 .chip-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -804,9 +799,8 @@ button { font-family: inherit; }
   padding-bottom: var(--safe-bottom);
   border-top: 0;
   border-radius: 22px 22px 0 0;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* 不透明底：内容从栏后滚过时绝不透字，浅深两主题都不会出现「黑底压字」。 */
+  background: var(--surface);
   box-shadow: 0 -8px 26px rgba(17, 19, 21, .05);
 }
 .tab {
@@ -1272,15 +1266,14 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .timeline-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  /* 无感滑动：滚动条彻底藏掉，手势滑动本身足够发现位置 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   margin: 0 calc(-1 * var(--space-4));
-  padding: 2px var(--space-4) 10px;
+  padding: 2px var(--space-4) 4px;
   -webkit-overflow-scrolling: touch;
 }
-.timeline-scroll::-webkit-scrollbar { height: 4px; }
-.timeline-scroll::-webkit-scrollbar-track { background: transparent; }
-.timeline-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--line-strong); }
+.timeline-scroll::-webkit-scrollbar { display: none; }
 .timeline-rail {
   position: relative;
   display: flex;
@@ -1291,7 +1284,7 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .timeline-rail::before {
   content: '';
   position: absolute;
-  top: 58px;
+  top: 54px;
   left: 52px;
   right: 52px;
   height: 1px;
@@ -1300,10 +1293,10 @@ html.overlay-open, html.overlay-open body { overflow: hidden; }
 .timeline-day {
   position: relative;
   display: grid;
-  grid-template-rows: 42px 32px minmax(94px, auto);
+  grid-template-rows: 40px 28px minmax(88px, auto);
   justify-items: center;
   width: auto;
-  min-width: 104px;
+  min-width: 96px;
 }
 .timeline-date {
   display: grid;
@@ -1925,6 +1918,8 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 
 /* ── 复盘统计环 ── */
 .review-stats { padding: 0; overflow: hidden; }
+/* 合并卡内两个折叠区的分隔线：与卡内 14px 边距同口径 */
+.rs-divider { height: 1px; margin: 0 14px; background: var(--line-subtle); }
 .rs-toggle {
   display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; width: 100%;
   padding: 12px 14px; background: transparent; border: 0; cursor: pointer;
@@ -2031,22 +2026,40 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .iv-copy small { font-size: 12px; color: var(--muted); }
 .iv-card-head time { flex: 0 0 auto; font-size: 11px; color: var(--muted); }
 .iv-snippet { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--copy); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.iv-src { font-style: normal; font-size: 10px; font-weight: 700; padding: 1.5px 6px; border-radius: 7px; margin-left: 6px; vertical-align: 1px; }
+.iv-src.self { background: var(--brand-soft); color: var(--brand); }
+.iv-src.imp { background: var(--surface-subtle); color: var(--muted); }
 
 /* ── 面经编辑 ── */
 .iv-paste { width: 100%; min-height: 180px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; line-height: 1.6; resize: vertical; }
 .iv-hint { margin: 6px 0 0; font-size: 11.5px; color: var(--brand); }
+.iv-src-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.iv-src-picker button { padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); font: inherit; text-align: left; cursor: pointer; display: grid; gap: 2px; }
+.iv-src-picker button strong { font-size: 13px; color: var(--ink); }
+.iv-src-picker button small { font-size: 11px; color: var(--muted); }
+.iv-src-picker button.on { border-color: var(--brand); background: var(--brand-soft); }
+.iv-src-picker button.on strong { color: var(--brand); }
 
 /* ── 面经阅读器 ── */
 .iv-reader { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--surface-subtle); animation: reader-in .22s var(--ease-out) both; }
 @keyframes reader-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .ivr-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
 .ivr-title { flex: 1; min-width: 0; font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ivr-paper { flex: 1; overflow: auto; margin: 0 12px; padding: 18px 16px 30px; border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-card); }
+.ivr-paper { flex: 1; min-height: 0; overflow: auto; margin: 0 12px; padding: 18px 16px 30px; border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-card); }
 .ivr-paper .iv-sec h3 { margin: 18px 0 8px; font-size: 15px; color: var(--brand); }
 .ivr-paper .iv-sec:first-child h3 { margin-top: 0; }
 .ivr-paper p { margin: 0 0 10px; font-size: 14px; line-height: 1.85; color: var(--copy); }
 .ivr-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
 .ivr-meta { font-size: 11.5px; color: var(--muted); }
+.ivr-questions { flex: 0 0 auto; max-height: 42%; overflow: auto; margin: 10px 12px 0; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-card); display: grid; gap: 6px; }
+.ivrq-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.ivrq-head strong { font-size: 13px; color: var(--ink); }
+.ivrq-head span { font-size: 11px; color: var(--muted); }
+.ivrq-item { display: flex; align-items: flex-start; gap: 9px; padding: 8px 10px; border: 1px solid var(--line-subtle); border-radius: 10px; background: var(--surface-subtle); font: inherit; text-align: left; cursor: pointer; }
+.ivrq-box { flex: 0 0 auto; width: 17px; height: 17px; margin-top: 1px; border-radius: 6px; border: 1.5px solid var(--line); display: grid; place-items: center; color: #fff; }
+.ivrq-item.hit { border-color: var(--brand); background: var(--brand-soft); }
+.ivrq-item.hit .ivrq-box { background: var(--brand); border-color: var(--brand); }
+.ivrq-text { font-size: 12.5px; line-height: 1.55; color: var(--copy); }
 
 /* ── 战前速览的面经真题 ── */
 .pb-iv-label { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }

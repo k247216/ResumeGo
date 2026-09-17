@@ -403,8 +403,8 @@ function onLinkResume(versionId: number | null) {
   <div>
     <header class="page-head">
       <div class="grow">
-        <h1 class="page-title">求职目标</h1>
-        <p class="page-sub">以公司为单位管理进度 · {{ countOf('all') }} 个计划</p>
+        <h1 class="page-title">我的战场</h1>
+        <p class="page-sub">{{ countOf('all') }} 条投递线在册 · 每一步都算数</p>
       </div>
       <div class="head-actions">
         <button class="icon-btn" aria-label="求职漏斗统计" title="求职漏斗统计" @click="statsOpen = true">

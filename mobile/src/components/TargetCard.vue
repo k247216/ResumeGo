@@ -67,7 +67,7 @@ function recentLabel(): string {
       </div>
     </header>
 
-    <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :wrap="compact" :interview-rounds="target.interviewRounds" :interview-round="target.interviewRound" @change="(s) => emit('stage', s)" @round="(r) => emit('round', r)" />
+    <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :mini="compact" :interview-rounds="target.interviewRounds" :interview-round="target.interviewRound" @change="(s) => emit('stage', s)" @round="(r) => emit('round', r)" />
 
     <div class="chip-row">
       <button v-if="resumeLabel" class="chip" @click.stop="emit('open')"><AppIcon name="file" :size="14" /> {{ resumeLabel }}</button>
