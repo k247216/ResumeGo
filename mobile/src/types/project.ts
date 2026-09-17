@@ -127,3 +127,24 @@ export interface StageEvent {
   stage: TargetStage
   occurredAt: string
 }
+
+/**
+ * 面经：别人家公司的真实面试记录，粘贴进来重新排版成好读的纸面文章。
+ * rounds / questionCount 在解析时算好存下来，列表页不必重新解析原文。
+ */
+export interface InterviewLog {
+  id: number
+  title: string
+  /** 关联的求职目标；面经常常先于目标存在，允许不关联。 */
+  targetId: number | null
+  /** 解析出的轮次数（一面/二面/hr面…的段落数）。 */
+  rounds: number
+  /** 解析出的面试问题数。 */
+  questionCount: number
+  /** 清洗排版后的正文（自产 HTML，纯文本已转义，不含外部标签）。 */
+  contentHtml: string
+  /** 解析出的问题原文，供战前速览直接引用。 */
+  questions: string[]
+  createdAt: string
+  updatedAt: string
+}

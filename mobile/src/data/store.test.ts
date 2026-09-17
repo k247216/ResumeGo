@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  backupSummaryOf, createSchedule, createTarget, currentVersionOf, deleteResume, deleteSchedule, deleteTarget, exportBackup, flushPersist, getReminder, getResume, importBackup, importResume,
-  interviewRoundOf, interviewRoundsOf, lastBackupAgeDays, listResumes, listReviews, listReviewTags, listSchedules, listTargets, markBackupNow, reopenTarget, resetWorkspace, restoreTarget,
+  backupSummaryOf, createInterviewLog, createSchedule, createTarget, currentVersionOf, deleteInterviewLog, deleteResume, deleteSchedule, deleteTarget, exportBackup, flushPersist, getReminder, getResume, importBackup, importResume,
+  interviewRoundOf, interviewRoundsOf, lastBackupAgeDays, listInterviewLogs, listResumes, listReviews, listReviewTags, listSchedules, listTargets, markBackupNow, reopenTarget, resetWorkspace, restoreTarget,
   setInterviewRound, setInterviewRounds,
-  setReminder, setReviewTags, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateSchedule, linkResume,
+  setReminder, setReviewTags, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateInterviewLog, updateSchedule, linkResume,
   recordScheduleResult,
 } from './store'
 
@@ -501,5 +501,55 @@ describe('备份导入的深度卫生处理', () => {
     flushPersist()
     const parsed = JSON.parse(localStorage.getItem('zhida-mobile-db-v2')!)
     expect(parsed.targets).toHaveLength(0)
+  })
+})
+
+describe('面经库', () => {
+  it('创建后可列出（新的在前），更新与删除生效', () => {
+    const a = createInterviewLog('字节一面面经', null, '<section class="iv-sec"><h3>一面</h3><p>x</p></section>', 1, ['q1', 'q2', 'q3'])
+    const b = createInterviewLog('腾讯面经', null, '<p>y</p>', 1, [])
+    const list = listInterviewLogs()
+    expect(list[0].id).toBe(b.id)
+    expect(list.find((l) => l.id === a.id)?.questionCount).toBe(3)
+
+    updateInterviewLog(a.id, { title: '字节跳动一面面经', targetId: null })
+    expect(listInterviewLogs().find((l) => l.id === a.id)?.title).toBe('字节跳动一面面经')
+
+    deleteInterviewLog(b.id)
+    expect(listInterviewLogs().some((l) => l.id === b.id)).toBe(false)
+    deleteInterviewLog(a.id)
+  })
+
+  it('面经计入备份预览，导出导入可完整往返', () => {
+    const log = createInterviewLog('往返测试面经', null, '<p>内容</p>', 1, ['一个问题？'])
+    const json = exportBackup()
+    expect(backupSummaryOf(json).logs).toBeGreaterThanOrEqual(1)
+
+    // 导入自己的导出，面经不丢
+    flushPersist()
+    const r = importBackup(json)
+    expect(r.ok).toBe(true)
+    expect(listInterviewLogs().some((l) => l.id === log.id)).toBe(true)
+    deleteInterviewLog(log.id)
+  })
+
+  it('备份里的坏面经（无标题/无正文）导入时被剔除，不影响其他数据', () => {
+    const json = JSON.stringify({
+      targets: [], schedules: [], resumes: [], versions: [], reminders: {},
+      interviewLogs: [
+        { id: 1, title: '正常面经', contentHtml: '<p>x</p>', createdAt: '2026-09-17T00:00:00.000Z', updatedAt: '2026-09-17T00:00:00.000Z' },
+        { id: 2, contentHtml: '<p>没标题</p>' },
+        { id: 3, title: '没正文' },
+      ],
+      seq: 3,
+    })
+    const r = importBackup(json)
+    expect(r.ok).toBe(true)
+    const list = listInterviewLogs()
+    expect(list.some((l) => l.id === 1)).toBe(true)
+    expect(list.some((l) => l.id === 2)).toBe(false)
+    expect(list.some((l) => l.id === 3)).toBe(false)
+    // 清场，不污染其他用例
+    for (const l of list) deleteInterviewLog(l.id)
   })
 })

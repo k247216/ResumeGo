@@ -15,14 +15,16 @@ import { shareErrorMessage, shareFileEx, shareTargetName } from '../data/share'
 import { NOTE_COLORS, NOTE_PAPERS, normalizeNotePaper } from '../constants/noteColors'
 import { parseInviteText } from '../data/parseInvite'
 import {
-  createSchedule, deleteSchedule, getReminder, listReviews, listReviewTags, listSchedules, listStageEvents, listTargets,
-  recordScheduleResult, setReminder, setReviewTags, setScheduleReview, updateSchedule,
+  createInterviewLog, createSchedule, deleteInterviewLog, deleteSchedule, getReminder, listInterviewLogs, listReviews, listReviewTags, listSchedules, listStageEvents, listTargets,
+  recordScheduleResult, setReminder, setReviewTags, setScheduleReview, updateInterviewLog, updateSchedule,
 } from '../data/store'
 import { stagePaceLine, stagePaceSummary } from '../data/stagePace'
+import { parseInterview } from '../data/interviewParse'
 import { requestNotificationPermission, scheduleReminder, cancelReminder, pendingNotificationIds, reviewNudgeEnabled, scheduleReviewNudge, cancelReviewNudge, REMINDER_OUTCOME_MESSAGES } from '../data/notifications'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { SCHEDULE_EVENT_TYPE_LABELS, SCHEDULE_EVENT_TYPE_COLORS, eventStatus, isEventFinished, scheduleTimeError } from '../types/schedule'
 import { isTerminalStage, TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import type { InterviewLog } from '../types/project'
 import { eventsOnDate, timelineDates } from '../data/timeline'
 import { addToDeviceCalendar } from '../data/calendar'
 import type { CalendarHandoff } from '../data/calendar'
@@ -136,6 +138,17 @@ const preBattle = computed(() => {
   for (const p of past) for (const t of p.reviewTags ?? []) tagCount.set(t, (tagCount.get(t) ?? 0) + 1)
   const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => t)
   return { ev, last, tags }
+})
+/** 战前速览的面经弹药：这家公司被公开讨论过的真题，最多取 4 条。 */
+const pbIvQuestions = computed(() => {
+  const pb = preBattle.value
+  if (!pb) return []
+  const seen = new Set<string>()
+  for (const log of listInterviewLogs()) {
+    if (log.targetId !== pb.ev.jobProjectId) continue
+    for (const q of log.questions ?? []) seen.add(q)
+  }
+  return [...seen].slice(0, 4)
 })
 const now0 = new Date()
 const monthCursor = ref({ y: now0.getFullYear(), m: now0.getMonth() })
@@ -389,6 +402,70 @@ const seasonReport = computed(() => {
   const pace = stagePaceLine(stagePaceSummary(listStageEvents(), listTargets(), now.value))
   return { total: targets.length, active, offered, failed, interviews, coverage: reviewCoverage.value, insight, pace }
 })
+
+// ── 面经库：别人家的真实面试记录，粘贴进来变成可检索、可复习的纸面文章 ──
+const reviewTab = ref<'notes' | 'logs'>('notes')
+const interviewLogs = computed(() => listInterviewLogs())
+const ivSheetOpen = ref(false)
+const ivEditing = ref<InterviewLog | null>(null)
+const ivReader = ref<InterviewLog | null>(null)
+const ivForm = ref({ title: '', targetId: null as number | null, raw: '' })
+const ivPreview = computed(() => (ivForm.value.raw.trim() ? parseInterview(ivForm.value.raw) : null))
+
+function ivTargetName(log: InterviewLog): string {
+  return listTargets().find((t) => t.id === log.targetId)?.name ?? ''
+}
+function ivSnippet(log: InterviewLog): string {
+  const plain = log.contentHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return headEllipsis(plain, 64)
+}
+function ivDate(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1} 月 ${d.getDate()} 日`
+}
+function openIvCreate() {
+  ivEditing.value = null
+  ivForm.value = { title: '', targetId: null, raw: '' }
+  ivSheetOpen.value = true
+}
+function openIvEdit(log: InterviewLog) {
+  ivEditing.value = log
+  // 编辑只保留原文重构：正文永远由解析器生成，不存在两份真相。
+  ivForm.value = { title: log.title, targetId: log.targetId, raw: log.contentHtml.replace(/<[^>]+>/g, '\n').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim() }
+  ivReader.value = null
+  ivSheetOpen.value = true
+}
+function saveIv() {
+  const title = ivForm.value.title.trim()
+  const raw = ivForm.value.raw.trim()
+  if (!title || !raw) return
+  const parsed = parseInterview(raw)
+  if (!parsed.html) {
+    toast('粘贴的内容没有可用的正文')
+    return
+  }
+  if (ivEditing.value) {
+    updateInterviewLog(ivEditing.value.id, { title, targetId: ivForm.value.targetId, contentHtml: parsed.html, rounds: parsed.rounds, questions: parsed.questions, questionCount: parsed.questions.length })
+    toast('面经已更新')
+  } else {
+    createInterviewLog(title, ivForm.value.targetId, parsed.html, parsed.rounds, parsed.questions)
+    toast(`已收录 · ${parsed.rounds} 轮 · ${parsed.questions.length} 个问题`)
+  }
+  ivSheetOpen.value = false
+  reviewTab.value = 'logs'
+}
+async function removeIv(log: InterviewLog) {
+  const ok = await confirmAction({
+    title: '删除这篇面经？',
+    message: `「${log.title}」会被永久删除，无法撤销。`,
+    confirmLabel: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  deleteInterviewLog(log.id)
+  ivReader.value = null
+  toast('面经已删除')
+}
 
 /**
  * 便签按月份分组。reviewNotes 已是时间倒序，所以顺序扫一遍即可连续成组。
@@ -923,6 +1000,12 @@ async function syncToCalendar() {
           <div v-if="preBattle.tags.length" class="pb-tags">
             <span v-for="t in preBattle.tags" :key="t" class="tag-chip">{{ t }}</span>
           </div>
+          <template v-if="pbIvQuestions.length">
+            <p class="pb-iv-label">这家公司的面经真题</p>
+            <ul class="pb-iv-list">
+              <li v-for="q in pbIvQuestions" :key="q">{{ q }}</li>
+            </ul>
+          </template>
           <button class="pb-open" @click="openNote(preBattle.last)">回看那篇心得 <AppIcon name="chevronRight" :size="14" /></button>
         </template>
         <p v-else class="pb-quote muted">这家你还没写过心得。面完回来补一篇，下一场就有了。</p>
@@ -1009,6 +1092,11 @@ async function syncToCalendar() {
     </template>
 
     <template v-else-if="viewMode === 'review'">
+      <div class="rv-tabs" role="tablist" aria-label="复盘内容切换">
+        <button class="rv-tab" :class="{ on: reviewTab === 'notes' }" role="tab" :aria-selected="reviewTab === 'notes'" @click="reviewTab = 'notes'">我的心得</button>
+        <button class="rv-tab" :class="{ on: reviewTab === 'logs' }" role="tab" :aria-selected="reviewTab === 'logs'" @click="reviewTab = 'logs'">面经库<em v-if="interviewLogs.length">{{ interviewLogs.length }}</em></button>
+      </div>
+      <template v-if="reviewTab === 'notes'">
       <section v-if="finishedEvents.length" class="review-hero workspace-card" :style="{ '--pct': reviewCoverage }">
         <div class="hero-ring">
           <svg viewBox="0 0 72 72" aria-hidden="true">
@@ -1179,6 +1267,37 @@ async function syncToCalendar() {
         title="没有匹配的心得"
         hint="换个关键词，或把类型筛选切回「全部」。"
       />
+      </template>
+
+      <template v-else>
+        <div class="section-head">
+          <div>
+            <h2>面经库</h2>
+            <p>别人踩过的坑，就是你下场的地图</p>
+          </div>
+          <button class="btn-primary" @click="openIvCreate"><AppIcon name="plus" :size="16" /> 添加面经</button>
+        </div>
+        <div v-if="interviewLogs.length" class="iv-list">
+          <button v-for="log in interviewLogs" :key="log.id" class="iv-card workspace-card" @click="ivReader = log">
+            <span class="iv-card-head">
+              <CompanyMark v-if="log.targetId" :name="ivTargetName(log)" :size="30" />
+              <AppIcon v-else name="book" :size="22" />
+              <span class="iv-copy">
+                <strong>{{ log.title }}</strong>
+                <small>{{ log.rounds }} 轮 · {{ log.questionCount }} 个问题<template v-if="log.targetId"> · {{ ivTargetName(log) }}</template></small>
+              </span>
+              <time>{{ ivDate(log.createdAt) }}</time>
+            </span>
+            <p class="iv-snippet">{{ ivSnippet(log) }}</p>
+          </button>
+        </div>
+        <EmptyState
+          v-else
+          icon="book"
+          title="还没有收藏面经"
+          hint="在牛客、脉脉、贴吧看到真实面经，复制过来粘一下，它就成了你下场的地图。"
+        />
+      </template>
     </template>
 
     <template v-else-if="viewMode === 'month'">
@@ -1421,6 +1540,46 @@ async function syncToCalendar() {
     </Transition>
 
     <!-- 复盘联动推进：写完心得顺手问一句结果，目标状态跟着长准，不用用户再去目标页手动改 -->
+    <Sheet v-if="ivSheetOpen" :title="ivEditing ? '编辑面经' : '添加面经'" @close="ivSheetOpen = false">
+      <div class="field"><label>标题</label><input v-model="ivForm.title" placeholder="如：字节跳动 后端一面面经"></div>
+      <div class="field">
+        <PickerField
+          :model-value="ivForm.targetId"
+          :options="targetOptions"
+          label="关联求职目标"
+          title="选择求职目标"
+          placeholder="不关联"
+          clearable
+          clear-label="不关联"
+          searchable
+          icon="target"
+          @update:model-value="(v) => ivForm.targetId = (v as number | null)"
+        />
+      </div>
+      <div class="field">
+        <label>粘贴面经原文</label>
+        <textarea v-model="ivForm.raw" class="iv-paste" rows="10" placeholder="从牛客 / 脉脉 / 贴吧复制面经原文，粘到这里——轮次、问题清单会自动识别排版。"></textarea>
+        <p v-if="ivPreview" class="iv-hint">已识别 {{ ivPreview.rounds }} 轮 · {{ ivPreview.questions.length }} 个问题，保存后自动排版</p>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-primary" :disabled="!ivForm.title.trim() || !ivForm.raw.trim()" @click="saveIv">保存</button>
+      </div>
+    </Sheet>
+
+    <!-- 面经阅读器：纸面排版，问题清单、轮次标题都来自解析器 -->
+    <div v-if="ivReader" class="iv-reader" role="dialog" aria-modal="true" :aria-label="ivReader.title">
+      <div class="ivr-bar">
+        <button class="icon-btn" aria-label="关闭" @click="ivReader = null"><AppIcon name="chevronLeft" :size="20" /></button>
+        <strong class="ivr-title">{{ ivReader.title }}</strong>
+        <button class="icon-btn" aria-label="编辑面经" @click="openIvEdit(ivReader)"><AppIcon name="edit" :size="16" /></button>
+      </div>
+      <article class="ivr-paper" v-html="ivReader.contentHtml"></article>
+      <div class="ivr-foot">
+        <span class="ivr-meta">{{ ivReader.rounds }} 轮 · {{ ivReader.questionCount }} 个问题</span>
+        <button class="btn-danger" @click="removeIv(ivReader)"><AppIcon name="trash" :size="14" /> 删除</button>
+      </div>
+    </div>
+
     <Sheet v-if="outcomeAsk" title="这场的结果是？" @close="skipOutcome">
       <p class="oc-lead">
         {{ companyName(outcomeAsk) }} · {{ SCHEDULE_EVENT_TYPE_LABELS[outcomeAsk.eventType] }}已结束。

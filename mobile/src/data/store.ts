@@ -1,5 +1,5 @@
 import { reactive, watch } from 'vue'
-import type { JobProject, StageEvent, TargetOutcome, TargetStage } from '../types/project'
+import type { InterviewLog, JobProject, StageEvent, TargetOutcome, TargetStage } from '../types/project'
 import { isTerminalStage, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
@@ -75,13 +75,14 @@ interface DbShape {
   resumes: ResumeFile[]
   versions: ResumeFileVer[]
   reminders: Record<number, number>
+  interviewLogs: InterviewLog[]
   seq: number
 }
 
 function iso(d: Date): string { return d.toISOString() }
 
 function emptyDb(): DbShape {
-  return { seq: 0, reminders: {}, targets: [], stageEvents: [], schedules: [], resumes: [], versions: [] }
+  return { seq: 0, reminders: {}, targets: [], stageEvents: [], schedules: [], resumes: [], versions: [], interviewLogs: [] }
 }
 
 /** 任意来源（本地存储 / 用户备份文件）都必须先归一，避免某个集合是 undefined 就让整页崩。 */
@@ -96,6 +97,7 @@ function normalizeDb(input: unknown): DbShape {
     schedules: saneItems(raw.schedules, (e) => validDateString(e.startTime)),
     resumes: saneItems(raw.resumes, () => true),
     versions: saneItems(raw.versions, (v) => saneId(v.resumeId) != null),
+    interviewLogs: saneItems(raw.interviewLogs, (l) => typeof l.title === 'string' && !!l.title && typeof l.contentHtml === 'string'),
     reminders: saneReminders(raw.reminders),
     seq: Number.isFinite(Number(raw.seq)) && Number(raw.seq) > 0 ? Number(raw.seq) : 0,
   }
@@ -575,22 +577,44 @@ export async function deleteResumeVersion(resumeId: number, versionId: number) {
   }
 }
 
+// ── 面经库 ──
+export function listInterviewLogs(): InterviewLog[] {
+  return [...db.interviewLogs].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+export function createInterviewLog(title: string, targetId: number | null, contentHtml: string, rounds: number, questions: string[]): InterviewLog {
+  const now = iso(new Date())
+  const log: InterviewLog = { id: nextId(), title, targetId, rounds, questionCount: questions.length, contentHtml, questions, createdAt: now, updatedAt: now }
+  db.interviewLogs.unshift(log)
+  persist()
+  return log
+}
+export function updateInterviewLog(id: number, patch: Partial<Pick<InterviewLog, 'title' | 'targetId' | 'contentHtml' | 'rounds' | 'questions' | 'questionCount'>>) {
+  const log = db.interviewLogs.find((l) => l.id === id)
+  if (!log) return
+  Object.assign(log, patch, { updatedAt: iso(new Date()) })
+  persist()
+}
+export function deleteInterviewLog(id: number) {
+  db.interviewLogs = db.interviewLogs.filter((l) => l.id !== id)
+  persist()
+}
+
 // ── 备份 / 恢复 ──
 export interface RestoreSummary {
   targets: number
   schedules: number
   resumes: number
   reminders: number
-}
-export function exportBackup(): string { return JSON.stringify(db, null, 2) }
+}export function exportBackup(): string { return JSON.stringify(db, null, 2) }
 
 /** 恢复前的内容预览：先把备份里有什么念给用户听，再让用户决定覆不覆盖本机。 */
-export function backupSummaryOf(json: string): { ok: boolean; message?: string; targets: number; schedules: number; resumes: number; reminders: number; reviews: number } {
+export function backupSummaryOf(json: string): { ok: boolean; message?: string; targets: number; schedules: number; resumes: number; reminders: number; reviews: number; logs: number } {
+  const zero = { targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0, logs: 0 }
   let parsed: unknown
-  try { parsed = JSON.parse(json) } catch { return { ok: false, message: '文件不是有效的 JSON，无法作为备份恢复', targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0 } }
+  try { parsed = JSON.parse(json) } catch { return { ok: false, message: '文件不是有效的 JSON，无法作为备份恢复', ...zero } }
   const raw = parsed as Partial<DbShape>
   if (!Array.isArray(raw?.targets) || !Array.isArray(raw?.schedules)) {
-    return { ok: false, message: '备份格式不正确（缺少目标/日程清单）', targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0 }
+    return { ok: false, message: '备份格式不正确（缺少目标/日程清单）', ...zero }
   }
   const reviews = (raw.schedules as Array<{ review?: unknown }>).filter((s) => typeof s.review === 'string' && s.review.trim()).length
   return {
@@ -600,6 +624,7 @@ export function backupSummaryOf(json: string): { ok: boolean; message?: string; 
     resumes: Array.isArray(raw.resumes) ? raw.resumes.length : 0,
     reminders: raw.reminders && typeof raw.reminders === 'object' ? Object.keys(raw.reminders).length : 0,
     reviews,
+    logs: Array.isArray(raw.interviewLogs) ? raw.interviewLogs.length : 0,
   }
 }
 

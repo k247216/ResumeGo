@@ -79,8 +79,8 @@ export async function runAutoBackup(): Promise<AutoBackupResult> {
   try {
     const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
     const json = exportBackup()
-    const parsed = JSON.parse(json) as { targets?: unknown[]; schedules?: unknown[]; resumes?: unknown[] }
-    const recordCount = (parsed.targets?.length ?? 0) + (parsed.schedules?.length ?? 0) + (parsed.resumes?.length ?? 0)
+    const parsed = JSON.parse(json) as { targets?: unknown[]; schedules?: unknown[]; resumes?: unknown[]; interviewLogs?: unknown[] }
+    const recordCount = (parsed.targets?.length ?? 0) + (parsed.schedules?.length ?? 0) + (parsed.resumes?.length ?? 0) + (parsed.interviewLogs?.length ?? 0)
     // 空库不落盘：备份一个空 JSON 只会让「保留 7 份」全是空壳，还可能覆盖损坏前的最后一份好数据。
     if (!recordCount) return { status: 'skipped', reason: 'empty' }
     try { await Filesystem.mkdir({ path: BACKUP_DIR, directory: Directory.External, recursive: true }) } catch { /* 已存在 */ }
