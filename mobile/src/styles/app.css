@@ -39,7 +39,7 @@
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent);
 
   /* 字阶刻度（收敛全站字号，最小 10.5px 保证可读）*/
-  --fs-display: 22px;   /* 页标题 */
+  --fs-display: 25px;   /* 页标题 */
   --fs-h1: 18px;        /* 英雄卡 / 空态主标 */
   --fs-h2: 16px;        /* Sheet 标题 */
   --fs-title: 15.5px;   /* 卡片标题 */
@@ -194,17 +194,35 @@ button { font-family: inherit; }
 .page-title {
   margin: 0;
   font-size: var(--fs-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.022em;
   color: var(--ink);
+}
+/* 标题末尾的品牌落款点：给静态页头一点产品气质；可点击改名的主标题（简历详情）不加 */
+h1.page-title:not(.clickable)::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--brand);
 }
 /* 简历标题默认取系统文件名，长度不可控：不收缩就会把右侧头像和操作按钮挤出屏幕。 */
 .page-head .page-title { min-width: 0; }
 .title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .page-sub {
-  margin: 2px 0 0;
-  font-size: var(--fs-caption);
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  letter-spacing: .01em;
   color: var(--muted);
+  text-wrap: balance;
+}
+/* 副行里的数字（份数/篇数/计划数）是用户真正关心的信息，用品牌色点出来 */
+.page-sub b {
+  color: var(--brand);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .icon-btn {
   display: grid;

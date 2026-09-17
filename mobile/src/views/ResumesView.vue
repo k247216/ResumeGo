@@ -175,8 +175,8 @@ function sourceLabel(log: InterviewLog): string {
   <div>
     <header class="page-head">
       <div class="grow">
-        <h1 class="page-title">我的装备</h1>
-        <p class="page-sub">简历递出去 · 面经带进场 · 只存本机</p>
+        <h1 class="page-title">我的资料</h1>
+        <p class="page-sub">简历与面经都只存本机 · <b>{{ resumes.length }}</b> 份简历 · <b>{{ interviewLogs.length }}</b> 篇面经</p>
       </div>
       <button v-if="tab === 'resumes'" class="icon-btn" aria-label="导入简历" :disabled="busy" @click="openPicker">
         <AppIcon name="upload" :size="18" />
