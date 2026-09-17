@@ -1,8 +1,9 @@
 import { reactive, watch } from 'vue'
-import type { InterviewLog, JobProject, StageEvent, TargetOutcome, TargetStage } from '../types/project'
-import { isTerminalStage, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
+import type { InterviewLog, JobProject, Milestone, MilestoneKind, StageEvent, TargetOutcome, TargetStage } from '../types/project'
+import { isTerminalStage, normalizeMilestoneKind, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
+import { compressImageToBlob } from './noteHtml'
 import { resumeMarkOf, type ResumeMarkName } from './resumeMark'
 import { normalizeNoteColor, normalizeNotePaper } from '../constants/noteColors'
 
@@ -76,13 +77,14 @@ interface DbShape {
   versions: ResumeFileVer[]
   reminders: Record<number, number>
   interviewLogs: InterviewLog[]
+  milestones: Milestone[]
   seq: number
 }
 
 function iso(d: Date): string { return d.toISOString() }
 
 function emptyDb(): DbShape {
-  return { seq: 0, reminders: {}, targets: [], stageEvents: [], schedules: [], resumes: [], versions: [], interviewLogs: [] }
+  return { seq: 0, reminders: {}, targets: [], stageEvents: [], schedules: [], resumes: [], versions: [], interviewLogs: [], milestones: [] }
 }
 
 /** 任意来源（本地存储 / 用户备份文件）都必须先归一，避免某个集合是 undefined 就让整页崩。 */
@@ -98,6 +100,7 @@ function normalizeDb(input: unknown): DbShape {
     resumes: saneItems(raw.resumes, () => true),
     versions: saneItems(raw.versions, (v) => saneId(v.resumeId) != null),
     interviewLogs: saneItems(raw.interviewLogs, (l) => typeof l.title === 'string' && !!l.title && typeof l.contentHtml === 'string'),
+    milestones: saneMilestones(raw.milestones),
     reminders: saneReminders(raw.reminders),
     seq: Number.isFinite(Number(raw.seq)) && Number(raw.seq) > 0 ? Number(raw.seq) : 0,
   }
@@ -136,6 +139,18 @@ function saneReminders(raw: unknown): Record<number, number> {
     if (id != null && Number.isFinite(minutes) && minutes > 0) out[id] = minutes
   }
   return out
+}
+/** 里程碑：标题必填、必须挂在某个目标下；kind / 图片 key / 日期逐字段兜底。 */
+function saneMilestones(list: unknown): Milestone[] {
+  return saneItems<Milestone>(list, (m) => typeof m.title === 'string' && !!m.title && saneId(m.targetId) != null).map((m) => ({
+    ...m,
+    targetId: m.targetId,
+    kind: normalizeMilestoneKind(m.kind) as MilestoneKind,
+    note: typeof m.note === 'string' ? m.note : '',
+    images: Array.isArray(m.images) ? m.images.filter((k): k is string => typeof k === 'string' && !!k) : [],
+    occurredAt: validDateString(m.occurredAt) ? m.occurredAt : iso(new Date()),
+    createdAt: validDateString(m.createdAt) ? m.createdAt : iso(new Date()),
+  }))
 }
 
 const PERSIST_DELAY_MS = 300
@@ -310,12 +325,16 @@ export function setTargetStatus(id: number, status: 'active' | 'archived') {
 export function schedulesOfTarget(id: number): ScheduleEvent[] {
   return db.schedules.filter((e) => e.jobProjectId === id).sort((a, b) => a.startTime.localeCompare(b.startTime))
 }
-export function deleteTarget(id: number): { removedScheduleIds: number[] } {
+export async function deleteTarget(id: number): Promise<{ removedScheduleIds: number[] }> {
   const removedScheduleIds = db.schedules.filter((e) => e.jobProjectId === id).map((e) => e.id)
   db.targets = db.targets.filter((x) => x.id !== id)
   db.stageEvents = db.stageEvents.filter((x) => x.targetId !== id)
   db.schedules = db.schedules.filter((e) => e.jobProjectId !== id)
   for (const scheduleId of removedScheduleIds) delete db.reminders[scheduleId]
+  // 连带清掉里程碑：记录从库里移除，截图本体从 IndexedDB 删掉，不留孤儿文件。
+  const gone = db.milestones.filter((m) => m.targetId === id)
+  db.milestones = db.milestones.filter((m) => m.targetId !== id)
+  await Promise.all(gone.flatMap((m) => m.images.map((k) => deleteFile(k))))
   return { removedScheduleIds }
 }
 export function updateApplication(id: number, payload: { industry?: string | null; role?: string | null; location?: string | null; notes?: string | null }) {
@@ -599,6 +618,42 @@ export function deleteInterviewLog(id: number) {
   persist()
 }
 
+// ── 里程碑（历程 / 荣誉墙）──
+export function listMilestones(targetId?: number): Milestone[] {
+  const all = [...db.milestones].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.id - a.id)
+  return targetId == null ? all : all.filter((m) => m.targetId === targetId)
+}
+export function createMilestone(input: { targetId: number; kind: MilestoneKind; title: string; note: string; images: string[]; occurredAt: string }): Milestone {
+  const now = iso(new Date())
+  const ms: Milestone = { id: nextId(), ...input, createdAt: now }
+  db.milestones.unshift(ms)
+  persist()
+  return ms
+}
+export function updateMilestone(id: number, patch: Partial<Pick<Milestone, 'kind' | 'title' | 'note' | 'images' | 'occurredAt'>>) {
+  const ms = db.milestones.find((m) => m.id === id)
+  if (!ms) return
+  Object.assign(ms, patch)
+  persist()
+}
+export async function deleteMilestone(id: number) {
+  const ms = db.milestones.find((m) => m.id === id)
+  db.milestones = db.milestones.filter((m) => m.id !== id)
+  persist()
+  if (ms) await Promise.all(ms.images.map((k) => deleteFile(k)))
+}
+/** 新截图先落 IndexedDB 再把 key 交给记录；失败返回 null 让调用方提示，而不是静默丢图。 */
+export async function saveMilestoneImage(file: File): Promise<string | null> {
+  try {
+    const blob = await compressImageToBlob(file)
+    const key = `ms-img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    await putFile(key, blob)
+    return key
+  } catch {
+    return null
+  }
+}
+
 // ── 备份 / 恢复 ──
 export interface RestoreSummary {
   targets: number
@@ -608,8 +663,8 @@ export interface RestoreSummary {
 }export function exportBackup(): string { return JSON.stringify(db, null, 2) }
 
 /** 恢复前的内容预览：先把备份里有什么念给用户听，再让用户决定覆不覆盖本机。 */
-export function backupSummaryOf(json: string): { ok: boolean; message?: string; targets: number; schedules: number; resumes: number; reminders: number; reviews: number; logs: number } {
-  const zero = { targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0, logs: 0 }
+export function backupSummaryOf(json: string): { ok: boolean; message?: string; targets: number; schedules: number; resumes: number; reminders: number; reviews: number; logs: number; milestones: number } {
+  const zero = { targets: 0, schedules: 0, resumes: 0, reminders: 0, reviews: 0, logs: 0, milestones: 0 }
   let parsed: unknown
   try { parsed = JSON.parse(json) } catch { return { ok: false, message: '文件不是有效的 JSON，无法作为备份恢复', ...zero } }
   const raw = parsed as Partial<DbShape>
@@ -625,6 +680,7 @@ export function backupSummaryOf(json: string): { ok: boolean; message?: string; 
     reminders: raw.reminders && typeof raw.reminders === 'object' ? Object.keys(raw.reminders).length : 0,
     reviews,
     logs: Array.isArray(raw.interviewLogs) ? raw.interviewLogs.length : 0,
+    milestones: Array.isArray(raw.milestones) ? raw.milestones.length : 0,
   }
 }
 

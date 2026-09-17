@@ -148,3 +148,34 @@ export interface InterviewLog {
   createdAt: string
   updatedAt: string
 }
+
+/**
+ * 里程碑：一条投递线上值得留证的瞬间——约面邮件、笔试通过、offer 电话截图。
+ * 截图本体存 IndexedDB（fileStore），记录里只存 key；JSON 备份不含图（与简历文件同理）。
+ */
+export type MilestoneKind = 'invite' | 'exam' | 'interview' | 'offer' | 'reject' | 'moment'
+
+export const MILESTONE_KINDS: Record<MilestoneKind, { label: string; color: string }> = {
+  invite: { label: '约面通知', color: '#4C6FFF' },
+  exam: { label: '笔试', color: '#F77234' },
+  interview: { label: '面试记录', color: '#168B68' },
+  offer: { label: 'Offer', color: '#D48806' },
+  reject: { label: '结果通知', color: '#B53C32' },
+  moment: { label: '其他时刻', color: '#989893' },
+}
+
+export function normalizeMilestoneKind(value: unknown): MilestoneKind {
+  return typeof value === 'string' && value in MILESTONE_KINDS ? (value as MilestoneKind) : 'moment'
+}
+
+export interface Milestone {
+  id: number
+  targetId: number
+  kind: MilestoneKind
+  title: string
+  note: string
+  /** 截图在 fileStore 里的 key 列表。 */
+  images: string[]
+  occurredAt: string
+  createdAt: string
+}

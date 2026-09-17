@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import TargetCard from '../components/TargetCard.vue'
 import Sheet from '../components/Sheet.vue'
 import StagePipeline from '../components/StagePipeline.vue'
@@ -9,18 +9,19 @@ import EmptyState from '../components/EmptyState.vue'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import {
-  createTarget, currentVersionOf, deleteTarget, getReminder, linkResume, listResumes, listSchedules, listStageEvents, listTargets,
-  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, reopenTarget, resumeLabel, restoreTarget,
-  setInterviewRound, setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, snapshotTarget,
+  createTarget, createMilestone, currentVersionOf, deleteMilestone, deleteTarget, getReminder, linkResume, listMilestones, listResumes, listSchedules, listStageEvents, listTargets,
+  interviewRoundOf, interviewRoundsOf, outcomeLabelOf, renameTarget, reopenTarget, resumeLabel, restoreTarget, saveMilestoneImage,
+  setInterviewRound, setInterviewRounds, setStage, setTargetOutcome, setTargetStatus, snapshotTarget, updateMilestone,
   stageEventsOf, schedulesOfTarget, updateApplication,
 } from '../data/store'
 import type { TargetSnapshot } from '../data/store'
+import { deleteFile, objectUrl } from '../data/fileStore'
 import { computeFunnel } from '../data/funnel'
 import { cancelReminder } from '../data/notifications'
 import { headEllipsis } from '../data/resumeFile'
 import { SCHEDULE_EVENT_TYPE_COLORS } from '../types/schedule'
-import type { JobProject, TargetOutcome, TargetStage } from '../types/project'
-import { TARGET_OUTCOME_LABELS, TARGET_STAGE_COLORS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage, stageFlowRank } from '../types/project'
+import type { JobProject, Milestone, MilestoneKind, TargetOutcome, TargetStage } from '../types/project'
+import { MILESTONE_KINDS, TARGET_OUTCOME_LABELS, TARGET_STAGE_COLORS, TARGET_STAGE_LABELS, isTerminalStage, normalizeTargetStage, stageFlowRank } from '../types/project'
 
 const search = ref('')
 const filter = ref<'all' | TargetStage | 'outcome' | 'archived'>('all')
@@ -251,7 +252,7 @@ async function doDelete(t: JobProject) {
     danger: true,
   })
   if (!ok) return
-  const { removedScheduleIds } = deleteTarget(t.id)
+  const { removedScheduleIds } = await deleteTarget(t.id)
   for (const scheduleId of removedScheduleIds) cancelReminder(scheduleId)
   menuTarget.value = null
   detailTarget.value = null
@@ -264,6 +265,122 @@ const resumeOptions = computed(() =>
     return v ? [{ value: v.id, label: `${headEllipsis(r.title, 14)} · V${v.versionNo}` }] : []
   }),
 )
+
+// ── 里程碑（历程 / 荣誉墙）──
+const detailMilestones = computed(() => (detailTarget.value ? listMilestones(detailTarget.value.id) : []))
+/** 截图本体在 IndexedDB：进详情后按需换 objectURL，键不在列表里就 revoke，避免泄漏。 */
+const msUrls = ref<Record<string, string>>({})
+async function loadMsUrls() {
+  const keys = detailMilestones.value.flatMap((m) => m.images)
+  for (const k of keys) {
+    if (msUrls.value[k]) continue
+    const u = await objectUrl(k)
+    if (u) msUrls.value[k] = u
+  }
+  for (const k of Object.keys(msUrls.value)) {
+    if (!keys.includes(k)) { URL.revokeObjectURL(msUrls.value[k]); delete msUrls.value[k] }
+  }
+}
+watch(detailMilestones, loadMsUrls)
+
+const msSheetOpen = ref(false)
+const msEditing = ref<Milestone | null>(null)
+const msForm = ref({ kind: 'invite' as MilestoneKind, title: '', note: '', occurredAt: '' })
+const msNewImages = ref<string[]>([])
+const msRemoveImages = ref<string[]>([])
+const msUploading = ref(false)
+const kindOptions = (Object.keys(MILESTONE_KINDS) as MilestoneKind[]).map((k) => ({ value: k, label: MILESTONE_KINDS[k].label }))
+
+function msDate(value: string): string {
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '—' : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+}
+function openMsCreate() {
+  msEditing.value = null
+  msForm.value = { kind: 'invite', title: '', note: '', occurredAt: new Date().toISOString().slice(0, 10) }
+  msNewImages.value = []
+  msRemoveImages.value = []
+  msSheetOpen.value = true
+}
+function openMsEdit(ms: Milestone) {
+  msEditing.value = ms
+  msForm.value = { kind: ms.kind, title: ms.title, note: ms.note, occurredAt: ms.occurredAt.slice(0, 10) }
+  msNewImages.value = []
+  msRemoveImages.value = []
+  msSheetOpen.value = true
+}
+function toggleRemoveImage(key: string) {
+  const i = msRemoveImages.value.indexOf(key)
+  if (i >= 0) msRemoveImages.value.splice(i, 1)
+  else msRemoveImages.value.push(key)
+}
+async function onMsFiles(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+  msUploading.value = true
+  for (const f of files) {
+    const key = await saveMilestoneImage(f)
+    if (key) {
+      msNewImages.value.push(key)
+      // 预览直接用本地 File 的 objectURL，不必从 IndexedDB 读回。
+      msUrls.value[key] = URL.createObjectURL(f)
+    } else {
+      toast('有一张截图处理失败，已跳过')
+    }
+  }
+  msUploading.value = false
+}
+/** 未保存就关掉编辑页时，把已落盘的新截图清掉，不留 IndexedDB 孤儿。 */
+function closeMsSheet() {
+  for (const k of msNewImages.value) {
+    URL.revokeObjectURL(msUrls.value[k] ?? '')
+    delete msUrls.value[k]
+    void deleteFile(k)
+  }
+  msNewImages.value = []
+  msSheetOpen.value = false
+}
+function saveMs() {
+  if (!detailTarget.value) return
+  const title = msForm.value.title.trim()
+  if (!title) { toast('请填写标题，如「约面邮件」'); return }
+  const day = new Date(`${msForm.value.occurredAt}T12:00:00`)
+  const occurredAt = Number.isNaN(day.getTime()) ? new Date().toISOString() : day.toISOString()
+  if (msEditing.value) {
+    const images = [...msEditing.value.images.filter((k) => !msRemoveImages.value.includes(k)), ...msNewImages.value]
+    updateMilestone(msEditing.value.id, { kind: msForm.value.kind, title, note: msForm.value.note, images, occurredAt })
+    for (const k of msRemoveImages.value) void deleteFile(k)
+    toast('里程碑已更新')
+  } else {
+    createMilestone({ targetId: detailTarget.value.id, kind: msForm.value.kind, title, note: msForm.value.note, images: [...msNewImages.value], occurredAt })
+    toast('已记下一程')
+  }
+  msNewImages.value = []
+  msRemoveImages.value = []
+  msSheetOpen.value = false
+}
+async function removeMilestone(ms: Milestone) {
+  const ok = await confirmAction({
+    title: `删除「${ms.title}」？`,
+    message: '这条里程碑和它的截图会被一起删除，不可恢复。',
+    confirmLabel: '删除',
+    danger: true,
+  })
+  if (!ok) return
+  await deleteMilestone(ms.id)
+  toast('已删除')
+}
+
+const viewer = ref<{ ms: Milestone; index: number } | null>(null)
+function openViewer(ms: Milestone, index: number) { viewer.value = { ms, index } }
+function viewerStep(d: number) {
+  if (!viewer.value) return
+  const n = viewer.value.ms.images.length
+  if (!n) return
+  viewer.value = { ms: viewer.value.ms, index: (viewer.value.index + d + n) % n }
+}
 const roundOptions = [1, 2, 3, 4, 5].map((value) => ({ value, label: `${value} 轮` }))
 const outcomeOptions: Array<{ value: TargetOutcome; label: string }> = [
   { value: 'pool', label: TARGET_OUTCOME_LABELS.pool },
@@ -439,6 +556,33 @@ function onLinkResume(versionId: number | null) {
         </div>
       </div>
 
+      <p class="section-kicker">历程 · 荣誉墙</p>
+      <div v-if="detailMilestones.length" class="ms-list">
+        <div v-for="ms in detailMilestones" :key="ms.id" class="ms-item">
+          <span class="ms-dot" :style="{ background: MILESTONE_KINDS[ms.kind].color }" />
+          <div class="ms-body">
+            <div class="ms-head">
+              <span class="ms-kind" :style="{ color: MILESTONE_KINDS[ms.kind].color, borderColor: MILESTONE_KINDS[ms.kind].color }">{{ MILESTONE_KINDS[ms.kind].label }}</span>
+              <span class="ms-title">{{ ms.title }}</span>
+              <span class="ms-date">{{ msDate(ms.occurredAt) }}</span>
+            </div>
+            <p v-if="ms.note" class="ms-note">{{ ms.note }}</p>
+            <div v-if="ms.images.length" class="ms-thumbs">
+              <template v-for="(k, i) in ms.images" :key="k">
+                <img v-if="msUrls[k]" :src="msUrls[k]" alt="里程碑截图" @click="openViewer(ms, i)">
+                <span v-else class="ms-thumb-loading" />
+              </template>
+            </div>
+            <div class="ms-ops">
+              <button class="btn-ghost btn-sm" @click="openMsEdit(ms)">编辑</button>
+              <button class="btn-ghost btn-sm" style="color: var(--danger)" @click="removeMilestone(ms)">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p v-else class="chip-meta">把约面邮件、笔试通过、offer 截图存进这条投递的时间线，回头翻就是一面荣誉墙。</p>
+      <button class="btn-ghost btn-sm ms-add" @click="openMsCreate">＋ 添加里程碑</button>
+
       <p class="section-kicker">绑定简历版本</p>
       <PickerField
         :model-value="detailTarget.resumeVersionId"
@@ -462,6 +606,58 @@ function onLinkResume(versionId: number | null) {
         <button class="btn-primary" @click="saveApplication">保存投递信息</button>
       </div>
     </Sheet>
+
+    <!-- 里程碑编辑 -->
+    <Sheet v-if="msSheetOpen" :title="msEditing ? '编辑里程碑' : '添加里程碑'" @close="closeMsSheet">
+      <p class="section-kicker">类型</p>
+      <PickerField
+        :model-value="msForm.kind"
+        :options="kindOptions"
+        label="选择里程碑类型"
+        title="选择类型"
+        icon="target"
+        @update:model-value="(v) => (msForm.kind = v as MilestoneKind)"
+      />
+      <div class="field"><label>标题</label><input v-model="msForm.title" placeholder="如：约面邮件 / 二面通过 / Offer call"></div>
+      <div class="field"><label>日期</label><input v-model="msForm.occurredAt" type="date"></div>
+      <div class="field"><label>备注（可选）</label><textarea v-model="msForm.note" placeholder="值得记住的细节：面试官说了什么、薪资多少…"></textarea></div>
+      <p class="section-kicker">截图</p>
+      <label class="ms-upload">
+        <input type="file" accept="image/*" multiple hidden @change="onMsFiles">
+        <AppIcon name="plus" :size="16" />
+        <span>{{ msUploading ? '处理中…' : '从相册选择截图（可多选）' }}</span>
+      </label>
+      <div v-if="msEditing && msEditing.images.length" class="ms-thumbs" style="margin-top:8px">
+        <template v-for="k in msEditing.images" :key="k">
+          <div class="ms-thumb-wrap" :class="{ removing: msRemoveImages.includes(k) }">
+            <img v-if="msUrls[k]" :src="msUrls[k]" alt="已有截图" @click="toggleRemoveImage(k)">
+            <span v-if="msRemoveImages.includes(k)" class="ms-thumb-x">将删除</span>
+          </div>
+        </template>
+      </div>
+      <div v-if="msNewImages.length" class="ms-thumbs" style="margin-top:8px">
+        <div v-for="k in msNewImages" :key="k" class="ms-thumb-wrap new">
+          <img :src="msUrls[k]" alt="新截图" @click="msNewImages = msNewImages.filter((x) => x !== k)">
+          <span class="ms-thumb-x">点击移除</span>
+        </div>
+      </div>
+      <p class="chip-meta" style="margin-top:6px">截图压缩后存本机，不会上传，也不会包含在 JSON 备份里（与简历文件同理）。</p>
+      <div class="sheet-actions">
+        <button class="btn-ghost" @click="msSheetOpen = false">取消</button>
+        <button class="btn-primary" :disabled="msUploading" @click="saveMs">{{ msEditing ? '保存' : '添加' }}</button>
+      </div>
+    </Sheet>
+
+    <!-- 全屏看图 -->
+    <div v-if="viewer" class="img-viewer" @click.self="viewer = null">
+      <img v-if="msUrls[viewer.ms.images[viewer.index]]" :src="msUrls[viewer.ms.images[viewer.index]]" alt="截图大图">
+      <div class="img-viewer-bar">
+        <button class="iv-nav" aria-label="上一张" @click="viewerStep(-1)">‹</button>
+        <span>{{ viewer.ms.title }} · {{ viewer.index + 1 }}/{{ viewer.ms.images.length }}</span>
+        <button class="iv-nav" aria-label="下一张" @click="viewerStep(1)">›</button>
+      </div>
+      <button class="img-viewer-close" aria-label="关闭" @click="viewer = null">✕</button>
+    </div>
 
     <!-- 求职漏斗统计 -->
     <Sheet v-if="statsOpen" title="求职漏斗" @close="statsOpen = false">

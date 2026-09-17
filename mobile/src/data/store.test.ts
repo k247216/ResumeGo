@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  backupSummaryOf, createInterviewLog, createSchedule, createTarget, currentVersionOf, deleteInterviewLog, deleteResume, deleteSchedule, deleteTarget, exportBackup, flushPersist, getReminder, getResume, importBackup, importResume,
-  interviewRoundOf, interviewRoundsOf, lastBackupAgeDays, listInterviewLogs, listResumes, listReviews, listReviewTags, listSchedules, listTargets, markBackupNow, reopenTarget, resetWorkspace, restoreTarget,
+  backupSummaryOf, createInterviewLog, createMilestone, createSchedule, createTarget, currentVersionOf, deleteInterviewLog, deleteMilestone, deleteResume, deleteSchedule, deleteTarget, exportBackup, flushPersist, getReminder, getResume, importBackup, importResume,
+  interviewRoundOf, interviewRoundsOf, lastBackupAgeDays, listInterviewLogs, listMilestones, listResumes, listReviews, listReviewTags, listSchedules, listTargets, markBackupNow, reopenTarget, resetWorkspace, restoreTarget,
   setInterviewRound, setInterviewRounds,
-  setReminder, setReviewTags, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateInterviewLog, updateSchedule, linkResume,
+  setReminder, setReviewTags, setScheduleReview, setStage, setTargetOutcome, setVersionNote, snapshotTarget, stageEventsOf, updateInterviewLog, updateMilestone, updateSchedule, linkResume,
   recordScheduleResult,
 } from './store'
 
@@ -159,12 +159,12 @@ function futureSchedule(title: string, jobProjectId: number | null) {
 }
 
 describe('删除与锁定的连带影响', () => {
-  it('删除求职目标会连带移除它的日程和提醒', () => {
+  it('删除求职目标会连带移除它的日程和提醒', async () => {
     const target = createTarget('级联删除测试')
     const event = futureSchedule('级联删除测试 一面', target.id)
     setReminder(event.id, 30)
 
-    const { removedScheduleIds } = deleteTarget(target.id)
+    const { removedScheduleIds } = await deleteTarget(target.id)
 
     expect(removedScheduleIds).toEqual([event.id])
     expect(listSchedules().some((e) => e.id === event.id)).toBe(false)
@@ -442,10 +442,10 @@ describe('阶段误触回退', () => {
     expect(stageEventsOf(t.id)).toHaveLength(eventsBefore)
   })
 
-  it('计划已被删除时撤销如实返回失败', () => {
+  it('计划已被删除时撤销如实返回失败', async () => {
     const t = createTarget('撤销前被删')
     const snap = snapshotTarget(t.id)!
-    deleteTarget(t.id)
+    await deleteTarget(t.id)
 
     expect(restoreTarget(snap)).toBe(false)
   })
@@ -551,5 +551,55 @@ describe('面经库', () => {
     expect(list.some((l) => l.id === 3)).toBe(false)
     // 清场，不污染其他用例
     for (const l of list) deleteInterviewLog(l.id)
+  })
+})
+
+describe('里程碑（历程 / 荣誉墙）', () => {
+  it('创建后按目标过滤列出，按发生时间倒序；更新与删除生效', async () => {
+    const t = createTarget('里程碑测试公司')
+    const early = createMilestone({ targetId: t.id, kind: 'invite', title: '约面邮件', note: '9 月 10 日约的一面', images: [], occurredAt: '2026-09-10T00:00:00.000Z' })
+    const late = createMilestone({ targetId: t.id, kind: 'offer', title: 'Offer call', note: '', images: ['k1'], occurredAt: '2026-09-15T00:00:00.000Z' })
+    const other = createMilestone({ targetId: t.id + 1000, kind: 'moment', title: '别家的', note: '', images: [], occurredAt: '2026-09-12T00:00:00.000Z' })
+
+    const mine = listMilestones(t.id)
+    expect(mine.map((m) => m.id)).toEqual([late.id, early.id])
+    expect(listMilestones().length).toBe(3)
+
+    updateMilestone(early.id, { kind: 'interview', title: '一面通过' })
+    expect(listMilestones(t.id).find((m) => m.id === early.id)?.title).toBe('一面通过')
+
+    await deleteMilestone(late.id)
+    expect(listMilestones().some((m) => m.id === late.id)).toBe(false)
+    await deleteMilestone(early.id)
+    await deleteMilestone(other.id)
+  })
+
+  it('删目标连带清掉它的里程碑', async () => {
+    const t = createTarget('连带删除测试')
+    createMilestone({ targetId: t.id, kind: 'offer', title: 'Offer 截图', note: '', images: [], occurredAt: '2026-09-14T00:00:00.000Z' })
+    await deleteTarget(t.id)
+    expect(listMilestones(t.id)).toHaveLength(0)
+  })
+
+  it('备份里的坏里程碑（无标题/无目标/坏 kind）导入时被剔除或兜底', () => {
+    const json = JSON.stringify({
+      targets: [], schedules: [], resumes: [], versions: [], reminders: {},
+      milestones: [
+        { id: 1, targetId: 1, kind: 'offer', title: '正常', note: '', images: ['a', 42, null], occurredAt: '2026-09-14T00:00:00.000Z', createdAt: '2026-09-14T00:00:00.000Z' },
+        { id: 2, targetId: 1, title: '没 kind 的应兜成 moment' },
+        { id: 3, targetId: 1, kind: 'offer', title: '' },
+        { id: 4, kind: 'offer', title: '没有 targetId' },
+      ],
+      seq: 4,
+    })
+    const r = importBackup(json)
+    expect(r.ok).toBe(true)
+    expect(backupSummaryOf(json).milestones).toBe(4)
+    const list = listMilestones()
+    expect(list.some((m) => m.id === 1 && m.images.length === 1)).toBe(true)
+    expect(list.find((m) => m.id === 2)?.kind).toBe('moment')
+    expect(list.some((m) => m.id === 3)).toBe(false)
+    expect(list.some((m) => m.id === 4)).toBe(false)
+    for (const m of list) void deleteMilestone(m.id)
   })
 })

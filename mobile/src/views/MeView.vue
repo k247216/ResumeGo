@@ -189,7 +189,7 @@ async function onImportFile(e: Event) {
   if (!summary.ok) { toast(summary.message ?? '备份无法识别'); return }
   const ok = await confirmAction({
     title: '用这份备份覆盖当前数据？',
-    message: `将恢复 ${summary.targets} 个目标 · ${summary.schedules} 条日程（含 ${summary.reviews} 篇心得） · ${summary.resumes} 份简历 · ${summary.reminders} 条提醒${summary.logs ? ` · ${summary.logs} 篇面经` : ''}。本机现有记录会被整体替换，此操作不可撤销。建议先导出一次备份。`,
+    message: `将恢复 ${summary.targets} 个目标 · ${summary.schedules} 条日程（含 ${summary.reviews} 篇心得） · ${summary.resumes} 份简历 · ${summary.reminders} 条提醒${summary.logs ? ` · ${summary.logs} 篇面经` : ''}${summary.milestones ? ` · ${summary.milestones} 条里程碑` : ''}。本机现有记录会被整体替换，此操作不可撤销。截图与简历文件不在备份内，换机后需重新上传。`,
     confirmLabel: '覆盖恢复',
     danger: true,
   })

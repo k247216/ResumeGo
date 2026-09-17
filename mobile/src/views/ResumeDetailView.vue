@@ -7,7 +7,7 @@ import ResumeMark from '../components/ResumeMark.vue'
 import Sheet from '../components/Sheet.vue'
 import {
   addResumeVersion, currentVersionOf, deleteResume, getResume, listTargets, renameResume,
-  setCurrentVersion, setVersionNote, versionsOf,
+  setCurrentVersion, setVersionNote, versionById, versionsOf,
 } from '../data/store'
 import { headEllipsis, humanSize, isSupportedResume, middleEllipsis, previewResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT, shareResumeFile, type ResumePreview } from '../data/resumeFile'
 import { shareErrorMessage, shareTargetName } from '../data/share'
@@ -15,7 +15,8 @@ import { appendPromptLine } from '../data/prompt'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { resumeMarkOf } from '../data/resumeMark'
-import { TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import { TARGET_STAGE_COLORS, TARGET_STAGE_LABELS, normalizeTargetStage } from '../types/project'
+import type { JobProject } from '../types/project'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,11 +26,23 @@ const resume = computed(() => getResume(resumeId))
 const versions = computed(() => versionsOf(resumeId))
 const current = computed(() => currentVersionOf(resumeId))
 
-/** 这份简历的任意版本被哪些求职目标绑定着——投递出去的痕迹，比版本号本身更有信息量。 */
+/**
+ * 这份简历的任意版本被哪些求职目标绑定着——投递出去的痕迹，比版本号本身更有信息量。
+ * 进行中的排前面，归档的沉底；同状态按最近更新倒序。
+ */
 const usedBy = computed(() => {
   const versionIds = new Set(versions.value.map((v) => v.id))
-  return listTargets().filter((t) => t.resumeVersionId != null && versionIds.has(t.resumeVersionId))
+  return listTargets()
+    .filter((t) => t.resumeVersionId != null && versionIds.has(t.resumeVersionId))
+    .sort((a, b) =>
+      (a.status === 'archived' ? 1 : 0) - (b.status === 'archived' ? 1 : 0)
+      || b.updatedAt.localeCompare(a.updatedAt))
 })
+/** 该目标绑的是这份简历的第几版，让「哪一版投了哪家」一眼可读。 */
+function versionNoOf(t: JobProject): string {
+  const v = t.resumeVersionId != null ? versionById(t.resumeVersionId) : undefined
+  return v ? `V${v.versionNo}` : '—'
+}
 
 const preview = ref<ResumePreview>({ kind: 'none' })
 const loading = ref(false)
@@ -207,16 +220,17 @@ function short(v: string): string {
       <span v-else class="note-empty">这一版投了什么岗位、改了什么，点一下写一句</span>
     </button>
 
-    <!-- 被哪些计划使用：绑定该简历任意版本的求职目标 -->
-    <section v-if="usedBy.length" class="resume-usedby" aria-label="被哪些计划使用">
-      <p class="section-kicker">被这些计划使用</p>
-      <div class="list">
+    <!-- 投递去向：绑定该简历任意版本的求职目标，走到哪一步一眼可读 -->
+    <section class="resume-usedby" aria-label="投递去向">
+      <p class="section-kicker">投递去向</p>
+      <div v-if="usedBy.length" class="list">
         <div v-for="t in usedBy" :key="t.id" class="setting-row" style="cursor: default">
-          <span class="event-type-dot" style="background: var(--brand)" />
-          <span class="s-label">{{ t.name }}</span>
-          <span class="s-value">{{ TARGET_STAGE_LABELS[normalizeTargetStage(t.stage)] }}</span>
+          <span class="event-type-dot" :style="{ background: TARGET_STAGE_COLORS[normalizeTargetStage(t.stage)] }" />
+          <span class="s-label">{{ t.name }}<small v-if="t.status === 'archived'" class="usedby-archived">已归档</small></span>
+          <span class="s-value">{{ versionNoOf(t) }} · {{ TARGET_STAGE_LABELS[normalizeTargetStage(t.stage)] }}</span>
         </div>
       </div>
+      <p v-else class="chip-meta">还没有求职计划绑定这份简历。在「目标」详情里绑定后，这里会显示它被投去了哪里、走到了哪一步。</p>
     </section>
 
     <!-- 预览：PDF 内嵌 / MD 渲染 / 缺失兜底 -->

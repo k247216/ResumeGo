@@ -100,3 +100,12 @@ export async function compressImageToDataUrl(file: File, maxDim = 1280, quality 
   bitmap.close()
   return canvas.toDataURL('image/jpeg', quality)
 }
+
+/**
+ * 同上，但产出 Blob：截图存 IndexedDB（fileStore）时用 Blob，不必背着 base64 的 33% 膨胀。
+ */
+export async function compressImageToBlob(file: File, maxDim = 1280, quality = 0.72): Promise<Blob> {
+  const dataUrl = await compressImageToDataUrl(file, maxDim, quality)
+  const res = await fetch(dataUrl)
+  return await res.blob()
+}

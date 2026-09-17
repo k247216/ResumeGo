@@ -2052,3 +2052,35 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .pb-iv-label { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
 .pb-iv-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .pb-iv-list li { font-size: 12.5px; line-height: 1.55; color: var(--copy); }
+
+/* ── 里程碑（历程 / 荣誉墙）── */
+.ms-list { display: grid; gap: 12px; }
+.ms-item { position: relative; display: flex; gap: 10px; }
+.ms-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; }
+.ms-item::before { content: ''; position: absolute; left: 4px; top: 18px; bottom: -14px; width: 2px; border-radius: 1px; background: var(--line); }
+.ms-item:last-child::before { display: none; }
+.ms-body { flex: 1; min-width: 0; background: var(--panel-2, var(--panel)); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.ms-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ms-kind { flex: none; font-size: 10.5px; font-weight: 700; line-height: 1; padding: 4px 7px; border: 1px solid; border-radius: 999px; }
+.ms-title { font-size: 13.5px; font-weight: 600; color: var(--copy); min-width: 0; overflow-wrap: anywhere; }
+.ms-date { margin-left: auto; font-size: 11px; color: var(--muted); flex: none; }
+.ms-note { margin: 6px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--copy); opacity: .85; overflow-wrap: anywhere; }
+.ms-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ms-thumbs img, .ms-thumb-loading { width: 76px; height: 76px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); background: var(--panel); }
+.ms-thumb-loading { display: inline-block; }
+.ms-thumb-wrap { position: relative; width: 76px; height: 76px; }
+.ms-thumb-wrap img { width: 100%; height: 100%; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); cursor: pointer; }
+.ms-thumb-wrap.removing img { opacity: .35; }
+.ms-thumb-x { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 9.5px; color: #fff; background: rgba(0, 0, 0, .55); border-radius: 6px; padding: 1px 0; pointer-events: none; }
+.ms-ops { display: flex; gap: 8px; margin-top: 8px; }
+.ms-add { margin-top: 10px; }
+.usedby-archived { margin-left: 6px; font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 5px; vertical-align: 1px; }
+.ms-upload { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 0; border: 1.5px dashed var(--line); border-radius: 12px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.ms-upload:active { border-color: var(--brand); color: var(--brand); }
+
+/* ── 全屏看图 ── */
+.img-viewer { position: fixed; inset: 0; z-index: 90; background: rgba(8, 10, 12, .92); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.img-viewer img { max-width: 100%; max-height: calc(100% - 64px); object-fit: contain; border-radius: 8px; }
+.img-viewer-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); color: #fff; font-size: 13px; }
+.iv-nav { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .35); background: transparent; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
+.img-viewer-close { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 14px; width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(255, 255, 255, .14); color: #fff; font-size: 15px; cursor: pointer; }
