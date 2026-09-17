@@ -6,7 +6,7 @@ import EmptyState from '../components/EmptyState.vue'
 import ResumeMark from '../components/ResumeMark.vue'
 import Sheet from '../components/Sheet.vue'
 import {
-  addResumeVersion, currentVersionOf, deleteResume, getResume, listTargets, renameResume,
+  addResumeVersion, currentVersionOf, deleteResume, getResume, linkResume, listTargets, renameResume,
   setCurrentVersion, setVersionNote, versionById, versionsOf,
 } from '../data/store'
 import { headEllipsis, humanSize, isSupportedResume, middleEllipsis, previewResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT, shareResumeFile, type ResumePreview } from '../data/resumeFile'
@@ -31,17 +31,47 @@ const current = computed(() => currentVersionOf(resumeId))
  * 进行中的排前面，归档的沉底；同状态按最近更新倒序。
  */
 const usedBy = computed(() => {
-  const versionIds = new Set(versions.value.map((v) => v.id))
+  const versionIds = versionIdsOfResume.value
   return listTargets()
     .filter((t) => t.resumeVersionId != null && versionIds.has(t.resumeVersionId))
     .sort((a, b) =>
       (a.status === 'archived' ? 1 : 0) - (b.status === 'archived' ? 1 : 0)
       || b.updatedAt.localeCompare(a.updatedAt))
 })
+const versionIdsOfResume = computed(() => new Set(versions.value.map((v) => v.id)))
+/** 还能绑定的目标：没绑过任何简历的，或绑的是别的简历的。 */
+const bindableTargets = computed(() => {
+  const ids = versionIdsOfResume.value
+  return listTargets().filter((t) => t.resumeVersionId == null || !ids.has(t.resumeVersionId))
+})
 /** 该目标绑的是这份简历的第几版，让「哪一版投了哪家」一眼可读。 */
 function versionNoOf(t: JobProject): string {
   const v = t.resumeVersionId != null ? versionById(t.resumeVersionId) : undefined
   return v ? `V${v.versionNo}` : '—'
+}
+
+// ── 投递去向编辑：切到当前版 / 解绑 / 绑新目标 ──
+const bindOpen = ref(false)
+function useCurrentVersion(t: JobProject) {
+  if (!current.value) return
+  linkResume(t.id, current.value.id)
+  toast(`已把「${t.name}」换到当前版本`)
+}
+async function unbindTarget(t: JobProject) {
+  const ok = await confirmAction({
+    title: '解除绑定？',
+    message: `「${t.name}」将不再关联这份简历的任何版本。`,
+    confirmLabel: '解绑',
+  })
+  if (!ok) return
+  linkResume(t.id, null)
+  toast('已解除绑定')
+}
+function bindToCurrent(t: JobProject) {
+  if (!current.value) { toast('这份简历还没有任何版本'); return }
+  linkResume(t.id, current.value.id)
+  bindOpen.value = false
+  toast(`已绑定到「${t.name}」`)
 }
 
 const preview = ref<ResumePreview>({ kind: 'none' })
@@ -220,18 +250,38 @@ function short(v: string): string {
       <span v-else class="note-empty">这一版投了什么岗位、改了什么，点一下写一句</span>
     </button>
 
-    <!-- 投递去向：绑定该简历任意版本的求职目标，走到哪一步一眼可读 -->
+    <!-- 投递去向：绑定该简历任意版本的求职目标，可切版本 / 解绑 / 绑新目标 -->
     <section class="resume-usedby" aria-label="投递去向">
-      <p class="section-kicker">投递去向</p>
+      <div class="usedby-head">
+        <p class="section-kicker">投递去向</p>
+        <button v-if="current" class="btn-ghost btn-sm" @click="bindOpen = true"><AppIcon name="plus" :size="13" /> 绑定目标</button>
+      </div>
       <div v-if="usedBy.length" class="list">
-        <div v-for="t in usedBy" :key="t.id" class="setting-row" style="cursor: default">
+        <div v-for="t in usedBy" :key="t.id" class="setting-row usedby-row">
           <span class="event-type-dot" :style="{ background: TARGET_STAGE_COLORS[normalizeTargetStage(t.stage)] }" />
           <span class="s-label">{{ t.name }}<small v-if="t.status === 'archived'" class="usedby-archived">已归档</small></span>
           <span class="s-value">{{ versionNoOf(t) }} · {{ TARGET_STAGE_LABELS[normalizeTargetStage(t.stage)] }}</span>
+          <span class="usedby-ops">
+            <button v-if="t.resumeVersionId !== current?.id" class="btn-ghost btn-sm" @click="useCurrentVersion(t)">设为当前版</button>
+            <button class="btn-ghost btn-sm usedby-unbind" @click="unbindTarget(t)">解绑</button>
+          </span>
         </div>
       </div>
-      <p v-else class="chip-meta">还没有求职计划绑定这份简历。在「目标」详情里绑定后，这里会显示它被投去了哪里、走到了哪一步。</p>
+      <p v-else class="chip-meta">还没有求职计划绑定这份简历。点右上角「绑定目标」，或到目标详情里绑定后，这里会显示它被投去了哪里。</p>
     </section>
+
+    <!-- 绑定新目标 -->
+    <Sheet v-if="bindOpen" title="绑定求职目标" @close="bindOpen = false">
+      <p class="theme-intro">选一个目标，把它绑到当前版本（V{{ current?.versionNo }}）上；之后这份简历的投递记录就会在这里出现。</p>
+      <div v-if="bindableTargets.length" class="list">
+        <button v-for="t in bindableTargets" :key="t.id" class="setting-row" @click="bindToCurrent(t)">
+          <span class="event-type-dot" :style="{ background: TARGET_STAGE_COLORS[normalizeTargetStage(t.stage)] }" />
+          <span class="s-label">{{ t.name }}</span>
+          <span class="s-value">{{ TARGET_STAGE_LABELS[normalizeTargetStage(t.stage)] }}</span>
+        </button>
+      </div>
+      <p v-else class="chip-meta">所有目标都已经绑了简历。先去解绑，或新建一个求职目标。</p>
+    </Sheet>
 
     <!-- 预览：PDF 内嵌 / MD 渲染 / 缺失兜底 -->
     <div class="doc-stage">

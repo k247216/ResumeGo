@@ -13,6 +13,11 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- 状态栏/导航栏融入应用画布色：顶部不再有灰色条，整屏视觉铺满 -->
+        <item name="android:statusBarColor">@color/zhida_canvas</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/zhida_canvas</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
 

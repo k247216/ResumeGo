@@ -30,6 +30,24 @@ describe('面经解析', () => {
     expect(r.questions[0]).toContain('？')
   })
 
+  it('问题按启发式分类：手撕/项目/场景/八股，cats 与 questions 平行', () => {
+    const raw = [
+      '一面',
+      '手写一个 LRU 缓存？',
+      '你简历上这个项目最难的地方在哪？',
+      '如果线上出现 OOM 你怎么排查？',
+      '讲讲 HashMap 的底层实现？',
+    ].join('\n')
+    const r = parseInterview(raw)
+    expect(r.cats).toEqual(['coding', 'project', 'scene', 'rote'])
+    expect(r.cats).toHaveLength(r.questions.length)
+  })
+
+  it('没有手撕/项目/场景特征的问题默认归八股', () => {
+    const r = parseInterview('线程安全的集合有哪些？')
+    expect(r.cats).toEqual(['rote'])
+  })
+
   it('站点水词行被整行剔除，正文不动', () => {
     const raw = ['一面', '下载App查看更多', '关注公众号领资料', '真问题是这个。', '回复'].join('\n')
     const r = parseInterview(raw)
@@ -54,6 +72,6 @@ describe('面经解析', () => {
   })
 
   it('空输入返回空结构', () => {
-    expect(parseInterview('')).toEqual({ html: '', rounds: 0, questions: [] })
+    expect(parseInterview('')).toEqual({ html: '', rounds: 0, questions: [], cats: [] })
   })
 })

@@ -88,11 +88,30 @@ const visible = computed(() => {
   })
 })
 
-function stageTimesOf(t: JobProject) {
-  const map: Partial<Record<TargetStage, string>> = {}
+/**
+ * 时间轴每个节点的时间，按节点 key 记录（applied/exam/interview-1/interview-2/hr/offer）。
+ * 阶段时间来自 stageEvents；「每一面」的独立时间来自该计划的笔试/面试日程——
+ * 按开始时间顺序对号入座：笔试 → 笔试节点，面试 → 1面/2面/…逐个排。
+ */
+function stageTimesOf(t: JobProject): Record<string, string> {
+  const map: Record<string, string> = {}
+  const day = (value: string): string => {
+    const d = new Date(value)
+    return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()}`
+  }
   for (const ev of stageEventsOf(t.id)) {
-    const d = new Date(ev.occurredAt)
-    map[ev.stage] = `${d.getMonth() + 1}月${d.getDate()}日`
+    const d = day(ev.occurredAt)
+    if (d) map[ev.stage] = d
+  }
+  let round = 0
+  for (const s of schedulesOfTarget(t.id)) {
+    const d = day(s.startTime)
+    if (!d) continue
+    if (s.eventType === 'exam') map.exam = d
+    else if (s.eventType === 'interview') {
+      round += 1
+      map[`interview-${round}`] = d
+    }
   }
   return map
 }
@@ -556,7 +575,12 @@ function onLinkResume(versionId: number | null) {
         </div>
       </div>
 
-      <p class="section-kicker">历程 · 荣誉墙</p>
+      <div class="ms-cere-head">
+        <span class="ms-cere-line" />
+        <p class="section-kicker">历程 · 荣誉墙</p>
+        <span class="ms-cere-line" />
+      </div>
+      <p v-if="detailMilestones.length" class="ms-cere-count">沿途留下的 {{ detailMilestones.length }} 个时刻</p>
       <div v-if="detailMilestones.length" class="ms-list">
         <div v-for="ms in detailMilestones" :key="ms.id" class="ms-item">
           <span class="ms-dot" :style="{ background: MILESTONE_KINDS[ms.kind].color }" />

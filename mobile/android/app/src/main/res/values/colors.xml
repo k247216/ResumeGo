@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用画布色：状态栏/导航栏与 WebView 背景同色，视觉上整屏铺满，
+         后台任务卡片顶部不再出现灰色条。 -->
+    <color name="zhida_canvas">#F4F6F5</color>
+</resources>

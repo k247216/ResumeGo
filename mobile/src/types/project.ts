@@ -149,10 +149,26 @@ export interface InterviewLog {
   contentHtml: string
   /** 解析出的问题原文，供战前速览直接引用。 */
   questions: string[]
+  /** 与 questions 平行的题型分类（questionCats[i] 对应 questions[i]），阅读器按类分组展示。 */
+  questionCats?: QuestionCat[]
   /** 阅读器里勾了「真的被问到」的问题下标——面经从一篇文章变成可对照的真题册。 */
   asked?: number[]
   createdAt: string
   updatedAt: string
+}
+
+/** 题型分类（解析器启发式判定）：八股 / 场景 / 手撕算法 / 项目拷打。 */
+export type QuestionCat = 'rote' | 'scene' | 'coding' | 'project'
+
+export const QUESTION_CATS: Record<QuestionCat, { label: string; color: string }> = {
+  rote: { label: '八股', color: '#4C6FFF' },
+  scene: { label: '场景', color: '#9A5CF5' },
+  coding: { label: '手撕', color: '#E2582E' },
+  project: { label: '项目拷打', color: '#168B68' },
+}
+
+export function normalizeQuestionCat(value: unknown): QuestionCat {
+  return typeof value === 'string' && value in QUESTION_CATS ? (value as QuestionCat) : 'rote'
 }
 
 /**

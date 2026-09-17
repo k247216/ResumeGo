@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
-import type { InterviewLog, JobProject, Milestone, MilestoneKind, StageEvent, TargetOutcome, TargetStage } from '../types/project'
-import { isTerminalStage, normalizeMilestoneKind, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
+import type { InterviewLog, JobProject, Milestone, MilestoneKind, QuestionCat, StageEvent, TargetOutcome, TargetStage } from '../types/project'
+import { isTerminalStage, normalizeMilestoneKind, normalizeQuestionCat, normalizeTargetStage, stageFlowRank, TARGET_OUTCOME_LABELS, TARGET_STAGE_LABELS } from '../types/project'
 import type { ScheduleEvent, ScheduleEventType } from '../types/schedule'
 import { deleteFile, putFile } from './fileStore'
 import { compressImageToBlob } from './noteHtml'
@@ -140,7 +140,7 @@ function saneReminders(raw: unknown): Record<number, number> {
   }
   return out
 }
-/** 面经：标题+正文必填；来源 / 日程关联 / 已问勾选逐字段兜底，坏数据不进运行时。 */
+/** 面经：标题+正文必填；来源 / 日程关联 / 已问勾选 / 题型分类逐字段兜底，坏数据不进运行时。 */
 function saneInterviewLogs(list: unknown): InterviewLog[] {
   return saneItems<InterviewLog>(list, (l) => typeof l.title === 'string' && !!l.title && typeof l.contentHtml === 'string').map((l) => ({
     ...l,
@@ -148,6 +148,10 @@ function saneInterviewLogs(list: unknown): InterviewLog[] {
     scheduleId: saneId(l.scheduleId),
     source: l.source === 'self' ? 'self' : 'imported',
     asked: Array.isArray(l.asked) ? l.asked.filter((n): n is number => Number.isInteger(n) && n >= 0) : [],
+    // 分类必须和问题一一平行：缺失/错位时按题数补默认值，绝不让阅读器拿到错位下标
+    questionCats: Array.isArray(l.questionCats) && l.questionCats.length === (Array.isArray(l.questions) ? l.questions.length : 0)
+      ? l.questionCats.map(normalizeQuestionCat)
+      : Array.isArray(l.questions) ? l.questions.map(() => 'rote' as const) : [],
   }))
 }
 /** 里程碑：标题必填、必须挂在某个目标下；kind / 图片 key / 日期逐字段兜底。 */
@@ -610,10 +614,11 @@ export async function deleteResumeVersion(resumeId: number, versionId: number) {
 export function listInterviewLogs(): InterviewLog[] {
   return [...db.interviewLogs].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
-export function createInterviewLog(title: string, targetId: number | null, contentHtml: string, rounds: number, questions: string[], opts: { source?: 'self' | 'imported'; scheduleId?: number | null } = {}): InterviewLog {
+export function createInterviewLog(title: string, targetId: number | null, contentHtml: string, rounds: number, questions: string[], opts: { source?: 'self' | 'imported'; scheduleId?: number | null; questionCats?: QuestionCat[] } = {}): InterviewLog {
   const now = iso(new Date())
   const log: InterviewLog = {
     id: nextId(), title, targetId, rounds, questionCount: questions.length, contentHtml, questions,
+    questionCats: opts.questionCats ?? questions.map(() => 'rote' as const),
     source: opts.source ?? 'imported', scheduleId: opts.scheduleId ?? null, asked: [],
     createdAt: now, updatedAt: now,
   }
@@ -621,7 +626,7 @@ export function createInterviewLog(title: string, targetId: number | null, conte
   persist()
   return log
 }
-export function updateInterviewLog(id: number, patch: Partial<Pick<InterviewLog, 'title' | 'targetId' | 'contentHtml' | 'rounds' | 'questions' | 'questionCount' | 'source' | 'scheduleId' | 'asked'>>) {
+export function updateInterviewLog(id: number, patch: Partial<Pick<InterviewLog, 'title' | 'targetId' | 'contentHtml' | 'rounds' | 'questions' | 'questionCount' | 'source' | 'scheduleId' | 'asked' | 'questionCats'>>) {
   const log = db.interviewLogs.find((l) => l.id === id)
   if (!log) return
   Object.assign(log, patch, { updatedAt: iso(new Date()) })

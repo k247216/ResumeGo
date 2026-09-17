@@ -13,7 +13,8 @@ const props = defineProps<{
   /** 双列布局的紧凑模式：图标缩小、阶段名只留当前节点、页脚收起——宽度减半时必须做取舍。 */
   compact?: boolean
   resumeLabel?: string | null
-  stageTimes?: Partial<Record<TargetStage, string>>
+  /** 时间按节点 key 记录（applied/exam/interview-1/…/hr/offer），每一面独立。 */
+  stageTimes?: Record<string, string>
 }>()
 const emit = defineEmits<{
   (e: 'open'): void
@@ -70,7 +71,7 @@ function recentLabel(): string {
     <StagePipeline :stage="stage" :times="stageTimes" :locked="locked" :mini="compact" :interview-rounds="target.interviewRounds" :interview-round="target.interviewRound" @change="(s) => emit('stage', s)" @round="(r) => emit('round', r)" />
 
     <div class="chip-row">
-      <button v-if="resumeLabel" class="chip" @click.stop="emit('open')"><AppIcon name="file" :size="14" /> {{ resumeLabel }}</button>
+      <button v-if="resumeLabel" class="chip" @click.stop="emit('open')"><AppIcon name="file" :size="14" /> <span class="chip-text">{{ resumeLabel }}</span></button>
       <button v-else class="chip dashed" @click.stop="emit('link-resume')"><AppIcon name="plus" :size="13" /> 绑定简历</button>
       <span v-if="locked && !compact" class="chip-meta">已标记「{{ outcomeLabelOf(target) }}」· 锁定</span>
     </div>

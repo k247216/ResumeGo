@@ -15,6 +15,7 @@ import { resumeMarkOf } from '../data/resumeMark'
 import { parseInterview } from '../data/interviewParse'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
+import { QUESTION_CATS, type QuestionCat } from '../types/project'
 import type { InterviewLog } from '../types/project'
 
 const router = useRouter()
@@ -139,10 +140,10 @@ function saveIv() {
   if (ivEditing.value) {
     // 问题清单变了，旧的「问过」勾选按新题数截断，防止越界勾选
     const asked = (ivEditing.value.asked ?? []).filter((i) => i < parsed.questions.length)
-    updateInterviewLog(ivEditing.value.id, { title, targetId, scheduleId, source: ivForm.value.source, contentHtml: parsed.html, rounds: parsed.rounds, questions: parsed.questions, questionCount: parsed.questions.length, asked })
+    updateInterviewLog(ivEditing.value.id, { title, targetId, scheduleId, source: ivForm.value.source, contentHtml: parsed.html, rounds: parsed.rounds, questions: parsed.questions, questionCats: parsed.cats, questionCount: parsed.questions.length, asked })
     toast('面经已更新')
   } else {
-    createInterviewLog(title, targetId, parsed.html, parsed.rounds, parsed.questions, { source: ivForm.value.source, scheduleId })
+    createInterviewLog(title, targetId, parsed.html, parsed.rounds, parsed.questions, { source: ivForm.value.source, scheduleId, questionCats: parsed.cats })
     toast(`已收录 · ${parsed.rounds} 轮 · ${parsed.questions.length} 个问题`)
   }
   ivSheetOpen.value = false
@@ -169,6 +170,28 @@ function toggleAsked(log: InterviewLog, index: number) {
 function sourceLabel(log: InterviewLog): string {
   return (log.source ?? 'imported') === 'self' ? '自记' : '搬运'
 }
+
+// ── 题目清单：按题型分组（八股/场景/手撕/项目），每道题独立成卡，先看类型再看题 ──
+const READER_CAT_ORDER: QuestionCat[] = ['rote', 'scene', 'coding', 'project']
+const readerCatSummary = computed(() => {
+  const log = ivReader.value
+  if (!log) return []
+  const cats = log.questionCats ?? log.questions.map(() => 'rote' as QuestionCat)
+  const counts = new Map<QuestionCat, number>()
+  for (const c of cats) counts.set(c, (counts.get(c) ?? 0) + 1)
+  return READER_CAT_ORDER.filter((c) => counts.has(c)).map((c) => ({ cat: c, count: counts.get(c)! }))
+})
+const readerGroups = computed(() => {
+  const log = ivReader.value
+  if (!log) return []
+  const cats = log.questionCats ?? log.questions.map(() => 'rote' as QuestionCat)
+  return READER_CAT_ORDER
+    .map((cat) => ({
+      cat,
+      items: log.questions.map((text, index) => ({ text, index })).filter((q) => cats[q.index] === cat),
+    }))
+    .filter((g) => g.items.length > 0)
+})
 </script>
 
 <template>
@@ -300,19 +323,27 @@ function sourceLabel(log: InterviewLog): string {
         <button class="icon-btn" aria-label="编辑面经" @click="openIvEdit(ivReader)"><AppIcon name="edit" :size="16" /></button>
       </div>
       <article class="ivr-paper" v-html="ivReader.contentHtml"></article>
-      <div v-if="ivReader.questions.length" class="ivr-questions">
+      <!-- 题目清单：每道题独立成卡、按题型分组，问过的打勾 -->
+      <div v-if="ivReader.questions.length" class="ivr-qlist">
         <div class="ivrq-head">
-          <strong>问题打卡</strong>
-          <span>真的被问到的勾一下 · {{ askedOf(ivReader).length }}/{{ ivReader.questions.length }}</span>
+          <strong>题目清单</strong>
+          <span>被问到的打勾 · {{ askedOf(ivReader).length }}/{{ ivReader.questions.length }}</span>
         </div>
-        <button
-          v-for="(q, i) in ivReader.questions" :key="i"
-          class="ivrq-item" :class="{ hit: askedOf(ivReader).includes(i) }"
-          @click="toggleAsked(ivReader, i)"
-        >
-          <span class="ivrq-box"><AppIcon v-if="askedOf(ivReader).includes(i)" name="check" :size="11" /></span>
-          <span class="ivrq-text">{{ q }}</span>
-        </button>
+        <div class="ivrq-cats">
+          <span v-for="c in readerCatSummary" :key="c.cat" class="ivrq-cat-chip" :style="{ color: QUESTION_CATS[c.cat].color }">{{ QUESTION_CATS[c.cat].label }} {{ c.count }}</span>
+        </div>
+        <template v-for="group in readerGroups" :key="group.cat">
+          <p class="ivrq-group-label" :style="{ color: QUESTION_CATS[group.cat].color }">{{ QUESTION_CATS[group.cat].label }}<em>{{ group.items.length }} 题</em></p>
+          <button
+            v-for="q in group.items" :key="q.index"
+            class="ivq-card" :class="{ hit: askedOf(ivReader).includes(q.index) }"
+            @click="toggleAsked(ivReader, q.index)"
+          >
+            <span class="ivq-no" :style="{ color: QUESTION_CATS[group.cat].color, borderColor: QUESTION_CATS[group.cat].color }">{{ q.index + 1 }}</span>
+            <span class="ivq-text">{{ q.text }}</span>
+            <span class="ivq-mark"><AppIcon v-if="askedOf(ivReader).includes(q.index)" name="check" :size="11" /></span>
+          </button>
+        </template>
       </div>
       <div class="ivr-foot">
         <span class="ivr-meta">{{ sourceLabel(ivReader) }} · {{ ivReader.rounds }} 轮 · {{ ivReader.questionCount }} 个问题</span>

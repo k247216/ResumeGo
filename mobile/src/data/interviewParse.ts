@@ -1,4 +1,5 @@
 import { escapeHtml } from './noteHtml'
+import type { QuestionCat } from '../types/project'
 
 /**
  * 面经解析：把从贴吧/牛客/脉脉复制来的原始文本，清洗排版成可读的纸面文章。
@@ -12,6 +13,8 @@ export interface ParsedInterview {
   rounds: number
   /** 识别出的问题（以 ？/? 结尾的行，去重保序）。 */
   questions: string[]
+  /** 与 questions 平行的题型分类（启发式）：八股 / 场景 / 手撕算法 / 项目拷打。 */
+  cats: QuestionCat[]
 }
 
 /**
@@ -25,6 +28,22 @@ const ROUND_HEAD = /^[\s#*\-·]*(?:【|\[)?\s*((?:[一二三四五六]|1|2|3|4|5
 
 /** 中文标点收尾的判定：合并断行时，句尾才算一段结束。 */
 const SENTENCE_END = /[。！？!?…：:」』）)」"]$/
+
+/**
+ * 题型分类规则（按序命中即止）：手撕最明确（写代码/算法），其次是项目拷打
+ * （问「你的项目」），再次是场景题（假设性排查/设计），剩下的默认归八股——
+ * 搬运面经里的问题绝大多数是概念/原理/对比类，兜底方向别错。
+ */
+const CAT_RULES: Array<[QuestionCat, RegExp]> = [
+  ['coding', /手撕|手写|写一?(?:个|道|段|下)|实现一?(?:个|道|下)|算法题|反转|链表|二叉树|动态规划|\bDP\b|leetcode|LC\s?\d|LRU|快排|堆排|top\s?k|two\s?sum|滑动窗口|双指针/i],
+  ['project', /项目(?:里|中|上|经历)?|简历(?:上|里|中)?(?:的|这个)|实习(?:期间|经历)?|你负责|你做的|你参与|你主导|你的(?:角色|贡献|难点|收获)|难点是什么|亮点|碰到(?:的|过)(?:什么|最大)(?:难|问题)/],
+  ['scene', /场景题|线上(?:问题|环境|事故|故障)|生产环境|排查|定位问题|如果|假如|万一|怎么处理|如何解决|怎么办|怎么优化|如何排查|设计方案|设计一?个|高并发|内存溢出|OOM|慢查询|cpu\s?飙高|服务雪崩|缓存(?:击穿|穿透|雪崩)/i],
+]
+
+export function classifyQuestion(q: string): QuestionCat {
+  for (const [cat, re] of CAT_RULES) if (re.test(q)) return cat
+  return 'rote'
+}
 
 function isJunk(line: string): boolean {
   return JUNK_LINE.test(line.trim())
@@ -73,11 +92,12 @@ export function parseInterview(raw: string): ParsedInterview {
     else sections.push({ head: '', paras: [line] })
   }
   if (sections.length === 1 && sections[0].head === '') sections[0].head = '正文'
-  if (!sections.length) return { html: '', rounds: 0, questions: [] }
+  if (!sections.length) return { html: '', rounds: 0, questions: [], cats: [] }
 
   // 问题抽取：以 ？/? 结尾的行；列表页和战前速览用。去重按「去问号」的键——
   // 全角半角转写是搬运面经时的常见噪声，不算新问题。
   const questions: string[] = []
+  const cats: QuestionCat[] = []
   const seen = new Set<string>()
   for (const line of merged) {
     if (/[？?]$/.test(line) && line.length >= 6) {
@@ -85,6 +105,7 @@ export function parseInterview(raw: string): ParsedInterview {
       if (seen.has(key)) continue
       seen.add(key)
       questions.push(line)
+      cats.push(classifyQuestion(line))
     }
   }
 
@@ -93,5 +114,5 @@ export function parseInterview(raw: string): ParsedInterview {
     const paras = sec.paras.map((p) => `<p>${escapeHtml(p)}</p>`).join('')
     return `<section class="iv-sec">${head}${paras}</section>`
   }).join('')
-  return { html: secHtml, rounds: sections.filter((s) => s.head !== '正文').length || 1, questions }
+  return { html: secHtml, rounds: sections.filter((s) => s.head !== '正文').length || 1, questions, cats }
 }
