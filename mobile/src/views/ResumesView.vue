@@ -12,7 +12,7 @@ import {
 } from '../data/store'
 import { headEllipsis, humanSize, isSupportedResume, RESUME_FILE_ACCEPT, RESUME_UNSUPPORTED_HINT } from '../data/resumeFile'
 import { resumeMarkOf } from '../data/resumeMark'
-import { parseInterview } from '../data/interviewParse'
+import { parseInterviewMany } from '../data/interviewParse'
 import { toast } from '../data/toast'
 import { confirmAction } from '../data/confirm'
 import { QUESTION_CATS, type QuestionCat } from '../types/project'
@@ -70,7 +70,8 @@ const ivSheetOpen = ref(false)
 const ivEditing = ref<InterviewLog | null>(null)
 const ivReader = ref<InterviewLog | null>(null)
 const ivForm = ref({ title: '', link: '', raw: '', source: 'imported' as 'self' | 'imported' })
-const ivPreview = computed(() => (ivForm.value.raw.trim() ? parseInterview(ivForm.value.raw) : null))
+/** 一次粘贴也可能包含多篇面经（再次出现「一面/笔试」就算新的一篇），保存时逐篇建档。 */
+const ivParsedList = computed(() => (ivForm.value.raw.trim() ? parseInterviewMany(ivForm.value.raw) : []))
 
 /** 关联首选日程：日程自带公司与「第几面」，面经才能逐条对上；只选计划则是整线共享。 */
 const ivLinkOptions = computed(() => {
@@ -131,20 +132,25 @@ function saveIv() {
   const title = ivForm.value.title.trim()
   const raw = ivForm.value.raw.trim()
   if (!title || !raw) return
-  const parsed = parseInterview(raw)
-  if (!parsed.html) {
+  const valid = ivParsedList.value.filter((p) => p.html)
+  if (!valid.length) {
     toast('粘贴的内容没有可用的正文')
     return
   }
   const { targetId, scheduleId } = resolveIvLink(ivForm.value.link)
   if (ivEditing.value) {
+    const p = valid[0]
     // 问题清单变了，旧的「问过」勾选按新题数截断，防止越界勾选
-    const asked = (ivEditing.value.asked ?? []).filter((i) => i < parsed.questions.length)
-    updateInterviewLog(ivEditing.value.id, { title, targetId, scheduleId, source: ivForm.value.source, contentHtml: parsed.html, rounds: parsed.rounds, questions: parsed.questions, questionCats: parsed.cats, questionCount: parsed.questions.length, asked })
+    const asked = (ivEditing.value.asked ?? []).filter((i) => i < p.questions.length)
+    updateInterviewLog(ivEditing.value.id, { title, targetId, scheduleId, source: ivForm.value.source, contentHtml: p.html, rounds: p.rounds, questions: p.questions, questionCats: p.cats, questionCount: p.questions.length, asked })
     toast('面经已更新')
   } else {
-    createInterviewLog(title, targetId, parsed.html, parsed.rounds, parsed.questions, { source: ivForm.value.source, scheduleId, questionCats: parsed.cats })
-    toast(`已收录 · ${parsed.rounds} 轮 · ${parsed.questions.length} 个问题`)
+    valid.forEach((p, i) => {
+      const name = valid.length > 1 ? `${title} · 第${i + 1}篇` : title
+      createInterviewLog(name, targetId, p.html, p.rounds, p.questions, { source: ivForm.value.source, scheduleId, questionCats: p.cats })
+    })
+    const total = valid.reduce((n, p) => n + p.questions.length, 0)
+    toast(valid.length > 1 ? `识别出 ${valid.length} 篇面经，已分别建档 · 共 ${total} 题` : `已收录 · ${valid[0].rounds} 轮 · ${valid[0].questions.length} 个问题`)
   }
   ivSheetOpen.value = false
 }
@@ -160,19 +166,18 @@ async function removeIv(log: InterviewLog) {
   ivReader.value = null
   toast('面经已删除')
 }
-/** 阅读器的问题打卡：被问到的勾一下，这篇面经就从「看过」升级成「对照过的真题册」。 */
-function askedOf(log: InterviewLog): number[] { return log.asked ?? [] }
-function toggleAsked(log: InterviewLog, index: number) {
-  const cur = askedOf(log)
-  const next = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index]
-  updateInterviewLog(log.id, { asked: next })
-}
 function sourceLabel(log: InterviewLog): string {
   return (log.source ?? 'imported') === 'self' ? '自记' : '搬运'
 }
 
-// ── 题目清单：按题型分组（八股/场景/手撕/项目），每道题独立成卡，先看类型再看题 ──
+// ── 题目清单：按原文顺序逐题展示，每题带题型角标（八股/场景/手撕/项目），不做任何勾选 ──
 const READER_CAT_ORDER: QuestionCat[] = ['rote', 'scene', 'coding', 'project']
+const readerQuestions = computed(() => {
+  const log = ivReader.value
+  if (!log) return []
+  const cats = log.questionCats ?? log.questions.map(() => 'rote' as QuestionCat)
+  return log.questions.map((text, i) => ({ no: i + 1, text, cat: cats[i] ?? ('rote' as QuestionCat) }))
+})
 const readerCatSummary = computed(() => {
   const log = ivReader.value
   if (!log) return []
@@ -180,17 +185,6 @@ const readerCatSummary = computed(() => {
   const counts = new Map<QuestionCat, number>()
   for (const c of cats) counts.set(c, (counts.get(c) ?? 0) + 1)
   return READER_CAT_ORDER.filter((c) => counts.has(c)).map((c) => ({ cat: c, count: counts.get(c)! }))
-})
-const readerGroups = computed(() => {
-  const log = ivReader.value
-  if (!log) return []
-  const cats = log.questionCats ?? log.questions.map(() => 'rote' as QuestionCat)
-  return READER_CAT_ORDER
-    .map((cat) => ({
-      cat,
-      items: log.questions.map((text, index) => ({ text, index })).filter((q) => cats[q.index] === cat),
-    }))
-    .filter((g) => g.items.length > 0)
 })
 </script>
 
@@ -262,7 +256,7 @@ const readerGroups = computed(() => {
             <AppIcon v-else name="book" :size="22" />
             <span class="iv-copy">
               <strong>{{ log.title }}<em class="iv-src" :class="(log.source ?? 'imported') === 'self' ? 'self' : 'imp'">{{ sourceLabel(log) }}</em></strong>
-              <small>{{ log.rounds }} 轮 · {{ log.questionCount }} 题<template v-if="ivTargetName(log)"> · {{ ivTargetName(log) }}</template><template v-if="askedOf(log).length"> · 已打卡 {{ askedOf(log).length }}/{{ log.questionCount }}</template></small>
+              <small>{{ log.rounds }} 轮 · {{ log.questionCount }} 题<template v-if="ivTargetName(log)"> · {{ ivTargetName(log) }}</template></small>
             </span>
             <time>{{ ivDate(log.createdAt) }}</time>
           </span>
@@ -308,7 +302,7 @@ const readerGroups = computed(() => {
       <div class="field">
         <label>粘贴面经原文</label>
         <textarea v-model="ivForm.raw" class="iv-paste" rows="10" placeholder="从牛客 / 脉脉 / 贴吧复制面经原文，粘到这里——轮次、问题清单会自动识别排版。"></textarea>
-        <p v-if="ivPreview" class="iv-hint">已识别 {{ ivPreview.rounds }} 轮 · {{ ivPreview.questions.length }} 个问题，保存后自动排版</p>
+        <p v-if="ivParsedList.length" class="iv-hint">{{ ivParsedList.length > 1 ? `识别出 ${ivParsedList.length} 篇面经，保存时会分别建档` : `已识别 ${ivParsedList[0].rounds} 轮 · ${ivParsedList[0].questions.length} 个问题，保存后自动排版` }}</p>
       </div>
       <div class="sheet-actions">
         <button class="btn-primary" :disabled="!ivForm.title.trim() || !ivForm.raw.trim()" @click="saveIv">保存</button>
@@ -323,27 +317,20 @@ const readerGroups = computed(() => {
         <button class="icon-btn" aria-label="编辑面经" @click="openIvEdit(ivReader)"><AppIcon name="edit" :size="16" /></button>
       </div>
       <article class="ivr-paper" v-html="ivReader.contentHtml"></article>
-      <!-- 题目清单：每道题独立成卡、按题型分组，问过的打勾 -->
+      <!-- 题目清单：按原文顺序逐题展示，每题带题型角标 -->
       <div v-if="ivReader.questions.length" class="ivr-qlist">
         <div class="ivrq-head">
           <strong>题目清单</strong>
-          <span>被问到的打勾 · {{ askedOf(ivReader).length }}/{{ ivReader.questions.length }}</span>
+          <span>按原文顺序 · 共 {{ ivReader.questions.length }} 题</span>
         </div>
         <div class="ivrq-cats">
           <span v-for="c in readerCatSummary" :key="c.cat" class="ivrq-cat-chip" :style="{ color: QUESTION_CATS[c.cat].color }">{{ QUESTION_CATS[c.cat].label }} {{ c.count }}</span>
         </div>
-        <template v-for="group in readerGroups" :key="group.cat">
-          <p class="ivrq-group-label" :style="{ color: QUESTION_CATS[group.cat].color }">{{ QUESTION_CATS[group.cat].label }}<em>{{ group.items.length }} 题</em></p>
-          <button
-            v-for="q in group.items" :key="q.index"
-            class="ivq-card" :class="{ hit: askedOf(ivReader).includes(q.index) }"
-            @click="toggleAsked(ivReader, q.index)"
-          >
-            <span class="ivq-no" :style="{ color: QUESTION_CATS[group.cat].color, borderColor: QUESTION_CATS[group.cat].color }">{{ q.index + 1 }}</span>
-            <span class="ivq-text">{{ q.text }}</span>
-            <span class="ivq-mark"><AppIcon v-if="askedOf(ivReader).includes(q.index)" name="check" :size="11" /></span>
-          </button>
-        </template>
+        <div v-for="q in readerQuestions" :key="q.no" class="ivq-card">
+          <span class="ivq-no" :style="{ color: QUESTION_CATS[q.cat].color, borderColor: QUESTION_CATS[q.cat].color }">{{ q.no }}</span>
+          <span class="ivq-text">{{ q.text }}</span>
+          <span class="ivq-tag" :style="{ color: QUESTION_CATS[q.cat].color }">{{ QUESTION_CATS[q.cat].label }}</span>
+        </div>
       </div>
       <div class="ivr-foot">
         <span class="ivr-meta">{{ sourceLabel(ivReader) }} · {{ ivReader.rounds }} 轮 · {{ ivReader.questionCount }} 个问题</span>

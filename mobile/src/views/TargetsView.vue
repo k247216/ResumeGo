@@ -90,8 +90,8 @@ const visible = computed(() => {
 
 /**
  * 时间轴每个节点的时间，按节点 key 记录（applied/exam/interview-1/interview-2/hr/offer）。
- * 阶段时间来自 stageEvents；「每一面」的独立时间来自该计划的笔试/面试日程——
- * 按开始时间顺序对号入座：笔试 → 笔试节点，面试 → 1面/2面/…逐个排。
+ * 阶段时间来自 stageEvents（推进轮次时会记一条带 round 的事件——每一面完成的那天）；
+ * 日程里的笔试/面试按 startTime 顺序对号入座并覆盖——排期日期比「推进状态的那天」更准确。
  */
 function stageTimesOf(t: JobProject): Record<string, string> {
   const map: Record<string, string> = {}
@@ -101,7 +101,9 @@ function stageTimesOf(t: JobProject): Record<string, string> {
   }
   for (const ev of stageEventsOf(t.id)) {
     const d = day(ev.occurredAt)
-    if (d) map[ev.stage] = d
+    if (!d) continue
+    if (ev.stage === 'interview' && ev.round) map[`interview-${ev.round}`] = d
+    else if (ev.stage !== 'interview') map[ev.stage] = d
   }
   let round = 0
   for (const s of schedulesOfTarget(t.id)) {
@@ -570,7 +572,7 @@ function onLinkResume(versionId: number | null) {
       <div class="list">
         <div v-for="ev in [...stageEventsOf(detailTarget.id)].reverse()" :key="ev.id" class="setting-row" style="cursor: default">
           <span class="event-type-dot" :style="{ background: 'var(--brand)' }" />
-          <span class="s-label">{{ TARGET_STAGE_LABELS[ev.stage] }}</span>
+          <span class="s-label">{{ ev.stage === 'interview' && ev.round ? `第 ${ev.round} 面完成` : TARGET_STAGE_LABELS[ev.stage] }}</span>
           <span class="s-value">{{ new Date(ev.occurredAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
         </div>
       </div>

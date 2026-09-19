@@ -438,18 +438,24 @@ h1.page-title:not(.clickable)::after {
 .pipeline.serp .pipeline-item.link-r::after { left: calc(50% + 8px); right: calc(-50% + 8px); }
 .pipeline.serp .pipeline-item.link-l::after { right: calc(50% + 8px); left: calc(-50% + 8px); }
 .pipeline.serp .pipeline-item.filled::after { background: color-mix(in srgb, var(--brand) 40%, transparent); }
+/* 拐弯线走「括弧」路线：从圆点右缘向右 → 沿卡片右缘向下 → 绕回下一行圆点，
+   全程避开节点自己的标签和时间文字（直穿会压字）。 */
 .pipeline.serp .pipeline-item.elbow::before {
   content: '';
   position: absolute;
   z-index: 0;
-  top: 11px;
-  height: calc(100% + 24px);
-  left: calc(50% - 1px);
-  width: 2px;
-  border-radius: 1px;
-  background: var(--line-subtle);
+  top: 9px;
+  bottom: -24px;
+  left: calc(50% + 7px);
+  right: -5px;
+  border-top: 2px solid var(--line-subtle);
+  border-right: 2px solid var(--line-subtle);
+  border-bottom: 2px solid var(--line-subtle);
+  border-radius: 0 9px 9px 0;
 }
-.pipeline.serp .pipeline-item.elbow.filled::before { background: color-mix(in srgb, var(--brand) 40%, transparent); }
+.pipeline.serp .pipeline-item.elbow.filled::before {
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+}
 .pipeline.serp .node { padding: 5px 0 0; min-height: 30px; gap: 2px; }
 .pipeline.serp .node .dot { width: 11px; height: 11px; }
 .pipeline.serp .node-label { font-size: 9.5px; }
@@ -1975,7 +1981,7 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .reader-enter-from, .reader-leave-to { opacity: 0; transform: translateY(14px); }
 
 /* ── 复盘统计环 ── */
-.review-stats { padding: 0; overflow: hidden; }
+.review-stats { padding: 0; overflow: hidden; margin-bottom: 14px; }
 /* 合并卡内两个折叠区的分隔线：与卡内 14px 边距同口径 */
 .rs-divider { height: 1px; margin: 0 14px; background: var(--line-subtle); }
 .rs-toggle {
@@ -2118,13 +2124,11 @@ button:disabled, .btn-ghost:disabled { opacity: .5; cursor: not-allowed; transfo
 .ivrq-group-label { display: flex; align-items: baseline; gap: 6px; margin: 12px 0 6px; font-size: 11.5px; font-weight: 700; }
 .ivrq-group-label:first-of-type { margin-top: 4px; }
 .ivrq-group-label em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--muted); }
-.ivq-card { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 9px 10px; border: 1px solid var(--line-subtle); border-radius: 11px; background: var(--surface-subtle); font: inherit; text-align: left; cursor: pointer; }
+.ivq-card { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 9px 10px; border: 1px solid var(--line-subtle); border-radius: 11px; background: var(--surface-subtle); }
 .ivq-card + .ivq-card { margin-top: 6px; }
 .ivq-no { flex: none; width: 18px; height: 18px; margin-top: 1px; display: grid; place-items: center; border: 1.5px solid; border-radius: 6px; font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ivq-text { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.6; color: var(--copy); }
-.ivq-mark { flex: none; width: 17px; height: 17px; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; color: #fff; }
-.ivq-card.hit { border-color: var(--brand); background: var(--brand-soft); }
-.ivq-card.hit .ivq-mark { background: var(--brand); border-color: var(--brand); }
+.ivq-tag { flex: none; font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 7px; margin-top: 2px; border-radius: 999px; background: color-mix(in srgb, currentColor 9%, transparent); }
 
 /* ── 战前速览的面经真题 ── */
 .pb-iv-label { margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }

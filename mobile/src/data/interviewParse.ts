@@ -69,16 +69,13 @@ function mergeWrapped(lines: string[]): string[] {
   return out
 }
 
-export function parseInterview(raw: string): ParsedInterview {
-  const lines = (raw ?? '')
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !isJunk(l))
-  const merged = mergeWrapped(lines)
+type Sec = { head: string; paras: string[] }
 
-  // 按轮次标题切段；没有任何标题就整体作一段「正文」。
-  type Sec = { head: string; paras: string[] }
+/** 轮次标题里的「流程起点」：再次出现它且当前篇已有内容，就视为新的一篇面经。
+ * 只认 一面/1面——笔试/二面可以是单篇内的合法顺序，不能当切分点。 */
+const FLOW_START = /^一\s*面$|^1\s*面$/
+
+function buildSections(merged: string[]): Sec[] {
   const sections: Sec[] = []
   for (const line of merged) {
     const m = ROUND_HEAD.exec(line)
@@ -92,6 +89,10 @@ export function parseInterview(raw: string): ParsedInterview {
     else sections.push({ head: '', paras: [line] })
   }
   if (sections.length === 1 && sections[0].head === '') sections[0].head = '正文'
+  return sections
+}
+
+function parseSections(sections: Sec[]): ParsedInterview {
   if (!sections.length) return { html: '', rounds: 0, questions: [], cats: [] }
 
   // 问题抽取：以 ？/? 结尾的行；列表页和战前速览用。去重按「去问号」的键——
@@ -99,8 +100,9 @@ export function parseInterview(raw: string): ParsedInterview {
   const questions: string[] = []
   const cats: QuestionCat[] = []
   const seen = new Set<string>()
-  for (const line of merged) {
-    if (/[？?]$/.test(line) && line.length >= 6) {
+  for (const sec of sections) {
+    for (const line of [...(sec.head ? [sec.head] : []), ...sec.paras]) {
+      if (!/[？?]$/.test(line) || line.length < 6) continue
       const key = line.replace(/[?？\s]+$/, '')
       if (seen.has(key)) continue
       seen.add(key)
@@ -115,4 +117,38 @@ export function parseInterview(raw: string): ParsedInterview {
     return `<section class="iv-sec">${head}${paras}</section>`
   }).join('')
   return { html: secHtml, rounds: sections.filter((s) => s.head !== '正文').length || 1, questions, cats }
+}
+
+/**
+ * 一次粘贴多篇面经的切分：再次出现「一面 / 1面 / 笔试」这类流程起点、
+ * 且当前篇已有内容时，就认为是新的一篇——用户整页复制多个公司的面经也能逐篇建档。
+ */
+export function parseInterviewMany(raw: string): ParsedInterview[] {
+  const lines = (raw ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !isJunk(l))
+  const merged = mergeWrapped(lines)
+  const sections = buildSections(merged)
+
+  const interviews: Sec[][] = []
+  let current: Sec[] = []
+  let sawRounds = false
+  for (const sec of sections) {
+    if (sec.head && FLOW_START.test(sec.head) && sawRounds && current.length) {
+      interviews.push(current)
+      current = []
+    }
+    if (sec.head) sawRounds = true
+    current.push(sec)
+  }
+  if (current.length) interviews.push(current)
+  // 只有一篇（或没有任何轮次标题）时，整体作为一篇返回
+  if (interviews.length <= 1) return [parseSections(sections)]
+  return interviews.map(parseSections)
+}
+
+export function parseInterview(raw: string): ParsedInterview {
+  return parseInterviewMany(raw)[0] ?? { html: '', rounds: 0, questions: [], cats: [] }
 }

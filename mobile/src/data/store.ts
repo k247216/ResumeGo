@@ -376,7 +376,14 @@ export function setInterviewRounds(id: number, rounds: number): TargetMutationRe
 export function setInterviewRound(id: number, round: number): TargetMutationResult {
   const t = db.targets.find((x) => x.id === id); if (!t) return { ok: false, message: '目标不存在' }
   const locked = targetMutationLock(t); if (locked) return locked
-  t.interviewRound = normalizeInterviewRound(round, interviewRoundsOf(t))
+  const prev = interviewRoundOf(t)
+  const next = normalizeInterviewRound(round, interviewRoundsOf(t))
+  t.interviewRound = next
+  // 每一面都是独立结果：推进到第 N 面的那一刻，就是第 N-1 面完成的时间——
+  // 给完成的轮次记一条带 round 的事件，时间轴上的「N面」才有自己的日期。
+  if (next > prev) {
+    db.stageEvents.push({ id: nextId(), targetId: id, stage: 'interview', round: prev, occurredAt: iso(new Date()) })
+  }
   t.updatedAt = iso(new Date())
   return { ok: true }
 }

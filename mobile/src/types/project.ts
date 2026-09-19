@@ -126,6 +126,8 @@ export interface StageEvent {
   id: number
   stage: TargetStage
   occurredAt: string
+  /** stage 为 interview 时对应第几面：推进轮次的那一刻即为上一面的完成时间，时间轴每面才有独立日期。 */
+  round?: number
 }
 
 /**

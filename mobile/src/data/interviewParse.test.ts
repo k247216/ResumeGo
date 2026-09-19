@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseInterview } from './interviewParse'
+import { parseInterview, parseInterviewMany } from './interviewParse'
 
 describe('面经解析', () => {
   it('按轮次标题分段，段落转义后进 HTML', () => {
@@ -46,6 +46,30 @@ describe('面经解析', () => {
   it('没有手撕/项目/场景特征的问题默认归八股', () => {
     const r = parseInterview('线程安全的集合有哪些？')
     expect(r.cats).toEqual(['rote'])
+  })
+
+  it('一次粘贴多篇面经：再次出现「一面/笔试」就切分成两篇，各自独立解析', () => {
+    const raw = [
+      '一面', '字节问了很多基础。', '讲讲 HashMap 的底层实现？', '二面', '字节二面聊设计。',
+      '一面', '腾讯主要手撕。', '手写一个 LRU 缓存？',
+    ].join('\n')
+    const list = parseInterviewMany(raw)
+    expect(list).toHaveLength(2)
+    expect(list[0].rounds).toBe(2)
+    expect(list[0].questions).toEqual(['讲讲 HashMap 的底层实现？'])
+    expect(list[1].rounds).toBe(1)
+    expect(list[1].questions).toEqual(['手写一个 LRU 缓存？'])
+    expect(list[1].cats).toEqual(['coding'])
+  })
+
+  it('单篇面经（含二面三面）不会被误切', () => {
+    const raw = ['一面', 'x？', '二面', 'y？', '三面', 'z？'].join('\n')
+    expect(parseInterviewMany(raw)).toHaveLength(1)
+  })
+
+  it('parseInterview 保留单篇语义（多篇时取第一篇）', () => {
+    const raw = ['一面', '介绍一下你的项目经验？', '一面', '讲讲你的实习经历？'].join('\n')
+    expect(parseInterview(raw).questions).toEqual(['介绍一下你的项目经验？'])
   })
 
   it('站点水词行被整行剔除，正文不动', () => {
